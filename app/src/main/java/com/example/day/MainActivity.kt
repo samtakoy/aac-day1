@@ -7,41 +7,41 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.day.ui.theme.Day1Theme
+import com.example.day.app.MyApp
+import com.example.day.app.di.LocalAppComponent
+import com.example.day.core.feature_entries.FeatureEntry
+import com.example.day.core.feature_entries.find
+import com.example.day.features.console.api.ConsoleFeatureEntry
+import com.example.day.core.ui.theme.Day1Theme
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val appComponent = (application as MyApp).appComponent
+        val featureEntries = appComponent.getFeatureEntries()
+        val mainEntry = featureEntries.find<ConsoleFeatureEntry>()
+
         enableEdgeToEdge()
         setContent {
             Day1Theme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                CompositionLocalProvider(LocalAppComponent provides appComponent) {
+                    MainUi(mainEntry)
                 }
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    Day1Theme {
-        Greeting("Android")
+    @Composable
+    private fun MainUi(mainEntry: FeatureEntry) {
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            mainEntry.ComposableEntryPoint(
+                modifier = Modifier.padding(innerPadding)
+            )
+        }
     }
 }
