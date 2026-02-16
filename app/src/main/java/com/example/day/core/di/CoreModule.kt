@@ -4,6 +4,7 @@ import dagger.Module
 import dagger.Provides
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
+import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
@@ -15,9 +16,10 @@ import javax.inject.Singleton
 interface CoreModule {
     companion object {
         @Provides
-        @Singleton // ОБЯЗАТЕЛЬНО: чтобы не плодить клиенты
+        @Singleton
         fun provideJson(): Json = Json {
             ignoreUnknownKeys = true
+            coerceInputValues = true
             isLenient = true
             prettyPrint = true
         }
@@ -29,6 +31,7 @@ interface CoreModule {
                 install(ContentNegotiation) {
                     json(json)
                 }
+                install(HttpCache)
                 install(Logging) {
                     level = LogLevel.BODY
                 }

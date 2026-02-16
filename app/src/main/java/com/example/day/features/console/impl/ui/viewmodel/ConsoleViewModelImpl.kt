@@ -30,10 +30,6 @@ internal class ConsoleViewModelImpl(
         )
     )
 
-    init {
-        requestUseCase.exec()
-    }
-
     override fun getStateAsFlow(): StateFlow<State> = _state
 
     override fun onEvent(event: ConsoleViewModel.Event) {
@@ -42,19 +38,19 @@ internal class ConsoleViewModelImpl(
                 _state.update { it.copy(inputInitialValue = event.text) }
             }
             is ConsoleViewModel.Event.SubmitButtonClick -> {
-                sendRequest()
+                sendRequest(event.inputText)
             }
         }
     }
 
-    private fun sendRequest() {
+    private fun sendRequest(inputText: String) {
         _state.update { it.copy(response = "waiting...", type = State.Type.Loading) }
         launchCatching(
             onError = { error ->
                 _state.update { it.copy(response = error.stackTraceToString(), type = State.Type.Error) }
             }
         ) {
-            requestUseCase.exec()
+            requestUseCase.exec(inputText)
                 .onSuccess { result ->
                     _state.update { it.copy(response = result, type = State.Type.Data) }
                 }

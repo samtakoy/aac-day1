@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -12,6 +14,11 @@ android {
         version = release(36)
     }
 
+    val localProperties = Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) load(file.inputStream())
+    }
+
     defaultConfig {
         applicationId = "com.example.day"
         minSdk = 24
@@ -20,6 +27,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Читаем ключ из файла, если его нет — ставим пустую строку
+        val apiKey = localProperties.getProperty("LLM_API_KEY") ?: ""
+
+        // Создаем поле в BuildConfig
+        buildConfigField("String", "LLM_API_KEY", "\"$apiKey\"")
     }
 
     buildTypes {
@@ -40,6 +53,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

@@ -7,7 +7,7 @@ import javax.inject.Inject
 internal class LlmRepositoryImpl @Inject constructor(
     private val api: RemoteLlmApi
 ) : LlmRepository {
-    override fun test() {
-
+    override suspend fun sendRequest(prompt: String): Result<String> {
+        return api.sendRequest(prompt)
     }
 }

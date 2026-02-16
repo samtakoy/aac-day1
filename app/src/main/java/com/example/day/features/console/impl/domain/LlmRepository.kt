@@ -1,5 +1,5 @@
 package com.example.day.features.console.impl.domain
 
 internal interface LlmRepository {
-    fun test()
+    suspend fun sendRequest(prompt: String): Result<String>
 }
