@@ -41,6 +41,8 @@ internal class LlmRequestUseCase @Inject constructor(
     }
 
     companion object {
+        // upstage/solar-pro-3:free
+        // stepfun/step-3.5-flash:free
         const val DEFAULT_MODEL = "z-ai/glm-4.5-air:free"
         private val SYSTEM_PROMPT = ModelRequest.Message(
             role = ModelRequest.Role.System,

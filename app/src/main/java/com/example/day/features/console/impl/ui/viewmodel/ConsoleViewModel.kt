@@ -1,6 +1,8 @@
 package com.example.day.features.console.impl.ui.viewmodel
 
 import androidx.compose.runtime.Immutable
+import com.example.day.core.ui.uikit.chat.bar.model.ChatBarUiModel
+import com.example.day.core.ui.uikit.chat.list.model.ChatListUiModel
 import kotlinx.coroutines.flow.StateFlow
 
 @Immutable
@@ -9,20 +11,12 @@ internal interface ConsoleViewModel {
     fun onEvent(event: Event)
 
     data class State(
-        val inputInitialValue: String,
-        val response: String,
-        val type: Type
-    ) {
-        @Immutable
-        sealed interface Type {
-            object Loading : Type
-            object Data: Type
-            object Error: Type
-        }
-    }
+        val chatList: ChatListUiModel,
+        val chatBar: ChatBarUiModel
+    )
 
     sealed interface Event {
-        class SubmitButtonClick(val inputText: String) : Event
+        object SubmitButtonClick : Event
         class InputChanged(val text: String) : Event
     }
 }

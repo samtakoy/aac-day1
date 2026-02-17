@@ -16,6 +16,7 @@ import com.example.day.core.feature_entries.FeatureEntry
 import com.example.day.core.feature_entries.find
 import com.example.day.features.console.api.ConsoleFeatureEntry
 import com.example.day.core.ui.theme.Day1Theme
+import com.example.day.features.chats.api.ChatsFeatureEntry
 
 class MainActivity : ComponentActivity() {
 
@@ -24,7 +25,8 @@ class MainActivity : ComponentActivity() {
 
         val appComponent = (application as MyApp).appComponent
         val featureEntries = appComponent.getFeatureEntries()
-        val mainEntry = featureEntries.find<ConsoleFeatureEntry>()
+        // val mainEntry = featureEntries.find<ConsoleFeatureEntry>()
+        val mainEntry = featureEntries.find<ChatsFeatureEntry>()
 
         enableEdgeToEdge()
         setContent {

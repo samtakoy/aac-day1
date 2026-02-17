@@ -1,5 +1,6 @@
 package com.example.day.features.console.impl.data
 
+import android.util.Log
 import com.example.day.BuildConfig
 import com.example.day.features.console.impl.data.remote.RemoteLlmApi
 import com.example.day.features.console.impl.data.remote.mappers.ModelRequestMapper
@@ -25,6 +26,7 @@ internal class LlmRepositoryImpl @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            Log.e("mytest", e.stackTraceToString())
             ModelResult.RuntimeError(e.stackTraceToString())
         }
     }

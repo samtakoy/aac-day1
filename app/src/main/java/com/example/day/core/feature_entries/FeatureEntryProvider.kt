@@ -1,6 +1,11 @@
 package com.example.day.core.feature_entries
 
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
+
+@Immutable
 interface FeatureEntryProvider {
+    @Stable
     // Получаем карту всех зарегистрированных фич
     fun getFeatureEntries(): Map<Class<out FeatureEntry>, FeatureEntry>
 }

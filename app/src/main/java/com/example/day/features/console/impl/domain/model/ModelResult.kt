@@ -24,7 +24,7 @@ sealed interface ModelResult {
     data class Error(
         val message: String,
         val code: Int? = null,
-        val metadata: String? = null,
+        // val metadata: String? = null,
         val param: String? = null,
         val type: String? = null
     ) : ModelResult

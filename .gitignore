@@ -14,7 +14,7 @@
 .cxx
 local.properties
 
-/prompts
+/prompts/my
 
 # Log/OS Files
 *.log

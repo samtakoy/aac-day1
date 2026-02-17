@@ -41,7 +41,7 @@ internal class ModelResponseMapperImpl @Inject constructor() : ModelResponseMapp
         return ModelResult.Error(
             message = errorResponseDto.error.message,
             code = errorResponseDto.error.code,
-            metadata = errorResponseDto.error.metadata,
+            // metadata = errorResponseDto.error.metadata,
             param = errorResponseDto.error.param,
             type = errorResponseDto.error.type
         )

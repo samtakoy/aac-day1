@@ -162,8 +162,9 @@ internal data class ErrorDetails(
     val message: String,
     @SerialName("code")
     val code: Int? = null,
-    @SerialName("metadata")
-    val metadata: String? = null,
+    // TODO ошибка в формате
+    // @SerialName("metadata")
+    // val metadata: String? = null,
     @SerialName("param")
     val param: String? = null,
     @SerialName("type")

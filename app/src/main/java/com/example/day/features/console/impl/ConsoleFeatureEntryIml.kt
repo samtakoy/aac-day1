@@ -1,8 +1,10 @@
 package com.example.day.features.console.impl
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.retain.retain
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.day.features.console.api.ConsoleFeatureEntry
 import com.example.day.features.console.impl.di.ConsoleFeatureComponent
@@ -22,6 +24,30 @@ class ConsoleFeatureEntryIml @Inject constructor(): ConsoleFeatureEntry {
         }
         val viewModel: ConsoleViewModelImpl = viewModel(factory = featureComponent.getViewModelFactory())
 
+        ConsoleScreen(
+            viewModel = viewModel,
+            modifier = modifier
+        )
+    }
+
+    // TODO временно
+    @Composable
+    fun PageEntryPoint(id: Long, modifier: Modifier) {
+        val featureComponent: ConsoleFeatureComponent = retain {
+            DaggerConsoleFeatureComponent.factory().create(
+                ConsoleFeatureDepsProvider.deps
+            )
+        }
+        val extras = remember(id) {
+            MutableCreationExtras().apply {
+                set(ConsoleViewModelImpl.ID_KEY, id)
+            }
+        }
+        val viewModel: ConsoleViewModelImpl = viewModel(
+            key = id.toString(),
+            factory = featureComponent.getViewModelFactory(),
+            extras = extras
+        )
         ConsoleScreen(
             viewModel = viewModel,
             modifier = modifier
