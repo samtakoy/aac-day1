@@ -13,8 +13,8 @@ import kotlinx.serialization.json.Json
 import javax.inject.Singleton
 
 @Module
-interface CoreModule {
-    companion object {
+interface NetworkModule {
+    companion object Companion {
         @Provides
         @Singleton
         fun provideJson(): Json = Json {

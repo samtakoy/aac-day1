@@ -1,12 +1,11 @@
 package com.example.day.features.console.impl.data.remote
 
+import com.example.day.features.console.impl.data.remote.model.request.ChatRequestDto
+import com.example.day.features.console.impl.data.remote.model.response.ChatResultDto
+
 internal interface RemoteLlmApi {
     suspend fun sendRequest(
-        prompt: String,
-        modelName: String = DEFAULT_MODEL
-    ): Result<String>
-
-    companion object {
-        const val DEFAULT_MODEL = "z-ai/glm-4.5-air:free"
-    }
+        request: ChatRequestDto,
+        apiKey: String
+    ): ChatResultDto
 }
