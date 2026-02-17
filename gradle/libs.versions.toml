@@ -15,6 +15,7 @@ serialization = "1.10.0"
 ksp = "2.2.21-2.0.5"
 lifecyleViewModelCompose = "2.10.0"
 dagger = "2.59.1"
+kotlinxCollectionsImmutable = "0.4.0"
 
 
 [libraries]
@@ -43,6 +44,7 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecyleViewModelCompose" }
 dagger = { group = "com.google.dagger", name = "dagger", version.ref = "dagger" }
 dagger-compiler = { group = "com.google.dagger", name = "dagger-compiler", version.ref = "dagger" }
+kotlinx-collections-immutable = { group = "org.jetbrains.kotlinx", name = "kotlinx-collections-immutable", version.ref = "kotlinxCollectionsImmutable" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

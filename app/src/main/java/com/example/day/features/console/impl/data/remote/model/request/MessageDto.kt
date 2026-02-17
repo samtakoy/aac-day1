@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  * @property cachePrompt Включить это сообщение в кэш промптов
  */
 @Serializable
-data class MessageDto(
+class MessageDto(
     @SerialName("role")
     val role: String,
     @SerialName("content")
