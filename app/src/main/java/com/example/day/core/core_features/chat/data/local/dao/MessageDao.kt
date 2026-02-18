@@ -3,6 +3,8 @@ package com.example.day.core.core_features.chat.data.local.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import com.example.day.core.core_features.chat.data.local.mapper.toDomain
+import com.example.day.core.core_features.chat.data.local.model.ChatDbConst
 import com.example.day.core.core_features.chat.data.local.model.MessageEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -13,6 +15,9 @@ internal interface MessageDao {
 
     @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY timestamp ASC")
     fun getMessagesByChatId(chatId: Long): Flow<List<MessageEntity>>
+
+    @Query("SELECT * FROM messages WHERE chatId = :chatId AND status = :status ORDER BY timestamp ASC")
+    suspend fun getMessagesByChatIdAndStatus(chatId: Long, status: Int): List<MessageEntity>
 
     @Query("SELECT * FROM messages WHERE id = :messageId")
     suspend fun getMessageById(messageId: Long): MessageEntity?

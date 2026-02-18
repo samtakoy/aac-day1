@@ -12,7 +12,7 @@ internal interface ChatDao {
     @Insert
     suspend fun insert(chat: ChatEntity): Long
 
-    @Query("SELECT * FROM chats ORDER BY id DESC")
+    @Query("SELECT * FROM chats ORDER BY id ASC")
     fun getAllChats(): Flow<List<ChatEntity>>
 
     @Query("SELECT * FROM chats WHERE id = :chatId")

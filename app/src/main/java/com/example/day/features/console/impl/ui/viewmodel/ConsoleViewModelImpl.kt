@@ -5,17 +5,20 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
+import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ChangeMessageStatusUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ClearChatNotViewedMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsFlowUseCase
+import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesWithStatusUseCase
 import com.example.day.core.ui.uikit.chat.bar.model.ChatBarUiModel
 import com.example.day.core.ui.uikit.chat.bar.model.ChatSendButtonType
 import com.example.day.core.ui.uikit.chat.list.model.ChatListUiModel
 import com.example.day.core.ui.uikit.chat.list.model.ChatMessageUiModel
 import com.example.day.core.ui.uikit.chat.list.model.UiMessageStatus
 import com.example.day.features.console.impl.domain.LlmRequestUseCase
+import com.example.day.features.console.impl.ui.components.ChatSettingsUiModel
 import com.example.day.features.console.impl.ui.viewmodel.ConsoleViewModel.State
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CancellationException
@@ -32,6 +35,7 @@ import javax.inject.Inject
 internal class ConsoleViewModelImpl(
     private val requestUseCase: LlmRequestUseCase,
     private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
+    private val getMessagesWithStatusUseCase: GetChatMessagesWithStatusUseCase,
     private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
     private val addChatMessageUseCase: AddChatMessageUseCase,
     private val changeMessageUseCase: ChangeMessageStatusUseCase,
@@ -43,8 +47,18 @@ internal class ConsoleViewModelImpl(
     private val _state = MutableStateFlow(
         State(
             chatList = ChatListUiModel(emptyList<ChatMessageUiModel>().toPersistentList()),
-            chatBar = ChatBarUiModel(inputInitialValue = "", buttonType = ChatSendButtonType.ArrowDisabled)
+            chatBar = ChatBarUiModel(inputInitialValue = "", buttonType = ChatSendButtonType.ArrowDisabled),
+            settings = null
         )
+    )
+
+    // TODO все переделать
+    private var chatSettings = ChatSettings(
+        chatId = chatId,
+        systemPromt = "Ты профессиональный пьяный психолог, очень дотошный",
+        stopWord = "Бутылка",
+        maxTokens = 0, // 500,
+        jsonFormat = false
     )
 
     init {
@@ -103,6 +117,17 @@ internal class ConsoleViewModelImpl(
             is ConsoleViewModel.Event.SubmitButtonClick -> {
                 sendRequest(_state.value.chatBar.inputInitialValue)
             }
+            ConsoleViewModel.Event.OpenSettingsClick -> {
+                _state.update { it.copy(settings = ChatSettingsUiModel("Настройки", chatSettings)) }
+            }
+
+            ConsoleViewModel.Event.SettingsCancelClick -> {
+                _state.update { it.copy(settings = null) }
+            }
+            is ConsoleViewModel.Event.SettingsSubmitClick -> {
+                chatSettings = event.result
+                _state.update { it.copy(settings = null) }
+            }
         }
     }
 
@@ -122,7 +147,8 @@ internal class ConsoleViewModelImpl(
                 inputText,
                 ChatMessageStatus.Sending
             )
-            val result = requestUseCase.exec(inputText)
+            val history = getMessagesWithStatusUseCase(chatId, ChatMessageStatus.Viewed)
+            requestUseCase.exec(inputText, history, chatSettings)
                 .onSuccess { result ->
                     changeMessageUseCase(messageId, ChatMessageStatus.Viewed)
                     addChatMessageUseCase.invoke(
@@ -180,6 +206,7 @@ internal class ConsoleViewModelImpl(
     class Factory @Inject constructor(
         private val requestUseCase: LlmRequestUseCase,
         private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
+        private val getMessagesWithStatusUseCase: GetChatMessagesWithStatusUseCase,
         private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
         private val addChatMessageUseCase: AddChatMessageUseCase,
         private val changeMessageUseCase: ChangeMessageStatusUseCase,
@@ -194,6 +221,7 @@ internal class ConsoleViewModelImpl(
             return ConsoleViewModelImpl(
                 requestUseCase,
                 getMessagesUseCase,
+                getMessagesWithStatusUseCase,
                 clearUnviewedUseCase,
                 addChatMessageUseCase,
                 changeMessageUseCase,

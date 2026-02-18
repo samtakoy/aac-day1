@@ -84,7 +84,7 @@ internal class ChatsViewModelImpl(
 
     private fun onChatAddClick() {
         launchCatching {
-            createChatUseCase("Chat${(Math.random()*100).toInt()}")
+            createChatUseCase("Chat${++CHAT_COUNTER}")
         }
     }
 
@@ -124,5 +124,7 @@ internal class ChatsViewModelImpl(
         }
     }
 
-
+    companion object {
+        private var CHAT_COUNTER = 0
+    }
 }

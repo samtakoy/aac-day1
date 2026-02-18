@@ -45,8 +45,8 @@ data class ModelRequest(
     data class Message(
         val role: Role,
         val content: String,
-        val thinking: String?,
-        val cachePrompt: Boolean
+        val thinking: String? = null,
+        val cachePrompt: Boolean? = null
     )
 }
 

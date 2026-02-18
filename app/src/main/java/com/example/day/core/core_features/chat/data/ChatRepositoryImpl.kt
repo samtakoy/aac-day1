@@ -29,6 +29,7 @@ internal class ChatRepositoryImpl @Inject constructor(
 
     private val mutex = Mutex()
 
+    // TODO убрать в мапперы
     private fun ChatMessageStatus.toDbStatus(): Int = when (this) {
         ChatMessageStatus.Sending -> ChatDbConst.MESSAGE_STATUS_SENDING
         ChatMessageStatus.Delivered -> ChatDbConst.MESSAGE_STATUS_DELIVERED
@@ -85,6 +86,7 @@ internal class ChatRepositoryImpl @Inject constructor(
     override fun getChatMessagesAsFlow(chatId: Long): Flow<List<ChatMessage>> {
         return messageDao.getMessagesByChatId(chatId).map { entities ->
             entities.mapNotNull { entity ->
+                // TODO все такие запросы пользователей - убрать - запросить один раз
                 val userEntity = userDao.getUserByType(ChatDbConst.USER_TYPE)?.let { user ->
                     if (entity.userId == user.id) user else userDao.getUserByType(ChatDbConst.BOT_TYPE)
                 } ?: userDao.getUserByType(ChatDbConst.BOT_TYPE)
@@ -92,6 +94,21 @@ internal class ChatRepositoryImpl @Inject constructor(
                 userEntity?.let {
                     entity.toDomain(it.toDomain())
                 }
+            }
+        }
+    }
+
+    override suspend fun getChatMessages(
+        chatId: Long,
+        status: ChatMessageStatus
+    ): List<ChatMessage> {
+        return messageDao.getMessagesByChatIdAndStatus(chatId, status.toDbStatus()).mapNotNull { entity ->
+            val userEntity = userDao.getUserByType(ChatDbConst.USER_TYPE)?.let { user ->
+                if (entity.userId == user.id) user else userDao.getUserByType(ChatDbConst.BOT_TYPE)
+            } ?: userDao.getUserByType(ChatDbConst.BOT_TYPE)
+
+            userEntity?.let {
+                entity.toDomain(it.toDomain())
             }
         }
     }

@@ -36,12 +36,7 @@ interface NetworkModule {
                 install(HttpCache)
                 install(Logging) {
                     logger = Logger.ANDROID
-                    level = LogLevel.BODY
-
-                    // Опционально: фильтрация логов (чтобы не спамить лишним)
-                    filter { request ->
-                        request.url.host.contains("your.api.com")
-                    }
+                    level = LogLevel.ALL
                 }
             }
         }

@@ -21,6 +21,7 @@ interface ChatRepository {
     suspend fun removeMessage(messageId: Long)
     suspend fun changeMessageStatus(messageId: Long, status: ChatMessageStatus)
     fun getChatMessagesAsFlow(chatId: Long): Flow<List<ChatMessage>>
+    suspend fun getChatMessages(chatId: Long, status: ChatMessageStatus): List<ChatMessage>
     suspend fun getOrCreateDefaultUsers(): Pair<User, User>
     suspend fun clearChat(chatId: Long)
     suspend fun clearChatNotViewedMessages(chatId: Long)

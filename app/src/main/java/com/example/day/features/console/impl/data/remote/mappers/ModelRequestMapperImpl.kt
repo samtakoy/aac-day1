@@ -20,7 +20,7 @@ internal class ModelRequestMapperImpl @Inject constructor(): ModelRequestMapper 
                     role = message.role.toDtoString(),
                     content = message.content,
                     thinking = message.thinking,
-                    cachePrompt = if (message.cachePrompt) true else null
+                    cachePrompt = message.cachePrompt
                 )
             },
             responseFormat = modelRequest.responseFormat.toDto(),
