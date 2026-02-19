@@ -38,7 +38,7 @@ internal class RemoteLlmApiImpl @Inject constructor(
 
     companion object {
         private const val END_POINT = "https://openrouter.ai/api/v1/chat/completions"
-        private const val HTTP_REFERER = "http://localhost"
+        private const val HTTP_REFERER = "ttps://github.com"
         private const val X_TITLE = "My Android App"
     }
 }

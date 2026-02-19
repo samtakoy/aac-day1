@@ -7,19 +7,17 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.chat.domain.model.UserType
-import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
-import com.example.day.core.core_features.chat.domain.usecase.ChangeMessageStatusUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ClearChatNotViewedMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsFlowUseCase
-import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesWithStatusUseCase
 import com.example.day.core.ui.uikit.chat.bar.model.ChatBarUiModel
 import com.example.day.core.ui.uikit.chat.bar.model.ChatSendButtonType
 import com.example.day.core.ui.uikit.chat.list.model.ChatListUiModel
 import com.example.day.core.ui.uikit.chat.list.model.ChatMessageUiModel
 import com.example.day.core.ui.uikit.chat.list.model.UiMessageStatus
-import com.example.day.features.console.impl.domain.LlmRequestUseCase
 import com.example.day.features.console.impl.ui.components.ChatSettingsUiModel
-import com.example.day.features.console.impl.ui.viewmodel.ConsoleViewModel.State
+import com.example.day.features.console.impl.ui.delegates.AgentsTalkDelegate
+import com.example.day.features.console.impl.ui.delegates.LlmTalkDelegate
+import com.example.day.features.console.impl.ui.delegates.TalkDelegate
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -33,21 +31,21 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 internal class ConsoleViewModelImpl(
-    private val requestUseCase: LlmRequestUseCase,
     private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
-    private val getMessagesWithStatusUseCase: GetChatMessagesWithStatusUseCase,
     private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
-    private val addChatMessageUseCase: AddChatMessageUseCase,
-    private val changeMessageUseCase: ChangeMessageStatusUseCase,
+    private val talkDelegate: TalkDelegate,
     // TODO
     // private val savedStateHandle: SavedStateHandle,
     private val chatId: Long
 ) : ViewModel(), ConsoleViewModel {
 
     private val _state = MutableStateFlow(
-        State(
+        ConsoleViewModel.State(
             chatList = ChatListUiModel(emptyList<ChatMessageUiModel>().toPersistentList()),
-            chatBar = ChatBarUiModel(inputInitialValue = "", buttonType = ChatSendButtonType.ArrowDisabled),
+            chatBar = ChatBarUiModel(
+                inputInitialValue = "",
+                buttonType = ChatSendButtonType.ArrowDisabled
+            ),
             settings = null
         )
     )
@@ -86,7 +84,7 @@ internal class ConsoleViewModelImpl(
             .launchIn(viewModelScope)
     }
 
-    override fun getStateAsFlow(): StateFlow<State> = _state
+    override fun getStateAsFlow(): StateFlow<ConsoleViewModel.State> = _state
 
     private fun onInputChanged(text: String) {
         _state.update { state ->
@@ -140,31 +138,10 @@ internal class ConsoleViewModelImpl(
             }
         ) {
             clearUnviewedUseCase.invoke(chatId)
-            val messageId = addChatMessageUseCase.invoke(
-                chatId,
-                System.currentTimeMillis(),
-                UserType.User,
-                inputText,
-                ChatMessageStatus.Sending
-            )
-            val history = getMessagesWithStatusUseCase(chatId, ChatMessageStatus.Viewed)
-            requestUseCase.exec(inputText, history, chatSettings)
-                .onSuccess { result ->
-                    changeMessageUseCase(messageId, ChatMessageStatus.Viewed)
-                    addChatMessageUseCase.invoke(
-                        chatId,
-                        System.currentTimeMillis(),
-                        UserType.Bot,
-                        result,
-                        ChatMessageStatus.Viewed
-                    )
-                    restoreSendButton()
-                }
-                .onFailure { result ->
-                    restoreSendButton()
-                    clearUnviewedUseCase.invoke(chatId)
-                }
-                .getOrNull()
+            // делегат отправки сообщения куда-то
+            talkDelegate.tryAddUserMessage(chatId, inputText, chatSettings) {
+                restoreSendButton()
+            }
         }
     }
 
@@ -204,12 +181,9 @@ internal class ConsoleViewModelImpl(
     }
 
     class Factory @Inject constructor(
-        private val requestUseCase: LlmRequestUseCase,
         private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
-        private val getMessagesWithStatusUseCase: GetChatMessagesWithStatusUseCase,
         private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
-        private val addChatMessageUseCase: AddChatMessageUseCase,
-        private val changeMessageUseCase: ChangeMessageStatusUseCase,
+        private val talkDelegate: LlmTalkDelegate,
     ): ViewModelProvider.Factory {
         override fun <T : ViewModel> create(
             modelClass: Class<T>,
@@ -219,12 +193,30 @@ internal class ConsoleViewModelImpl(
             // val savedStateHandle = extras.createSavedStateHandle()
             val id = extras[ID_KEY] ?: error("ID not found in extras")
             return ConsoleViewModelImpl(
-                requestUseCase,
                 getMessagesUseCase,
-                getMessagesWithStatusUseCase,
                 clearUnviewedUseCase,
-                addChatMessageUseCase,
-                changeMessageUseCase,
+                talkDelegate,
+                id
+            ) as T
+        }
+    }
+
+    class AgentFactory @Inject constructor(
+        private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
+        private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
+        private val talkDelegate: AgentsTalkDelegate,
+    ): ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(
+            modelClass: Class<T>,
+            extras: CreationExtras
+        ): T {
+            // TODO
+            // val savedStateHandle = extras.createSavedStateHandle()
+            val id = extras[ID_KEY] ?: error("ID not found in extras")
+            return ConsoleViewModelImpl(
+                getMessagesUseCase,
+                clearUnviewedUseCase,
+                talkDelegate,
                 id
             ) as T
         }

@@ -52,6 +52,7 @@ fun ChatSettingsView(
     colors: ChatUiColors = LocalChatColors.current
 ) {
     val settings = model.model
+    // TODO нужны ключи
     var systemPrompt by remember { mutableStateOf(settings.systemPromt) }
     var stopWord by remember { mutableStateOf(settings.stopWord) }
     var maxTokens by remember { mutableStateOf(settings.maxTokens.toString()) }

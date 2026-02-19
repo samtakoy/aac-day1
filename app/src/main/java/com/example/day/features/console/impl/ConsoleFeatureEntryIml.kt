@@ -45,7 +45,10 @@ class ConsoleFeatureEntryIml @Inject constructor(): ConsoleFeatureEntry {
         }
         val viewModel: ConsoleViewModelImpl = viewModel(
             key = id.toString(),
-            factory = featureComponent.getViewModelFactory(),
+            // обычный разговор
+            // factory = featureComponent.getViewModelFactory(),
+            // разговор с агентами
+            factory = featureComponent.getAgentsViewModelFactory(),
             extras = extras
         )
         ConsoleScreen(
