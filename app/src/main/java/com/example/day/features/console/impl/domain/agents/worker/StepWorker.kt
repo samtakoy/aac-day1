@@ -1,8 +1,7 @@
 package com.example.day.features.console.impl.domain.agents.worker
 
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.features.console.impl.domain.model.ChatSettings
 import com.example.day.features.console.impl.domain.LlmRequestUseCase
-import com.example.day.features.console.impl.domain.ModelConst
 import com.example.day.features.console.impl.domain.model.ModelRequest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -32,7 +31,7 @@ internal class StepWorker @Inject constructor(
             send("--- Думаю над шагом №$currentStep ---")
 
             val response = llmRequestUseCase.exec(
-                model = ModelConst.DEFAULT_MODEL,
+                modelSettings = chatSettings.model,
                 systemPrompt = STEP_BY_STEP_SYSTEM_PROMPT,
                 messages = messageHistory,
                 promptText = nextUserMessage

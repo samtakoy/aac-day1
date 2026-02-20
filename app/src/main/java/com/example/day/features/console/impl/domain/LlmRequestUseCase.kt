@@ -1,11 +1,13 @@
 package com.example.day.features.console.impl.domain
 
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.features.console.impl.domain.model.ChatSettings
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.features.console.impl.domain.model.ModelRequest
 import com.example.day.features.console.impl.domain.model.ModelRequest.ResponseFormat
 import com.example.day.features.console.impl.domain.model.ModelResult
+import com.example.day.features.console.impl.domain.model.ModelSettings
+import kotlinx.collections.immutable.ImmutableList
 import javax.inject.Inject
 
 internal class LlmRequestUseCase @Inject constructor(
@@ -13,29 +15,28 @@ internal class LlmRequestUseCase @Inject constructor(
 ) {
 
     suspend fun exec(
-        model: String,
+        modelSettings: ModelSettings,
         systemPrompt: String?,
         messages: List<ModelRequest.Message>,
         promptText: String,
-        responseFormat: ResponseFormat = ResponseFormat.None,
-        maxTokens: Int? = null,
-        stopSequence: List<String>? = null
     ): Result<String> {
         val request = ModelRequest(
-            model = model,
+            model = modelSettings.name,
             messages = buildList {
                 // Системный промт
-                systemPrompt.toSystemPromptOrNull()?.let { systemMessage ->
+                systemPrompt.reqSystemPromptOrNull()?.let { systemMessage ->
                     add(systemMessage)
                 }
                 // Предыдущая история
                 addAll(messages)
                 // Текущее сообщение
-                add(promptText.toUserMessage())
+                add(promptText.reqUserMessage())
             },
-            responseFormat = responseFormat,
-            maxTokens = maxTokens,
-            stop = stopSequence
+            responseFormat = modelSettings.reqResponseFormat(),
+            maxTokens = modelSettings.reqMaxTokensOrNull(),
+            temperature = modelSettings.reqTemperatureOrNull(),
+            stopSequence = modelSettings.reqStopSequenceOrNull(),
+            reasoningEffort = modelSettings.reqReasoning()
         )
         val result = repository.sendRequest(request)
         return mapResult(result)
@@ -47,40 +48,37 @@ internal class LlmRequestUseCase @Inject constructor(
         chatSettings: ChatSettings
     ): Result<String> {
         return exec(
-            model = ModelConst.DEFAULT_MODEL,
+            modelSettings = chatSettings.model,
             systemPrompt = chatSettings.systemPromt,
             messages = history.map { chatMessage ->
-                chatMessage.mapToRequestMessage()
+                chatMessage.reqMessage()
             },
             promptText = promptText,
-            if (chatSettings.jsonFormat) ModelRequest.ResponseFormat.JsonObject else ModelRequest.ResponseFormat.None,
-            maxTokens = chatSettings.maxTokens.takeIf { it > 0 },
-            stopSequence = if (chatSettings.stopWord.isNotBlank()) listOf(chatSettings.stopWord) else null
         )
     }
 
-    private fun String.toUserMessage() = ModelRequest.Message(
+    private fun String.reqUserMessage() = ModelRequest.Message(
         role = ModelRequest.Role.User,
         content = this,
         thinking = null,
         cachePrompt = false
     )
 
-    private fun ChatMessage.mapToRequestMessage(): ModelRequest.Message = ModelRequest.Message(
-        role = user.type.mapToRole(),
+    private fun ChatMessage.reqMessage(): ModelRequest.Message = ModelRequest.Message(
+        role = user.type.reqRole(),
         content = text,
         thinking = null,
         cachePrompt = false
     )
 
-    private fun UserType.mapToRole(): ModelRequest.Role =
+    private fun UserType.reqRole(): ModelRequest.Role =
         if (this == UserType.User) {
             ModelRequest.Role.User
         } else {
             ModelRequest.Role.Assistant
         }
 
-    private fun String?.toSystemPromptOrNull(): ModelRequest.Message? {
+    private fun String?.reqSystemPromptOrNull(): ModelRequest.Message? {
         return if (this != null && isNotBlank()) {
             ModelRequest.Message(
                 role = ModelRequest.Role.System,
@@ -92,6 +90,26 @@ internal class LlmRequestUseCase @Inject constructor(
         } else {
             null
         }
+    }
+
+    private fun ModelSettings.reqStopSequenceOrNull(): ImmutableList<String>? =
+        stopSequence.ifEmpty { null }
+
+    private fun ModelSettings.reqMaxTokensOrNull(): Int? =
+        maxTokens.takeIf { it > 0 }
+
+    private fun ModelSettings.reqResponseFormat(): ResponseFormat =
+        if (jsonFormat) ResponseFormat.JsonObject else ResponseFormat.None
+
+    private fun ModelSettings.reqTemperatureOrNull(): Double? = temperature
+
+    private fun ModelSettings.reqReasoning(): ModelRequest.Reasoning? {
+        reasoningEffort ?: return null
+        val reasoningEffort = reasoningEffort.trim()
+        ModelRequest.Reasoning.entries.forEach {
+            if (it.title.equals(reasoningEffort, ignoreCase = true)) return it
+        }
+        return null
     }
 
     private fun mapResult(result: ModelResult): Result<String> {
@@ -114,5 +132,4 @@ internal class LlmRequestUseCase @Inject constructor(
             }
         }
     }
-
 }

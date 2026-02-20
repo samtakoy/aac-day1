@@ -2,6 +2,7 @@ package com.example.day.features.console.impl.data.remote.mappers
 
 import com.example.day.features.console.impl.data.remote.model.request.ChatRequestDto
 import com.example.day.features.console.impl.data.remote.model.request.MessageDto
+import com.example.day.features.console.impl.data.remote.model.request.Reasoning
 import com.example.day.features.console.impl.data.remote.model.request.ResponseFormatDto
 import com.example.day.features.console.impl.domain.model.ModelRequest
 import javax.inject.Inject
@@ -25,16 +26,32 @@ internal class ModelRequestMapperImpl @Inject constructor(): ModelRequestMapper 
             },
             responseFormat = modelRequest.responseFormat.toDto(),
             stream = modelRequest.stream ?: false,
+            maxCompletionTokens = modelRequest.maxCompletionTokens,
             maxTokens = modelRequest.maxTokens,
             temperature = modelRequest.temperature,
             topP = modelRequest.topP,
             topK = modelRequest.topK,
-            stop = modelRequest.stop?.toList(),
+            stop = modelRequest.stopSequence?.toList(),
             presencePenalty = modelRequest.presencePenalty,
             frequencyPenalty = modelRequest.frequencyPenalty,
+            reasoning = mapReasoning(modelRequest.reasoningEffort),
             seed = modelRequest.seed,
             logProbs = modelRequest.logProbs,
             topLogProbs = modelRequest.topLogProbs
+        )
+    }
+
+    private fun mapReasoning(reasoning: ModelRequest.Reasoning?): Reasoning? {
+        reasoning ?: return null
+        return Reasoning(
+            effort = when (reasoning) {
+                ModelRequest.Reasoning.XHIGH -> "xhigh"
+                ModelRequest.Reasoning.HIGH -> "high"
+                ModelRequest.Reasoning.MEDIUM -> "medium"
+                ModelRequest.Reasoning.LOW -> "low"
+                ModelRequest.Reasoning.MINIMAL -> "minimal"
+                ModelRequest.Reasoning.NONE -> "none"
+            }
         )
     }
 

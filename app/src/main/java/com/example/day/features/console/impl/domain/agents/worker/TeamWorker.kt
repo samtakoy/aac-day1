@@ -1,8 +1,7 @@
 package com.example.day.features.console.impl.domain.agents.worker
 
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.features.console.impl.domain.model.ChatSettings
 import com.example.day.features.console.impl.domain.LlmRequestUseCase
-import com.example.day.features.console.impl.domain.ModelConst
 import com.example.day.features.console.impl.domain.model.ModelRequest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -32,7 +31,7 @@ internal class TeamWorker @Inject constructor(
             val promptText = "Твоя роль: $name. Задача: $mission. " +
                     if (messageHistory.isNotEmpty()) "Учитывай мнение предыдущих экспертов. Контекст: $task" else "Контекст: $task"
 
-            val response = askExpert(promptText, messageHistory)
+            val response = askExpert(chatSettings, promptText, messageHistory)
 
             response.onSuccess { rawAnswer ->
                 val result = extractResult(rawAnswer) ?: rawAnswer
@@ -48,7 +47,7 @@ internal class TeamWorker @Inject constructor(
         val managerPrompt = "Ты — Менеджер. Собери воедино мнения аналитика и инженера, " +
                 "учти замечания критика и выдай финальный пошаговый план реализации задачи: $task"
 
-        val finalResponse = askExpert(managerPrompt, messageHistory)
+        val finalResponse = askExpert(chatSettings, managerPrompt, messageHistory)
 
         finalResponse.onSuccess { raw ->
             // Логируем для отладки, если пусто
@@ -65,9 +64,13 @@ internal class TeamWorker @Inject constructor(
         close()
     }
 
-    private suspend fun askExpert(prompt: String, history: List<ModelRequest.Message>) =
+    private suspend fun askExpert(
+        chatSettings: ChatSettings,
+        prompt: String,
+        history: List<ModelRequest.Message>
+    ) =
         llmRequestUseCase.exec(
-            model = ModelConst.DEFAULT_MODEL,
+            modelSettings = chatSettings.model,
             systemPrompt = TEAM_SYSTEM_PROMPT,
             messages = history,
             promptText = prompt

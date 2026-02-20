@@ -22,7 +22,7 @@ import kotlinx.serialization.Serializable
  * @property topLogProbs Количество top logprobs для включения
  */
 @Serializable
-data class ChatRequestDto(
+class ChatRequestDto(
     @SerialName("model")
     val model: String,
     @SerialName("messages")
@@ -31,6 +31,8 @@ data class ChatRequestDto(
     val responseFormat: ResponseFormatDto? = null,
     @SerialName("stream")
     val stream: Boolean = false,
+    @SerialName("max_completion_tokens")
+    val maxCompletionTokens: Int? = null,
     @SerialName("max_tokens")
     val maxTokens: Int? = null,
     @SerialName("temperature")
@@ -45,6 +47,8 @@ data class ChatRequestDto(
     val presencePenalty: Double? = null,
     @SerialName("frequency_penalty")
     val frequencyPenalty: Double? = null,
+    @SerialName("reasoning")
+    val reasoning: Reasoning? = null,
     @SerialName("seed")
     val seed: Int? = null,
     @SerialName("logprobs")
@@ -54,13 +58,35 @@ data class ChatRequestDto(
 )
 
 /**
+ *        reasoning:
+ *           type: object
+ *           properties:
+ *             effort:
+ *               anyOf:
+ *                 - type: string
+ *                   enum:
+ *                     - xhigh
+ *                     - high
+ *                     - medium
+ *                     - low
+ *                     - minimal
+ *                     - none
+ *                   x-speakeasy-unknown-values: allow
+ *                 - type: 'null'
+ * */
+@Serializable
+class Reasoning(
+    val effort: String?
+)
+
+/**
  * Формат ответа для генерации
  *
  * @property type Тип формата ("json_object" или "json_schema")
  * @property jsonSchema Опциональная JSON schema для валидации
  */
 @Serializable
-data class ResponseFormatDto(
+class ResponseFormatDto(
     @SerialName("type")
     val type: String,
     @SerialName("json_schema")
@@ -76,7 +102,7 @@ data class ResponseFormatDto(
  * @property strict Включить strict mode
  */
 @Serializable
-data class JsonSchemaDto(
+class JsonSchemaDto(
     @SerialName("name")
     val name: String,
     @SerialName("description")

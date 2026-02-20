@@ -5,7 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.features.console.impl.domain.model.ChatSettings
+import com.example.day.features.console.impl.domain.model.ModelSettings
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.core.core_features.chat.domain.usecase.ClearChatNotViewedMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsFlowUseCase
@@ -14,10 +15,12 @@ import com.example.day.core.ui.uikit.chat.bar.model.ChatSendButtonType
 import com.example.day.core.ui.uikit.chat.list.model.ChatListUiModel
 import com.example.day.core.ui.uikit.chat.list.model.ChatMessageUiModel
 import com.example.day.core.ui.uikit.chat.list.model.UiMessageStatus
+import com.example.day.features.console.impl.domain.ModelConst
 import com.example.day.features.console.impl.ui.components.ChatSettingsUiModel
 import com.example.day.features.console.impl.ui.delegates.AgentsTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.LlmTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.TalkDelegate
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -53,10 +56,16 @@ internal class ConsoleViewModelImpl(
     // TODO все переделать
     private var chatSettings = ChatSettings(
         chatId = chatId,
-        systemPromt = "Ты профессиональный пьяный психолог, очень дотошный",
-        stopWord = "Бутылка",
-        maxTokens = 0, // 500,
-        jsonFormat = false
+        // systemPromt = "Ты профессиональный пьяный психолог, очень дотошный",
+        systemPromt = "",
+        model = ModelSettings(
+            name = ModelConst.DEFAULT_MODEL,
+            // stopSequence = listOf("Бутылка").toImmutableList(),
+            stopSequence = emptyList<String>().toImmutableList(),
+            maxTokens = 0, // 500,
+            jsonFormat = false,
+            reasoningEffort = "none"
+        )
     )
 
     init {

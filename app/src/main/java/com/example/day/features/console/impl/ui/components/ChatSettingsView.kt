@@ -35,28 +35,32 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.features.console.impl.domain.model.ChatSettings
+import com.example.day.features.console.impl.domain.model.ModelSettings
 import com.example.day.core.ui.uikit.chat.ChatUiColors
 import com.example.day.core.ui.uikit.chat.DarkChatUiColors
 import com.example.day.core.ui.uikit.chat.LocalChatColors
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.serialization.Serializable
 
 /**
  * Chat settings view for configuring LLM parameters
  */
 @Composable
 fun ChatSettingsView(
-    model: ChatSettingsUiModel,
+    state: ChatSettingsUiModel,
     onSubmit: (ChatSettings) -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
     colors: ChatUiColors = LocalChatColors.current
 ) {
-    val settings = model.model
-    // TODO нужны ключи
-    var systemPrompt by remember { mutableStateOf(settings.systemPromt) }
-    var stopWord by remember { mutableStateOf(settings.stopWord) }
-    var maxTokens by remember { mutableStateOf(settings.maxTokens.toString()) }
-    var jsonFormat by remember { mutableStateOf(settings.jsonFormat) }
+    val settings = state.settingsState
+    val model = state.settingsState.model
+    var systemPrompt by remember(settings.systemPromt) { mutableStateOf(settings.systemPromt) }
+    var stopWord by remember(model.stopSequence) { mutableStateOf(model.stopSequence.firstOrNull().orEmpty()) }
+    var temperature by remember(model.temperature) { mutableStateOf(model.temperature.toString()) }
+    var reasoningEffort by remember(model.reasoningEffort) { mutableStateOf(model.reasoningEffort.toString()) }
+    var jsonFormat by remember(model.jsonFormat) { mutableStateOf(model.jsonFormat) }
 
     Column(
         modifier = modifier
@@ -68,7 +72,7 @@ fun ChatSettingsView(
     ) {
         // Title
         Text(
-            text = model.title,
+            text = state.title,
             style = MaterialTheme.typography.titleLarge,
             color = colors.botText
         )
@@ -99,17 +103,24 @@ fun ChatSettingsView(
 
         // Max Tokens field (small numeric field)
         SettingsTextField(
-            label = "Max Tokens",
-            value = maxTokens,
+            label = "Temperature",
+            value = temperature,
             onValueChange = { newValue ->
-                // Only allow digits
-                if (newValue.isEmpty() || newValue.all { it.isDigit() }) {
-                    maxTokens = newValue
-                }
+                temperature = newValue
             },
             placeholder = "e.g., 1000",
             modifier = Modifier.fillMaxWidth(),
             keyboardType = KeyboardType.Number,
+            colors = colors
+        )
+
+        //
+        SettingsTextField(
+            label = "Reasoning effort",
+            value = reasoningEffort,
+            onValueChange = { reasoningEffort = it },
+            placeholder = "xhigh|high|medium|low|minimal|none",
+            modifier = Modifier.fillMaxWidth(),
             colors = colors
         )
 
@@ -144,7 +155,7 @@ fun ChatSettingsView(
         // Action buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End)
+            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start)
         ) {
             TextButton(
                 onClick = onCancel,
@@ -157,13 +168,19 @@ fun ChatSettingsView(
 
             Button(
                 onClick = {
-                    val tokens = maxTokens.toIntOrNull() ?: settings.maxTokens
+                    val temperature = temperature.toDoubleOrNull() ?: settings.model.temperature
                     onSubmit(
                         settings.copy(
                             systemPromt = systemPrompt,
-                            stopWord = stopWord,
-                            maxTokens = tokens,
-                            jsonFormat = jsonFormat
+                            model = ModelSettings(
+                                name = state.settingsState.model.name,
+                                stopSequence = buildList {
+                                    if (stopWord.isNotBlank()) add(stopWord)
+                                }.toImmutableList(),
+                                jsonFormat = jsonFormat,
+                                temperature = temperature,
+                                reasoningEffort = reasoningEffort
+                            )
                         )
                     )
                 },
@@ -251,15 +268,18 @@ private fun SettingsTextField(
 private fun ChatSettingsViewPreview() {
     val testSettings = ChatSettings(
         chatId = 1L,
-        systemPromt = "You are a helpful assistant.",
-        stopWord = "END",
-        maxTokens = 1000,
-        jsonFormat = false
+        systemPromt = "You are a ¡ assistant.",
+        model = ModelSettings(
+            name = "name",
+            stopSequence = listOf("END").toImmutableList(),
+            maxTokens = 1000,
+            jsonFormat = false
+        )
     )
 
     Dialog(onDismissRequest = {}) {
         ChatSettingsView(
-            model = ChatSettingsUiModel("title", testSettings),
+            state = ChatSettingsUiModel("title", testSettings),
             onSubmit = { settings ->
                 println("Submit: $settings")
             },

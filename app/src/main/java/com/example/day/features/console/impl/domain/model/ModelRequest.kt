@@ -1,21 +1,54 @@
 package com.example.day.features.console.impl.domain.model
 
+
+/**
+ * @property presencePenalty
+ *             - type: number
+ *               minimum: -2
+ *               maximum: 2
+ *             - type: 'null'
+ * @property frequencyPenalty
+ *             - type: number
+ *               minimum: -2
+ *               maximum: 2
+ *             - type: 'null'
+ * @property maxCompletionTokens
+ *             - type: number
+ *               minimum: 1
+ *             - type: 'null'
+ * @property maxTokens
+ *           anyOf:
+ *             - type: number
+ *               minimum: 1
+ *             - type: 'null'
+ * */
 data class ModelRequest(
     val model: String,
     val messages: List<Message>,
     val responseFormat: ResponseFormat,
     val stream: Boolean? = null,
+    val maxCompletionTokens: Int? = null,
     val maxTokens: Int? = null,
     val temperature: Double? = null,
     val topP: Double? = null,
     val topK: Int? = null,
-    val stop: List<String>? = null,
+    val stopSequence: List<String>? = null,
     val presencePenalty: Double? = null,
     val frequencyPenalty: Double? = null,
+    val reasoningEffort: Reasoning? = null,
     val seed: Int? = null,
     val logProbs: Boolean? = null,
     val topLogProbs: Int? = null
 ) {
+    enum class Reasoning(val title: String) {
+        XHIGH("xhigh"),
+        HIGH("high"),
+        MEDIUM("medium"),
+        LOW("low"),
+        MINIMAL("minimal"),
+        NONE("none")
+    }
+
     /**
      * Параметр response_format радикально меняет то, как модель «упаковывает» свои мысли.
      * */
