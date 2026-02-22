@@ -1,6 +1,6 @@
 package com.example.day.features.console.impl.domain.agents.worker
 
-import com.example.day.features.console.impl.domain.model.ChatSettings
+import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import kotlinx.coroutines.flow.Flow
 
 /** Интерфейс для каждого типа обработчика команды из [com.example.day.features.console.impl.domain.agents.ChatCommand]

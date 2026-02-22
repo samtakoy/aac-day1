@@ -1,21 +1,28 @@
 package com.example.day.core.core_features.chat.data
 
 import com.example.day.core.core_features.chat.data.local.dao.ChatDao
+import com.example.day.core.core_features.chat.data.local.dao.ChatGroupDao
+import com.example.day.core.core_features.chat.data.local.dao.ChatTypeDao
 import com.example.day.core.core_features.chat.data.local.dao.MessageDao
 import com.example.day.core.core_features.chat.data.local.dao.UserDao
+import com.example.day.core.core_features.chat.data.local.mapper.ChatGroupMapper
+import com.example.day.core.core_features.chat.data.local.mapper.ChatMapper
 import com.example.day.core.core_features.chat.data.local.mapper.toDomain
 import com.example.day.core.core_features.chat.data.local.model.ChatDbConst
 import com.example.day.core.core_features.chat.data.local.model.ChatEntity
+import com.example.day.core.core_features.chat.data.local.model.ChatGroupEntity
+import com.example.day.core.core_features.chat.data.local.model.ChatTypeEntity
 import com.example.day.core.core_features.chat.data.local.model.MessageEntity
 import com.example.day.core.core_features.chat.data.local.model.UserEntity
 import com.example.day.core.core_features.chat.domain.ChatRepository
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.model.ChatGroup
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
+import com.example.day.core.core_features.chat.domain.model.ChatType
 import com.example.day.core.core_features.chat.domain.model.User
 import com.example.day.core.core_features.chat.domain.model.UserType
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -24,7 +31,11 @@ import javax.inject.Inject
 internal class ChatRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
     private val chatDao: ChatDao,
-    private val messageDao: MessageDao
+    private val messageDao: MessageDao,
+    private val chatGroupDao: ChatGroupDao,
+    private val chatTypeDao: ChatTypeDao,
+    private val chatMapper: ChatMapper,
+    private val chatGroupMapper: ChatGroupMapper
 ) : ChatRepository {
 
     private val mutex = Mutex()
@@ -36,19 +47,13 @@ internal class ChatRepositoryImpl @Inject constructor(
         ChatMessageStatus.Viewed -> ChatDbConst.MESSAGE_STATUS_VIEWED
     }
 
-    override suspend fun createChat(title: String): Long = mutex.withLock {
+    override suspend fun createChat(title: String, chatGroupId: Long): Long = mutex.withLock {
         getOrCreateDefaultUsers()
-        return chatDao.insert(ChatEntity(title = title))
-    }
-
-    override fun getChatListAsFlow(): Flow<List<Chat>> {
-        return chatDao.getAllChats().map { entities ->
-            entities.map { it.toDomain() }
-        }
+        return chatDao.insert(ChatEntity(title = title, chatGroupId = chatGroupId))
     }
 
     override suspend fun getChatById(chatId: Long): Chat? {
-        return chatDao.getChatById(chatId)?.toDomain()
+        return chatDao.getChatById(chatId)?.let(chatMapper::toDomain)
     }
 
     override suspend fun addMessage(
@@ -141,9 +146,62 @@ internal class ChatRepositoryImpl @Inject constructor(
     }
 
     override suspend fun dropChat(chatId: Long) {
-        val chatEntity = chatDao.getChatById(chatId)
-        chatEntity?.let {
-            chatDao.delete(it)
+        chatDao.delete(chatId)
+    }
+
+    // New methods for groups
+    override fun getAllChatGroups(): Flow<List<ChatGroup>> {
+        return chatGroupDao.getAllGroupsWithTypeAsFlow().map { entities ->
+            entities.map(chatGroupMapper::toDomain)
         }
+    }
+
+    override suspend fun getChatGroupWithMaxId(): ChatGroup? {
+        return chatGroupDao.getGroupWithMaxId()?.let(chatGroupMapper::toDomain)
+    }
+
+    override suspend fun createChatGroup(title: String, chatType: ChatType, colorIndex: Int): Long {
+        ensureChatTypesExist()
+        
+        val typeEntity = chatTypeDao.getTypeByName(chatType.dbType)
+            ?: throw IllegalStateException("Chat type ${chatType.dbType} not found")
+        
+        val entity = ChatGroupEntity(title = title, typeId = typeEntity.id, colorIndex = colorIndex)
+        return chatGroupDao.insertGroup(entity)
+    }
+
+    override suspend fun updateChatGroup(group: ChatGroup) {
+        val entity = ChatGroupEntity(id = group.id, title = group.title, typeId = group.typeId, colorIndex = group.colorIndex)
+        chatGroupDao.updateGroup(entity)
+    }
+
+    override suspend fun deleteChatGroup(groupId: Long) {
+        chatGroupDao.deleteGroupById(groupId)
+    }
+
+    override suspend fun getAllChatTypes(): List<ChatType> {
+        return enumValues<ChatType>().toList()
+    }
+
+    override suspend fun ensureChatTypesExist() {
+        // Ensure all enum values exist in database
+        val existingTypes = chatTypeDao.getAllTypes()
+        val existingDbTypes = existingTypes.map { it.type }.toSet()
+        
+        enumValues<ChatType>().forEach { chatType ->
+            if (chatType.dbType !in existingDbTypes) {
+                chatTypeDao.insertType(ChatTypeEntity(type = chatType.dbType))
+            }
+        }
+    }
+
+    override fun getChatsByGroup(groupId: Long): Flow<List<Chat>> {
+        return chatDao.getChatsByGroupAsFlow(groupId).map { list ->
+            list.map(chatMapper::toDomain)
+        }
+    }
+
+    override suspend fun getChatsCountInGroup(groupId: Long): Int {
+        return chatDao.getChatsCountInGroup(groupId)
     }
 }

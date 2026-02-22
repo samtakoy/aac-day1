@@ -4,12 +4,15 @@ import android.content.Context
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.example.day.core.core_features.chat.di.ChatCoreFeatureModule
+import com.example.day.core.core_features.llm.di.LlmCoreFeatureModule
 import com.example.day.core.di.NetworkModule
 import com.example.day.core.feature_entries.FeatureEntryProvider
 import com.example.day.features.chats.impl.di.ChatsFeatureDeps
-import com.example.day.features.chats.impl.di.ChatsFeatureExportModule
+import com.example.day.features.chats.impl.di.ChatsFeatureApiModule
 import com.example.day.features.console.impl.di.ConsoleFeatureDeps
-import com.example.day.features.console.impl.di.ConsoleFeatureExportModule
+import com.example.day.features.console.impl.di.ConsoleFeatureApiModule
+import com.example.day.features.group_choice.impl.di.GroupChoiceFeatureApiModule
+import com.example.day.features.group_choice.impl.di.GroupChoiceFeatureDeps
 import dagger.BindsInstance
 import dagger.Component
 import javax.inject.Singleton
@@ -19,12 +22,14 @@ import javax.inject.Singleton
     modules = [
         NetworkModule::class,
         ChatCoreFeatureModule::class,
-        ConsoleFeatureExportModule::class,
-        ChatsFeatureExportModule::class,
+        ConsoleFeatureApiModule::class,
+        ChatsFeatureApiModule::class,
+        GroupChoiceFeatureApiModule::class,
+        LlmCoreFeatureModule::class
     ]
 )
 @Immutable
-interface AppComponent : FeatureEntryProvider, ConsoleFeatureDeps, ChatsFeatureDeps {
+interface AppComponent : FeatureEntryProvider, ConsoleFeatureDeps, ChatsFeatureDeps, GroupChoiceFeatureDeps {
 
     @Component.Factory
     interface Factory {

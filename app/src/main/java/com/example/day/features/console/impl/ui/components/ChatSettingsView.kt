@@ -35,13 +35,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.day.features.console.impl.domain.model.ChatSettings
-import com.example.day.features.console.impl.domain.model.ModelSettings
+import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.ui.uikit.chat.ChatUiColors
 import com.example.day.core.ui.uikit.chat.DarkChatUiColors
 import com.example.day.core.ui.uikit.chat.LocalChatColors
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.serialization.Serializable
 
 /**
  * Chat settings view for configuring LLM parameters

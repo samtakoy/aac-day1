@@ -1,15 +1,17 @@
 package com.example.day.core.core_features.chat.domain
 
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.model.ChatGroup
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
+import com.example.day.core.core_features.chat.domain.model.ChatType
 import com.example.day.core.core_features.chat.domain.model.User
 import com.example.day.core.core_features.chat.domain.model.UserType
 import kotlinx.coroutines.flow.Flow
 
 interface ChatRepository {
-    suspend fun createChat(title: String): Long
-    fun getChatListAsFlow(): Flow<List<Chat>>
+    // Existing chat methods
+    suspend fun createChat(title: String, chatGroupId: Long): Long
     suspend fun getChatById(chatId: Long): Chat?
     suspend fun addMessage(
         chatId: Long,
@@ -26,4 +28,19 @@ interface ChatRepository {
     suspend fun clearChat(chatId: Long)
     suspend fun clearChatNotViewedMessages(chatId: Long)
     suspend fun dropChat(chatId: Long)
+    
+    // New methods for groups
+    fun getAllChatGroups(): Flow<List<ChatGroup>>
+    suspend fun getChatGroupWithMaxId(): ChatGroup?
+    suspend fun createChatGroup(title: String, chatType: ChatType, colorIndex: Int): Long
+    suspend fun updateChatGroup(group: ChatGroup)
+    suspend fun deleteChatGroup(groupId: Long)
+    
+    // New methods for types
+    suspend fun getAllChatTypes(): List<ChatType>
+    suspend fun ensureChatTypesExist()
+    
+    // New methods for chats by group
+    fun getChatsByGroup(groupId: Long): Flow<List<Chat>>
+    suspend fun getChatsCountInGroup(groupId: Long): Int
 }

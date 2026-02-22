@@ -13,10 +13,10 @@ internal interface MessageDao {
     @Insert
     suspend fun insert(message: MessageEntity): Long
 
-    @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY timestamp ASC")
+    @Query("SELECT * FROM messages WHERE chat_id = :chatId ORDER BY timestamp ASC")
     fun getMessagesByChatId(chatId: Long): Flow<List<MessageEntity>>
 
-    @Query("SELECT * FROM messages WHERE chatId = :chatId AND status = :status ORDER BY timestamp ASC")
+    @Query("SELECT * FROM messages WHERE chat_id = :chatId AND status = :status ORDER BY timestamp ASC")
     suspend fun getMessagesByChatIdAndStatus(chatId: Long, status: Int): List<MessageEntity>
 
     @Query("SELECT * FROM messages WHERE id = :messageId")
@@ -28,9 +28,9 @@ internal interface MessageDao {
     @Query("DELETE FROM messages WHERE id = :messageId")
     suspend fun deleteById(messageId: Long)
 
-    @Query("DELETE FROM messages WHERE chatId = :chatId")
+    @Query("DELETE FROM messages WHERE chat_id = :chatId")
     suspend fun deleteByChatId(chatId: Long)
 
-    @Query("DELETE FROM messages WHERE chatId = :chatId AND status != :viewedStatus")
+    @Query("DELETE FROM messages WHERE chat_id = :chatId AND status != :viewedStatus")
     suspend fun deleteByChatIdAndStatusNotViewed(chatId: Long, viewedStatus: Int)
 }

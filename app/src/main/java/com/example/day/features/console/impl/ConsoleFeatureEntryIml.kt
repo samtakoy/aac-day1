@@ -6,9 +6,9 @@ import androidx.compose.runtime.retain.retain
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.day.app.di.LocalAppComponent
 import com.example.day.features.console.api.ConsoleFeatureEntry
 import com.example.day.features.console.impl.di.ConsoleFeatureComponent
-import com.example.day.features.console.impl.di.ConsoleFeatureDepsProvider
 import com.example.day.features.console.impl.di.DaggerConsoleFeatureComponent
 import com.example.day.features.console.impl.ui.ConsoleScreen
 import com.example.day.features.console.impl.ui.viewmodel.ConsoleViewModelImpl
@@ -16,41 +16,25 @@ import javax.inject.Inject
 
 class ConsoleFeatureEntryIml @Inject constructor(): ConsoleFeatureEntry {
     @Composable
-    override fun ComposableEntryPoint(modifier: Modifier) {
+    override fun EntryPoint(chatId: Long, modifier: Modifier) {
+        val appComponent = LocalAppComponent.current
+        
         val featureComponent: ConsoleFeatureComponent = retain {
-            DaggerConsoleFeatureComponent.factory().create(
-                ConsoleFeatureDepsProvider.deps
-            )
+            DaggerConsoleFeatureComponent.factory().create(appComponent)
         }
-        val viewModel: ConsoleViewModelImpl = viewModel(factory = featureComponent.getViewModelFactory())
 
-        ConsoleScreen(
-            viewModel = viewModel,
-            modifier = modifier
-        )
-    }
-
-    // TODO временно
-    @Composable
-    fun PageEntryPoint(id: Long, modifier: Modifier) {
-        val featureComponent: ConsoleFeatureComponent = retain {
-            DaggerConsoleFeatureComponent.factory().create(
-                ConsoleFeatureDepsProvider.deps
-            )
-        }
-        val extras = remember(id) {
+        val extras = remember(chatId) {
             MutableCreationExtras().apply {
-                set(ConsoleViewModelImpl.ID_KEY, id)
+                set(ConsoleViewModelImpl.CHAT_ID_KEY, chatId)
             }
         }
+
         val viewModel: ConsoleViewModelImpl = viewModel(
-            key = id.toString(),
-            // обычный разговор
-            // factory = featureComponent.getViewModelFactory(),
-            // разговор с агентами
-            factory = featureComponent.getAgentsViewModelFactory(),
+            key = chatId.toString(),
+            factory = featureComponent.getViewModelFactory(),
             extras = extras
         )
+
         ConsoleScreen(
             viewModel = viewModel,
             modifier = modifier

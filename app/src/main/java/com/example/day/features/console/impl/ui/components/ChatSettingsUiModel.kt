@@ -1,7 +1,7 @@
 package com.example.day.features.console.impl.ui.components
 
 import androidx.compose.runtime.Immutable
-import com.example.day.features.console.impl.domain.model.ChatSettings
+import com.example.day.core.core_features.chat.domain.model.ChatSettings
 
 @Immutable
 data class ChatSettingsUiModel(

@@ -5,8 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
-import com.example.day.features.console.impl.domain.model.ChatSettings
-import com.example.day.features.console.impl.domain.model.ModelSettings
+import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.core.core_features.chat.domain.usecase.ClearChatNotViewedMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsFlowUseCase
@@ -15,7 +15,7 @@ import com.example.day.core.ui.uikit.chat.bar.model.ChatSendButtonType
 import com.example.day.core.ui.uikit.chat.list.model.ChatListUiModel
 import com.example.day.core.ui.uikit.chat.list.model.ChatMessageUiModel
 import com.example.day.core.ui.uikit.chat.list.model.UiMessageStatus
-import com.example.day.features.console.impl.domain.ModelConst
+import com.example.day.core.core_features.llm.domain.ModelConst
 import com.example.day.features.console.impl.ui.components.ChatSettingsUiModel
 import com.example.day.features.console.impl.ui.delegates.AgentsTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.LlmTalkDelegate
@@ -200,7 +200,7 @@ internal class ConsoleViewModelImpl(
         ): T {
             // TODO
             // val savedStateHandle = extras.createSavedStateHandle()
-            val id = extras[ID_KEY] ?: error("ID not found in extras")
+            val id = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
             return ConsoleViewModelImpl(
                 getMessagesUseCase,
                 clearUnviewedUseCase,
@@ -221,17 +221,17 @@ internal class ConsoleViewModelImpl(
         ): T {
             // TODO
             // val savedStateHandle = extras.createSavedStateHandle()
-            val id = extras[ID_KEY] ?: error("ID not found in extras")
+            val chatId = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
             return ConsoleViewModelImpl(
                 getMessagesUseCase,
                 clearUnviewedUseCase,
                 talkDelegate,
-                id
+                chatId = chatId
             ) as T
         }
     }
 
     companion object {
-        val ID_KEY = object : CreationExtras.Key<Long> {}
+        val CHAT_ID_KEY = object : CreationExtras.Key<Long> {}
     }
 }

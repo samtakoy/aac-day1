@@ -1,15 +1,12 @@
 package com.example.day.features.chats.impl.ui.viewmodel
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.day.core.core_features.chat.domain.usecase.CreateChatUseCase
-import com.example.day.core.core_features.chat.domain.usecase.GetChatListAsFlowUseCase
+import com.example.day.core.core_features.chat.domain.usecase.GetChatsByGroupUseCase
 import com.example.day.features.chats.impl.ui.viewmodel.ChatsViewModel.State
-import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CancellationException
@@ -25,8 +22,9 @@ import javax.inject.Inject
 
 internal class ChatsViewModelImpl(
     private val createChatUseCase: CreateChatUseCase,
-    private val getChatsUseCase: GetChatListAsFlowUseCase,
-    private val savedStateHandle: SavedStateHandle
+    private val getChatsByGroupUseCase: GetChatsByGroupUseCase,
+    // private val savedStateHandle: SavedStateHandle,
+    private val groupId: Long,
 ) : ViewModel(), ChatsViewModel {
 
     private val _state = MutableStateFlow(
@@ -36,14 +34,20 @@ internal class ChatsViewModelImpl(
     )
 
     init {
-        getChatsUseCase()
+        require(groupId > 0) { "groupId must be positive, got: $groupId" }
+        loadChats()
+    }
+
+    private fun loadChats() {
+        getChatsByGroupUseCase(groupId)
             .onEach { chatModels ->
                 _state.update { state ->
                     val selectedIndex = state.chips.indexOfFirst { it.isSelected }
                     state.copy(
                         chips = chatModels.mapIndexed { idx, model ->
                             State.Chat(
-                                model.id,
+                                id = model.id,
+                                chatType = model.chatGroup.chatType,
                                 title = model.title,
                                 isSelected = selectedIndex == idx
                             )
@@ -84,7 +88,7 @@ internal class ChatsViewModelImpl(
 
     private fun onChatAddClick() {
         launchCatching {
-            createChatUseCase("Chat${++CHAT_COUNTER}")
+            createChatUseCase("Chat${++CHAT_COUNTER}", groupId)
         }
     }
 
@@ -109,22 +113,25 @@ internal class ChatsViewModelImpl(
 
     class Factory @Inject constructor(
         private val createChatUseCase: CreateChatUseCase,
-        private val getChatsUseCase: GetChatListAsFlowUseCase
+        private val getChatsByGroupUseCase: GetChatsByGroupUseCase
     ): ViewModelProvider.Factory {
         override fun <T : ViewModel> create(
             modelClass: Class<T>,
             extras: CreationExtras
         ): T {
-            val savedStateHandle = extras.createSavedStateHandle()
+            // val savedStateHandle = extras.createSavedStateHandle()
+            val groupId = extras[GROUP_ID_KEY] ?: error("GROUP_ID_KEY not found in extras")
             return ChatsViewModelImpl(
                 createChatUseCase,
-                getChatsUseCase,
-                savedStateHandle
+                getChatsByGroupUseCase,
+                // savedStateHandle,
+                groupId = groupId
             ) as T
         }
     }
 
     companion object {
         private var CHAT_COUNTER = 0
+        val GROUP_ID_KEY = object : CreationExtras.Key<Long> {}
     }
 }

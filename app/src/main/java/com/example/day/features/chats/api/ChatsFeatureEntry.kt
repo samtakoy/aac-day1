@@ -1,5 +1,13 @@
 package com.example.day.features.chats.api
 
-import com.example.day.core.feature_entries.FeatureEntry
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 
-interface ChatsFeatureEntry : FeatureEntry
+interface ChatsFeatureEntry {
+    @Composable
+    fun EntryPoint(
+        groupId: Long,
+        modifier: Modifier = Modifier,
+        onNavigateBack: (() -> Unit)? = null
+    )
+}

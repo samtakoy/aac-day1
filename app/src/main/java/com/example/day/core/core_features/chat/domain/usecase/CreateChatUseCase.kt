@@ -6,7 +6,7 @@ import javax.inject.Inject
 class CreateChatUseCase @Inject constructor(
     private val repository: ChatRepository
 ) {
-    suspend operator fun invoke(title: String): Long {
-        return repository.createChat(title)
+    suspend operator fun invoke(title: String, groupId: Long): Long {
+        return repository.createChat(title, groupId)
     }
 }

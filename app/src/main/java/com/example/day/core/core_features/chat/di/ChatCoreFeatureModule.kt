@@ -5,6 +5,8 @@ import androidx.room.Room
 import com.example.day.core.core_features.chat.data.ChatRepositoryImpl
 import com.example.day.core.core_features.chat.data.local.ChatDatabase
 import com.example.day.core.core_features.chat.data.local.dao.ChatDao
+import com.example.day.core.core_features.chat.data.local.dao.ChatGroupDao
+import com.example.day.core.core_features.chat.data.local.dao.ChatTypeDao
 import com.example.day.core.core_features.chat.data.local.dao.MessageDao
 import com.example.day.core.core_features.chat.data.local.dao.UserDao
 import com.example.day.core.core_features.chat.domain.ChatRepository
@@ -37,5 +39,11 @@ internal interface ChatCoreFeatureModule {
 
         @Provides
         internal fun provideMessageDao(db: ChatDatabase): MessageDao = db.messageDao()
+
+        @Provides
+        internal fun provideChatGroupDao(db: ChatDatabase): ChatGroupDao = db.chatGroupDao()
+
+        @Provides
+        internal fun provideChatTypeDao(db: ChatDatabase): ChatTypeDao = db.chatTypeDao()
     }
 }

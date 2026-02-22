@@ -1,5 +1,12 @@
 package com.example.day.features.console.api
 
-import com.example.day.core.feature_entries.FeatureEntry
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 
-interface ConsoleFeatureEntry : FeatureEntry
+interface ConsoleFeatureEntry {
+    @Composable
+    fun EntryPoint(
+        chatId: Long,
+        modifier: Modifier
+    )
+}

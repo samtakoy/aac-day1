@@ -1,6 +1,7 @@
 package com.example.day.features.chats.impl.ui.viewmodel
 
 import androidx.compose.runtime.Immutable
+import com.example.day.core.core_features.chat.domain.model.ChatType
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.coroutines.flow.StateFlow
 
@@ -12,7 +13,12 @@ internal interface ChatsViewModel {
     data class State(
         val chips: PersistentList<Chat>,
     ) {
-        data class Chat(val id: Long, val title: String, val isSelected: Boolean)
+        data class Chat(
+            val id: Long,
+            val chatType: ChatType,
+            val title: String,
+            val isSelected: Boolean
+        )
     }
 
     sealed interface Event {
