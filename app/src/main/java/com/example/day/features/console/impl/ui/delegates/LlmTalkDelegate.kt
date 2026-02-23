@@ -9,9 +9,12 @@ import com.example.day.core.core_features.chat.domain.usecase.ChangeMessageStatu
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesWithStatusUseCase
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
+import com.example.day.core.core_features.llm.domain.model.getContent
 import javax.inject.Inject
 
-/** Ведет простой диалог с Llm */
+/** Ведет простой диалог с Llm.
+ * В каждый запрос к Llm добавляет историю сообщений которую читает прямо из чата (все подряд)
+ * */
 internal class LlmTalkDelegate @Inject constructor(
     private val requestUseCase: LlmRequestUseCase,
     private val getMessagesWithStatusUseCase: GetChatMessagesWithStatusUseCase,
@@ -20,27 +23,26 @@ internal class LlmTalkDelegate @Inject constructor(
 ) : TalkDelegate {
 
     override suspend fun tryAddUserMessage(
-        chatId: Long,
-        inputText: String,
         chat: Chat,
+        inputText: String,
         onSuccess: () -> Unit
     ) {
         val messageId = addChatMessageUseCase.invoke(
-            chatId,
+            chat.id,
             System.currentTimeMillis(),
             UserType.User,
             inputText,
             ChatMessageStatus.Sending
         )
-        val history = getMessagesWithStatusUseCase(chatId, ChatMessageStatus.Viewed)
+        val history = getMessagesWithStatusUseCase(chat.id, ChatMessageStatus.Viewed)
         llmRequest(inputText, history, chat.settings)
             .onSuccess { llmResult ->
                 changeMessageUseCase(messageId, ChatMessageStatus.Viewed)
                 addChatMessageUseCase.invoke(
-                    chatId,
+                    chat.id,
                     System.currentTimeMillis(),
                     UserType.Bot,
-                    llmResult.text,
+                    llmResult.getContent(),
                     ChatMessageStatus.Viewed
                 )
                 onSuccess()

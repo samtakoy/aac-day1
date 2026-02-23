@@ -1,12 +1,11 @@
-package com.example.day.features.console.impl.domain.agents.worker
+package com.example.day.features.console.impl.domain.agents.worker.base
 
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
-import com.example.day.core.core_features.llm.domain.model.LlmResult
 import kotlinx.coroutines.flow.Flow
 
 /** Интерфейс для каждого типа обработчика команды из [com.example.day.features.console.impl.domain.agents.ChatCommand]
  * @return Flow ответов LLM
  * */
-interface AWorker {
-    suspend fun doWork(task: String, chatSettings: ChatSettings): Flow<LlmResult>
+internal interface AWorker {
+    suspend fun doWork(task: String, chatSettings: ChatSettings): Flow<WorkerEvent>
 }

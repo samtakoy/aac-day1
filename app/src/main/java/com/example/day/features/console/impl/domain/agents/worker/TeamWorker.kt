@@ -2,8 +2,13 @@ package com.example.day.features.console.impl.domain.agents.worker
 
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
-import com.example.day.core.core_features.llm.domain.model.LlmResult
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
+import com.example.day.core.core_features.llm.domain.model.ModelResult
+import com.example.day.core.core_features.llm.domain.model.getContent
+import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
+import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
+import com.example.day.features.console.impl.domain.agents.worker.base.askLlm
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -16,7 +21,7 @@ internal class TeamWorker @Inject constructor(
     override suspend fun doWork(
         task: String,
         chatSettings: ChatSettings
-    ): Flow<LlmResult> = callbackFlow {
+    ): Flow<WorkerEvent> = callbackFlow {
 
         val messageHistory = mutableListOf<ModelRequest.Message>()
         val experts = listOf(
@@ -27,25 +32,28 @@ internal class TeamWorker @Inject constructor(
 
         // 1. Опрос экспертов
         experts.forEach { (name, mission) ->
-            send(LlmResult(text = "--- 🧠 Выступает $name ---", source = null))
+            send(WorkerEvent.Speech(text = "--- 🧠 Выступает $name ---"))
 
             val promptText = "Твоя роль: $name. Задача: $mission. " +
                     if (messageHistory.isNotEmpty()) "Учитывай мнение предыдущих экспертов. Контекст: $task" else "Контекст: $task"
 
-            val response = askExpert(chatSettings, promptText, messageHistory)
-
-            response.onSuccess { llmResult ->
-                val rawAnswer = llmResult.text
-                val result = extractResult(rawAnswer) ?: rawAnswer
-                send(LlmResult(text = result, source = llmResult.source))
-                messageHistory.add(ModelRequest.Message(ModelRequest.Role.User, promptText))
-                messageHistory.add(ModelRequest.Message(ModelRequest.Role.Assistant, rawAnswer))
-            }
+            askExpert(chatSettings, promptText, messageHistory)
+                .onSuccess { llmResult ->
+                    val rawAnswer = llmResult.getContent()
+                    val result = extractResult(rawAnswer) ?: rawAnswer
+                    send(WorkerEvent.Speech(text = result))
+                    messageHistory.add(ModelRequest.Message(ModelRequest.Role.User, promptText))
+                    messageHistory.add(ModelRequest.Message(ModelRequest.Role.Assistant, rawAnswer))
+                }
+                .onFailure {
+                    send(WorkerEvent.Speech("что-то пошло не так: ${it.message}"))
+                    close()
+                }
             delay(2000)
         }
 
         // 2. Финальное резюме от Менеджера
-        send(LlmResult(text = "--- 📋 МЕНЕДЖЕР ПРОЕКТА (Сводный план) ---", source = null))
+        send(WorkerEvent.Speech(text = "--- 📋 МЕНЕДЖЕР ПРОЕКТА (Сводный план) ---"))
         val managerPrompt = "Ты — Менеджер. Собери воедино мнения аналитика и инженера, " +
                 "учти замечания критика и выдай финальный пошаговый план реализации задачи: $task"
 
@@ -53,31 +61,34 @@ internal class TeamWorker @Inject constructor(
 
         finalResponse.onSuccess { llmResult ->
             // Логируем для отладки, если пусто
-            val raw = llmResult.text
+            val raw = llmResult.getContent()
             val result = extractResult(raw)
             if (result != null) {
-                send(LlmResult(text = result, source = llmResult.source))
+                send(WorkerEvent.Speech(text = result))
             } else {
                 // Если совсем ничего не нашли в content, пробуем заглянуть в reasoning (крайний случай)
-                send(LlmResult(text = "Ошибка парсинга: ${raw.take(100)}...", source = llmResult.source))
+                send(WorkerEvent.Speech(text = "Ошибка парсинга: ${raw.take(100)}..."))
             }
         }.onFailure {
-            send(LlmResult(text = "Ошибка менеджера: ${it.message}", source = null))
+            send(WorkerEvent.Speech(text = "Ошибка менеджера: ${it.message}"))
         }
         close()
     }
 
-    private suspend fun askExpert(
+    private suspend fun ProducerScope<WorkerEvent>.askExpert(
         chatSettings: ChatSettings,
         prompt: String,
         history: List<ModelRequest.Message>
-    ): Result<LlmResult> =
-        llmRequestUseCase.exec(
-            modelSettings = chatSettings.model,
-            systemPrompt = TEAM_SYSTEM_PROMPT,
-            messages = history,
-            promptText = prompt
-        )
+    ): Result<ModelResult.Success> {
+        return with(llmRequestUseCase) {
+            askLlm(
+                chatSettings = chatSettings,
+                userPrompt = prompt,
+                systemPrompt = TEAM_SYSTEM_PROMPT,
+                history = history
+            )
+        }
+    }
 
     private fun extractResult(answer: String): String? {
         val regex = Regex("\\[RESULT_START\\](.*)\\[RESULT_END\\]", RegexOption.DOT_MATCHES_ALL)

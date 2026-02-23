@@ -150,7 +150,6 @@ internal class ConsoleViewModelImpl(
 
     private fun sendRequest(inputText: String) {
         val currentChat = chat ?: return
-        val settings = chatSettings ?: return
         changeSendBar("", ChatSendButtonType.ArrowDisabled)
         launchCatching(
             onError = { error ->
@@ -160,7 +159,7 @@ internal class ConsoleViewModelImpl(
         ) {
             clearUnviewedUseCase.invoke(chatId)
             // делегат отправки сообщения куда-то
-            talkDelegate.tryAddUserMessage(chatId, inputText, currentChat) {
+            talkDelegate.tryAddUserMessage(currentChat, inputText) {
                 restoreSendButton()
             }
         }

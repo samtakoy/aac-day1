@@ -2,7 +2,10 @@ package com.example.day.features.console.impl.domain.agents.worker
 
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
-import com.example.day.core.core_features.llm.domain.model.LlmResult
+import com.example.day.core.core_features.llm.domain.model.getContent
+import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
+import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
+import com.example.day.features.console.impl.domain.agents.worker.base.askLlm
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import javax.inject.Inject
@@ -13,51 +16,48 @@ internal class PromptWorker @Inject constructor(
     override suspend fun doWork(
         task: String,
         chatSettings: ChatSettings
-    ): Flow<LlmResult> {
-        return callbackFlow {
-            // 1. составим промпт
-            val promptResult = llmRequestUseCase.exec(
-                modelSettings = chatSettings.model,
-                systemPrompt = SYSTEM_PROMPT,
-                messages = emptyList(),
-                promptText = "Составь промпт для LLM для решения задачи: $task\n",
-                // текущая LLM со стоп словом перестает отвечать - пока без него
-                //stopSequence = listOf(TERMINATE)
+    ): Flow<WorkerEvent> = callbackFlow {
+        // 1. составим промпт
+        val promptResult = with(llmRequestUseCase) {
+            askLlm(
+                chatSettings = chatSettings,
+                userPrompt = "Составь промпт для LLM для решения задачи: $task\n",
+                systemPrompt = SYSTEM_PROMPT
             )
-            // Ошибка
-            if (promptResult.isFailure) {
-                val errorText = promptResult.exceptionOrNull()?.stackTraceToString() ?: "ошибка"
-                send(LlmResult(text = errorText, source = null))
-                close()
-                return@callbackFlow
-            }
-
-            val llmResult = promptResult.getOrThrow()
-            val generatedPrompt = extractResult(llmResult.text)
-            if (generatedPrompt == null) {
-                send(LlmResult(text = "Я не смог выполнить инструкции и написал:\n${llmResult.text}", source = llmResult.source))
-                close()
-                return@callbackFlow
-            }
-
-            // Отправляем промпт в чат
-            send(LlmResult(text = "Я составил промпт:\n$generatedPrompt", source = llmResult.source))
-
-            // 2. Даем задание в виде промпта:
-            val result = llmRequestUseCase.exec(
-                modelSettings = chatSettings.model,
-                systemPrompt = null,
-                messages = emptyList(),
-                promptText = generatedPrompt,
-            )
-                .onSuccess { result  ->
-                    send(result)
-                }
-                .onFailure { exception ->
-                    send(LlmResult(text = exception.stackTraceToString(), source = null))
-                }
-            close()
         }
+        // Ошибка
+        if (promptResult.isFailure) {
+            val errorText = promptResult.exceptionOrNull()?.stackTraceToString() ?: "ошибка"
+            send(WorkerEvent.Speech(text = errorText))
+            close()
+            return@callbackFlow
+        }
+
+        val llmResult = promptResult.getOrThrow()
+        val generatedPrompt = extractResult(llmResult.getContent())
+        if (generatedPrompt == null) {
+            send(WorkerEvent.Speech(text = "Я не смог выполнить инструкции и написал:\n${llmResult.getContent()}"))
+            close()
+            return@callbackFlow
+        }
+
+        // Отправляем промпт в чат
+        send(WorkerEvent.Speech(text = "Я составил промпт:\n$generatedPrompt"))
+
+        // 2. Даем задание в виде промпта:
+        with(llmRequestUseCase) {
+            askLlm(
+                chatSettings = chatSettings,
+                userPrompt = generatedPrompt,
+            )
+        }
+            .onSuccess { result  ->
+                send(WorkerEvent.Speech(result.getContent()))
+            }
+            .onFailure { exception ->
+                send(WorkerEvent.Speech(text = exception.stackTraceToString()))
+            }
+        close()
     }
 
     private fun extractResult(answer: String): String? {
