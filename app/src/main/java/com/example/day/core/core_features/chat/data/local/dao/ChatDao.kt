@@ -6,7 +6,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import com.example.day.core.core_features.chat.data.local.model.ChatEntity
-import com.example.day.core.core_features.chat.data.local.model.joins.ChatWithGroup
+import com.example.day.core.core_features.chat.data.local.model.joins.ChatWithGroupAndSettings
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -16,14 +16,18 @@ internal interface ChatDao {
 
     @Transaction
     @Query("SELECT * FROM chats WHERE id = :chatId")
-    suspend fun getChatById(chatId: Long): ChatWithGroup?
+    suspend fun getChatById(chatId: Long): ChatWithGroupAndSettings?
+
+    @Transaction
+    @Query("SELECT * FROM chats WHERE id = :chatId")
+    fun getChatByIdAsFlow(chatId: Long): Flow<ChatWithGroupAndSettings?>
 
     @Query("DELETE FROM chats WHERE id = :chatId")
     suspend fun delete(chatId: Long)
 
     @Transaction
     @Query("SELECT * FROM chats WHERE chat_group_id = :groupId ORDER BY id ASC")
-    fun getChatsByGroupAsFlow(groupId: Long): Flow<List<ChatWithGroup>>
+    fun getChatsByGroupAsFlow(groupId: Long): Flow<List<ChatWithGroupAndSettings>>
     
     @Query("SELECT COUNT(*) FROM chats WHERE chat_group_id = :groupId")
     suspend fun getChatsCountInGroup(groupId: Long): Int

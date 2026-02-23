@@ -6,21 +6,20 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
-import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.core.core_features.chat.domain.usecase.ClearChatNotViewedMessageUseCase
+import com.example.day.core.core_features.chat.domain.usecase.GetChatByIdAsFlowUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsFlowUseCase
+import com.example.day.core.core_features.chat.domain.usecase.UpdateChatSettingsUseCase
 import com.example.day.core.ui.uikit.chat.bar.model.ChatBarUiModel
 import com.example.day.core.ui.uikit.chat.bar.model.ChatSendButtonType
 import com.example.day.core.ui.uikit.chat.list.model.ChatListUiModel
 import com.example.day.core.ui.uikit.chat.list.model.ChatMessageUiModel
 import com.example.day.core.ui.uikit.chat.list.model.UiMessageStatus
-import com.example.day.core.core_features.llm.domain.ModelConst
 import com.example.day.features.console.impl.ui.components.ChatSettingsUiModel
 import com.example.day.features.console.impl.ui.delegates.AgentsTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.LlmTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.TalkDelegate
-import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +36,8 @@ internal class ConsoleViewModelImpl(
     private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
     private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
     private val talkDelegate: TalkDelegate,
+    private val getChatByIdAsFlowUseCase: GetChatByIdAsFlowUseCase,
+    private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
     // TODO
     // private val savedStateHandle: SavedStateHandle,
     private val chatId: Long
@@ -53,22 +54,20 @@ internal class ConsoleViewModelImpl(
         )
     )
 
-    // TODO все переделать
-    private var chatSettings = ChatSettings(
-        chatId = chatId,
-        // systemPromt = "Ты профессиональный пьяный психолог, очень дотошный",
-        systemPromt = "",
-        model = ModelSettings(
-            name = ModelConst.DEFAULT_MODEL,
-            // stopSequence = listOf("Бутылка").toImmutableList(),
-            stopSequence = emptyList<String>().toImmutableList(),
-            maxTokens = 0, // 500,
-            jsonFormat = false,
-            reasoningEffort = "none"
-        )
-    )
+    // Chat settings loaded from database
+    private var chatSettings: ChatSettings? = null
 
     init {
+        // Subscribe to chat data to get settings
+        getChatByIdAsFlowUseCase(chatId)
+            .onEach { chat ->
+                chat?.settings?.let { settings ->
+                    chatSettings = settings
+                }
+            }
+            .launchIn(viewModelScope)
+
+        // Subscribe to messages
         getMessagesUseCase(chatId)
             .onEach { messages ->
                 _state.update { state ->
@@ -125,7 +124,9 @@ internal class ConsoleViewModelImpl(
                 sendRequest(_state.value.chatBar.inputInitialValue)
             }
             ConsoleViewModel.Event.OpenSettingsClick -> {
-                _state.update { it.copy(settings = ChatSettingsUiModel("Настройки", chatSettings)) }
+                chatSettings?.let { settings ->
+                    _state.update { it.copy(settings = ChatSettingsUiModel("Настройки", settings)) }
+                }
             }
 
             ConsoleViewModel.Event.SettingsCancelClick -> {
@@ -134,11 +135,16 @@ internal class ConsoleViewModelImpl(
             is ConsoleViewModel.Event.SettingsSubmitClick -> {
                 chatSettings = event.result
                 _state.update { it.copy(settings = null) }
+                // Save settings to database
+                viewModelScope.launch {
+                    updateChatSettingsUseCase(event.result)
+                }
             }
         }
     }
 
     private fun sendRequest(inputText: String) {
+        val settings = chatSettings ?: return
         changeSendBar("", ChatSendButtonType.ArrowDisabled)
         launchCatching(
             onError = { error ->
@@ -148,7 +154,7 @@ internal class ConsoleViewModelImpl(
         ) {
             clearUnviewedUseCase.invoke(chatId)
             // делегат отправки сообщения куда-то
-            talkDelegate.tryAddUserMessage(chatId, inputText, chatSettings) {
+            talkDelegate.tryAddUserMessage(chatId, inputText, settings) {
                 restoreSendButton()
             }
         }
@@ -193,6 +199,8 @@ internal class ConsoleViewModelImpl(
         private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
         private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
         private val talkDelegate: LlmTalkDelegate,
+        private val getChatByIdAsFlowUseCase: GetChatByIdAsFlowUseCase,
+        private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
     ): ViewModelProvider.Factory {
         override fun <T : ViewModel> create(
             modelClass: Class<T>,
@@ -205,6 +213,8 @@ internal class ConsoleViewModelImpl(
                 getMessagesUseCase,
                 clearUnviewedUseCase,
                 talkDelegate,
+                getChatByIdAsFlowUseCase,
+                updateChatSettingsUseCase,
                 id
             ) as T
         }
@@ -214,6 +224,8 @@ internal class ConsoleViewModelImpl(
         private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
         private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
         private val talkDelegate: AgentsTalkDelegate,
+        private val getChatByIdAsFlowUseCase: GetChatByIdAsFlowUseCase,
+        private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
     ): ViewModelProvider.Factory {
         override fun <T : ViewModel> create(
             modelClass: Class<T>,
@@ -226,6 +238,8 @@ internal class ConsoleViewModelImpl(
                 getMessagesUseCase,
                 clearUnviewedUseCase,
                 talkDelegate,
+                getChatByIdAsFlowUseCase,
+                updateChatSettingsUseCase,
                 chatId = chatId
             ) as T
         }

@@ -1,0 +1,101 @@
+# Project Rules for AI Assistant
+
+## Tech Stack
+- Kotlin + Jetpack Compose + Material 3
+- **Dagger** (NOT Hilt!) for DI with feature-scoped components
+- **Room** for database with relations/joins
+- **Ktor Client** (NOT Retrofit!) for networking
+- Kotlinx Serialization for JSON
+- kotlinx.collections.immutable
+
+## Architecture
+
+### Clean Architecture Layers
+- `domain/` - public models, repositories, use cases
+- `data/` - internal implementations, Room entities, DAOs, mappers
+- `ui/` - ViewModels, Screens, Components
+
+### Feature Structure
+```
+features/feature_name/
+├── api/        # FeatureEntry (public)
+└── impl/       # Implementation (internal)
+    ├── di/     # FeatureComponent, FeatureDeps, FeatureModule
+    └── ui/     # Screen, ViewModel
+```
+
+### Dependency Injection
+- `AppComponent` (Singleton) implements all `FeatureDeps` interfaces
+- Feature components depend on `FeatureDeps` interface, not AppComponent directly
+- Use `@Inject` constructor injection for UseCases
+
+## Code Patterns
+
+### Visibility
+- Data layer classes: `internal`
+- Domain layer: `public`
+- Mappers: `internal`
+
+### Naming Conventions
+- UseCases: `*UseCase`, `*UseCaseImpl` if needed
+- Entities: `*Entity`
+- DAOs: `*Dao`
+- Mappers: `*Mapper`
+- Constants: `*Const` object (no magic numbers)
+
+### Enum Mapping
+```kotlin
+// ALWAYS use explicit when - NEVER ordinal()
+fun fromEntity(status: Int): ChatMessageStatus = when (status) {
+    ChatDbConst.MESSAGE_STATUS_SENDING -> ChatMessageStatus.Sending
+    ChatDbConst.MESSAGE_STATUS_DELIVERED -> ChatMessageStatus.Delivered
+    ChatDbConst.MESSAGE_STATUS_VIEWED -> ChatMessageStatus.Viewed
+    else -> error("Unknown status: $status")
+}
+```
+
+### Room Relations
+```kotlin
+// Use @Relation for loading related entities
+data class ChatWithGroupAndSettings(
+    @Embedded val chat: ChatEntity,
+    @Relation(parentColumn = "chatGroupId", entityColumn = "id")
+    val group: ChatGroupEntity?,
+    @Relation(parentColumn = "id", entityColumn = "chatId")
+    val settings: ChatSettingsEntity?
+)
+```
+
+### JSON in Database
+```kotlin
+// Use @Serializable for complex objects stored as JSON
+@Serializable
+data class ModelSettingsEntity(
+    val name: String,
+    val maxTokens: Int = 0,
+    // ...
+)
+
+// In mapper, use Json.encodeToString/decodeFromString
+```
+
+### Thread Safety
+```kotlin
+// Use Mutex for thread-safe operations
+private val mutex = Mutex()
+override suspend fun someOperation() = mutex.withLock {
+    // ...
+}
+```
+
+## Common Mistakes to Avoid
+
+1. **DON'T** use Hilt annotations (`@HiltViewModel`, `@AndroidEntryPoint`)
+2. **DON'T** use Retrofit - use Ktor Client
+3. **DON'T** use `ordinal()` for enum mapping
+4. **DON'T** put magic numbers in code - use `*Const` objects
+5. **DON'T** make data layer classes public
+
+## File References
+
+Full architecture documentation: `prompts/system/architecture.md`

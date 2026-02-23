@@ -4,6 +4,7 @@ import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatGroup
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
+import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.chat.domain.model.ChatType
 import com.example.day.core.core_features.chat.domain.model.User
 import com.example.day.core.core_features.chat.domain.model.UserType
@@ -13,6 +14,7 @@ interface ChatRepository {
     // Existing chat methods
     suspend fun createChat(title: String, chatGroupId: Long): Long
     suspend fun getChatById(chatId: Long): Chat?
+    fun getChatByIdAsFlow(chatId: Long): Flow<Chat?>
     suspend fun addMessage(
         chatId: Long,
         timestamp: Long,
@@ -43,4 +45,8 @@ interface ChatRepository {
     // New methods for chats by group
     fun getChatsByGroup(groupId: Long): Flow<List<Chat>>
     suspend fun getChatsCountInGroup(groupId: Long): Int
+    
+    // ChatSettings methods
+    suspend fun getChatSettings(chatId: Long): ChatSettings?
+    suspend fun updateChatSettings(settings: ChatSettings)
 }

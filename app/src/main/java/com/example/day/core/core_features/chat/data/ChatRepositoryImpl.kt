@@ -2,15 +2,18 @@ package com.example.day.core.core_features.chat.data
 
 import com.example.day.core.core_features.chat.data.local.dao.ChatDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatGroupDao
+import com.example.day.core.core_features.chat.data.local.dao.ChatSettingsDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatTypeDao
 import com.example.day.core.core_features.chat.data.local.dao.MessageDao
 import com.example.day.core.core_features.chat.data.local.dao.UserDao
 import com.example.day.core.core_features.chat.data.local.mapper.ChatGroupMapper
 import com.example.day.core.core_features.chat.data.local.mapper.ChatMapper
+import com.example.day.core.core_features.chat.data.local.mapper.ChatSettingsMapper
 import com.example.day.core.core_features.chat.data.local.mapper.toDomain
 import com.example.day.core.core_features.chat.data.local.model.ChatDbConst
 import com.example.day.core.core_features.chat.data.local.model.ChatEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatGroupEntity
+import com.example.day.core.core_features.chat.data.local.model.ChatSettingsEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatTypeEntity
 import com.example.day.core.core_features.chat.data.local.model.MessageEntity
 import com.example.day.core.core_features.chat.data.local.model.UserEntity
@@ -19,9 +22,12 @@ import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatGroup
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
+import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.chat.domain.model.ChatType
 import com.example.day.core.core_features.chat.domain.model.User
 import com.example.day.core.core_features.chat.domain.model.UserType
+import com.example.day.core.core_features.llm.domain.ModelConst
+import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -34,8 +40,10 @@ internal class ChatRepositoryImpl @Inject constructor(
     private val messageDao: MessageDao,
     private val chatGroupDao: ChatGroupDao,
     private val chatTypeDao: ChatTypeDao,
+    private val chatSettingsDao: ChatSettingsDao,
     private val chatMapper: ChatMapper,
-    private val chatGroupMapper: ChatGroupMapper
+    private val chatGroupMapper: ChatGroupMapper,
+    private val chatSettingsMapper: ChatSettingsMapper
 ) : ChatRepository {
 
     private val mutex = Mutex()
@@ -49,11 +57,25 @@ internal class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun createChat(title: String, chatGroupId: Long): Long = mutex.withLock {
         getOrCreateDefaultUsers()
-        return chatDao.insert(ChatEntity(title = title, chatGroupId = chatGroupId))
+        val chatId = chatDao.insert(ChatEntity(title = title, chatGroupId = chatGroupId))
+        
+        // Создаем настройки по умолчанию для нового чата
+        val defaultSettings = ChatSettings(
+            chatId = chatId,
+            systemPromt = "",
+            model = ModelSettings(name = ModelConst.DEFAULT_MODEL)
+        )
+        chatSettingsDao.insert(chatSettingsMapper.toEntity(defaultSettings))
+        
+        return chatId
     }
 
     override suspend fun getChatById(chatId: Long): Chat? {
         return chatDao.getChatById(chatId)?.let(chatMapper::toDomain)
+    }
+
+    override fun getChatByIdAsFlow(chatId: Long): Flow<Chat?> {
+        return chatDao.getChatByIdAsFlow(chatId).map { it?.let(chatMapper::toDomain) }
     }
 
     override suspend fun addMessage(
@@ -203,5 +225,14 @@ internal class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun getChatsCountInGroup(groupId: Long): Int {
         return chatDao.getChatsCountInGroup(groupId)
+    }
+
+    // ChatSettings methods
+    override suspend fun getChatSettings(chatId: Long): ChatSettings? {
+        return chatSettingsDao.getSettingsByChatId(chatId)?.let(chatSettingsMapper::toDomain)
+    }
+
+    override suspend fun updateChatSettings(settings: ChatSettings) {
+        chatSettingsDao.insert(chatSettingsMapper.toEntity(settings))
     }
 }

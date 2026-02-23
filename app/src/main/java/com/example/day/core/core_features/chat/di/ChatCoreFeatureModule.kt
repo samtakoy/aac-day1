@@ -6,6 +6,7 @@ import com.example.day.core.core_features.chat.data.ChatRepositoryImpl
 import com.example.day.core.core_features.chat.data.local.ChatDatabase
 import com.example.day.core.core_features.chat.data.local.dao.ChatDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatGroupDao
+import com.example.day.core.core_features.chat.data.local.dao.ChatSettingsDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatTypeDao
 import com.example.day.core.core_features.chat.data.local.dao.MessageDao
 import com.example.day.core.core_features.chat.data.local.dao.UserDao
@@ -45,5 +46,8 @@ internal interface ChatCoreFeatureModule {
 
         @Provides
         internal fun provideChatTypeDao(db: ChatDatabase): ChatTypeDao = db.chatTypeDao()
+
+        @Provides
+        internal fun provideChatSettingsDao(db: ChatDatabase): ChatSettingsDao = db.chatSettingsDao()
     }
 }
