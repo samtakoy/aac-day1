@@ -2,6 +2,7 @@ package com.example.day.features.console.impl.domain.agents.worker
 
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
+import com.example.day.core.core_features.llm.domain.model.LlmResult
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -14,7 +15,7 @@ internal class StepWorker @Inject constructor(
     override suspend fun doWork(
         task: String,
         chatSettings: ChatSettings
-    ): Flow<String> = callbackFlow {
+    ): Flow<LlmResult> = callbackFlow {
 
         // История сообщений для поддержания контекста
         val messageHistory = mutableListOf<ModelRequest.Message>()
@@ -28,7 +29,7 @@ internal class StepWorker @Inject constructor(
                 "Если задача решена, напиши $DONE. \nЗадача: $task"
 
         while (!isFinished && cycleCount <= MAX_STEPS) {
-            send("--- Думаю над шагом №$currentStep ---")
+            send(LlmResult(text = "--- Думаю над шагом №$currentStep ---", source = null))
 
             val response = llmRequestUseCase.exec(
                 modelSettings = chatSettings.model,
@@ -37,18 +38,19 @@ internal class StepWorker @Inject constructor(
                 promptText = nextUserMessage
             )
 
-            response.onSuccess { rawAnswer ->
+            response.onSuccess { llmResult ->
+                val rawAnswer = llmResult.text
                 val results = extractResults(rawAnswer)
 
                 if (results.isEmpty()) {
-                    send("Вот мой финальный ответ:\n$rawAnswer")
+                    send(LlmResult(text = "Вот мой финальный ответ:\n$rawAnswer", source = llmResult.source))
                     close()
                     return@callbackFlow
                 }
 
                 // Отправляем промежуточные результаты в UI
                 results.forEachIndexed { index, content ->
-                    send(content)
+                    send(LlmResult(text = content, source = llmResult.source))
                     currentStep++
                 }
 
@@ -62,21 +64,21 @@ internal class StepWorker @Inject constructor(
 
                 if (rawAnswer.contains(DONE)) {
                     isFinished = true
-                    send("✅ Задача завершена")
+                    send(LlmResult(text = "✅ Задача завершена", source = llmResult.source))
                 } else {
                     nextUserMessage = "Выполни следующий шаг или заверши работу тегом $DONE"
                     cycleCount++
-                    send("--- Думаю над шагом №$currentStep ---")
+                    send(LlmResult(text = "--- Думаю над шагом №$currentStep ---", source = null))
                     // на всякий случай уменьшим частоту ddos-атаки
                     delay(1000)
                 }
             }.onFailure {
-                send("Ошибка на шаге $cycleCount: ${it.message}")
+                send(LlmResult(text = "Ошибка на шаге $cycleCount: ${it.message}", source = null))
                 isFinished = true
             }
         }
 
-        if (cycleCount > MAX_STEPS) send("⚠️ Превышен лимит шагов")
+        if (cycleCount > MAX_STEPS) send(LlmResult(text = "⚠️ Превышен лимит шагов", source = null))
         close()
     }
 

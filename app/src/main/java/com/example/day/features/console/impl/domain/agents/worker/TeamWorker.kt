@@ -2,6 +2,7 @@ package com.example.day.features.console.impl.domain.agents.worker
 
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
+import com.example.day.core.core_features.llm.domain.model.LlmResult
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +16,7 @@ internal class TeamWorker @Inject constructor(
     override suspend fun doWork(
         task: String,
         chatSettings: ChatSettings
-    ): Flow<String> = callbackFlow {
+    ): Flow<LlmResult> = callbackFlow {
 
         val messageHistory = mutableListOf<ModelRequest.Message>()
         val experts = listOf(
@@ -26,16 +27,17 @@ internal class TeamWorker @Inject constructor(
 
         // 1. Опрос экспертов
         experts.forEach { (name, mission) ->
-            send("--- 🧠 Выступает $name ---")
+            send(LlmResult(text = "--- 🧠 Выступает $name ---", source = null))
 
             val promptText = "Твоя роль: $name. Задача: $mission. " +
                     if (messageHistory.isNotEmpty()) "Учитывай мнение предыдущих экспертов. Контекст: $task" else "Контекст: $task"
 
             val response = askExpert(chatSettings, promptText, messageHistory)
 
-            response.onSuccess { rawAnswer ->
+            response.onSuccess { llmResult ->
+                val rawAnswer = llmResult.text
                 val result = extractResult(rawAnswer) ?: rawAnswer
-                send(result)
+                send(LlmResult(text = result, source = llmResult.source))
                 messageHistory.add(ModelRequest.Message(ModelRequest.Role.User, promptText))
                 messageHistory.add(ModelRequest.Message(ModelRequest.Role.Assistant, rawAnswer))
             }
@@ -43,23 +45,24 @@ internal class TeamWorker @Inject constructor(
         }
 
         // 2. Финальное резюме от Менеджера
-        send("--- 📋 МЕНЕДЖЕР ПРОЕКТА (Сводный план) ---")
+        send(LlmResult(text = "--- 📋 МЕНЕДЖЕР ПРОЕКТА (Сводный план) ---", source = null))
         val managerPrompt = "Ты — Менеджер. Собери воедино мнения аналитика и инженера, " +
                 "учти замечания критика и выдай финальный пошаговый план реализации задачи: $task"
 
         val finalResponse = askExpert(chatSettings, managerPrompt, messageHistory)
 
-        finalResponse.onSuccess { raw ->
+        finalResponse.onSuccess { llmResult ->
             // Логируем для отладки, если пусто
+            val raw = llmResult.text
             val result = extractResult(raw)
             if (result != null) {
-                send(result)
+                send(LlmResult(text = result, source = llmResult.source))
             } else {
                 // Если совсем ничего не нашли в content, пробуем заглянуть в reasoning (крайний случай)
-                send("Ошибка парсинга: ${raw.take(100)}...")
+                send(LlmResult(text = "Ошибка парсинга: ${raw.take(100)}...", source = llmResult.source))
             }
         }.onFailure {
-            send("Ошибка менеджера: ${it.message}")
+            send(LlmResult(text = "Ошибка менеджера: ${it.message}", source = null))
         }
         close()
     }
@@ -68,7 +71,7 @@ internal class TeamWorker @Inject constructor(
         chatSettings: ChatSettings,
         prompt: String,
         history: List<ModelRequest.Message>
-    ) =
+    ): Result<LlmResult> =
         llmRequestUseCase.exec(
             modelSettings = chatSettings.model,
             systemPrompt = TEAM_SYSTEM_PROMPT,

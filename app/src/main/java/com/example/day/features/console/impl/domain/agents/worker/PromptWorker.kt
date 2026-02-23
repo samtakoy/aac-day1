@@ -2,6 +2,7 @@ package com.example.day.features.console.impl.domain.agents.worker
 
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
+import com.example.day.core.core_features.llm.domain.model.LlmResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import javax.inject.Inject
@@ -12,7 +13,7 @@ internal class PromptWorker @Inject constructor(
     override suspend fun doWork(
         task: String,
         chatSettings: ChatSettings
-    ): Flow<String> {
+    ): Flow<LlmResult> {
         return callbackFlow {
             // 1. составим промпт
             val promptResult = llmRequestUseCase.exec(
@@ -26,20 +27,21 @@ internal class PromptWorker @Inject constructor(
             // Ошибка
             if (promptResult.isFailure) {
                 val errorText = promptResult.exceptionOrNull()?.stackTraceToString() ?: "ошибка"
-                send(errorText)
+                send(LlmResult(text = errorText, source = null))
                 close()
                 return@callbackFlow
             }
 
-            val generatedPrompt = extractResult(promptResult.getOrThrow())
+            val llmResult = promptResult.getOrThrow()
+            val generatedPrompt = extractResult(llmResult.text)
             if (generatedPrompt == null) {
-                send("Я не смог выполнить инструкции и написал:\n$generatedPrompt")
+                send(LlmResult(text = "Я не смог выполнить инструкции и написал:\n${llmResult.text}", source = llmResult.source))
                 close()
                 return@callbackFlow
             }
 
             // Отправляем промпт в чат
-            send("Я составил промпт:\n$generatedPrompt")
+            send(LlmResult(text = "Я составил промпт:\n$generatedPrompt", source = llmResult.source))
 
             // 2. Даем задание в виде промпта:
             val result = llmRequestUseCase.exec(
@@ -52,7 +54,7 @@ internal class PromptWorker @Inject constructor(
                     send(result)
                 }
                 .onFailure { exception ->
-                    send(exception.stackTraceToString())
+                    send(LlmResult(text = exception.stackTraceToString(), source = null))
                 }
             close()
         }

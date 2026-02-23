@@ -1,8 +1,10 @@
 package com.example.day.features.console.impl.di
 
+import com.example.day.core.core_features.chat.domain.ChatRepository
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ChangeMessageStatusUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ClearChatNotViewedMessageUseCase
+import com.example.day.core.core_features.chat.domain.usecase.CreateChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatByIdAsFlowUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsFlowUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesWithStatusUseCase
@@ -18,4 +20,6 @@ interface ConsoleFeatureDeps {
     val llmRequestUseCase: LlmRequestUseCase
     val getChatByIdAsFlowUseCase: GetChatByIdAsFlowUseCase
     val updateChatSettingsUseCase: UpdateChatSettingsUseCase
+    val createChatUseCase: CreateChatUseCase
+    val chatRepository: ChatRepository
 }

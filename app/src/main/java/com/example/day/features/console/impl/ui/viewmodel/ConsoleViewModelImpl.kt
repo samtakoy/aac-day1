@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
+import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.chat.domain.model.UserType
@@ -54,14 +55,18 @@ internal class ConsoleViewModelImpl(
         )
     )
 
-    // Chat settings loaded from database
+    // Chat object loaded from database
+    private var chat: Chat? = null
+
+    // Chat settings loaded from database (derived from chat)
     private var chatSettings: ChatSettings? = null
 
     init {
         // Subscribe to chat data to get settings
         getChatByIdAsFlowUseCase(chatId)
-            .onEach { chat ->
-                chat?.settings?.let { settings ->
+            .onEach { chatData ->
+                chat = chatData
+                chatData?.settings?.let { settings ->
                     chatSettings = settings
                 }
             }
@@ -144,6 +149,7 @@ internal class ConsoleViewModelImpl(
     }
 
     private fun sendRequest(inputText: String) {
+        val currentChat = chat ?: return
         val settings = chatSettings ?: return
         changeSendBar("", ChatSendButtonType.ArrowDisabled)
         launchCatching(
@@ -154,7 +160,7 @@ internal class ConsoleViewModelImpl(
         ) {
             clearUnviewedUseCase.invoke(chatId)
             // делегат отправки сообщения куда-то
-            talkDelegate.tryAddUserMessage(chatId, inputText, settings) {
+            talkDelegate.tryAddUserMessage(chatId, inputText, currentChat) {
                 restoreSendButton()
             }
         }

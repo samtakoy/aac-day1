@@ -1,8 +1,8 @@
 package com.example.day.features.console.impl.ui.delegates
 
+import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ChangeMessageStatusUseCase
@@ -22,7 +22,7 @@ internal class LlmTalkDelegate @Inject constructor(
     override suspend fun tryAddUserMessage(
         chatId: Long,
         inputText: String,
-        chatSettings: ChatSettings,
+        chat: Chat,
         onSuccess: () -> Unit
     ) {
         val messageId = addChatMessageUseCase.invoke(
@@ -33,14 +33,14 @@ internal class LlmTalkDelegate @Inject constructor(
             ChatMessageStatus.Sending
         )
         val history = getMessagesWithStatusUseCase(chatId, ChatMessageStatus.Viewed)
-        llmRequest(inputText, history, chatSettings)
-            .onSuccess { result ->
+        llmRequest(inputText, history, chat.settings)
+            .onSuccess { llmResult ->
                 changeMessageUseCase(messageId, ChatMessageStatus.Viewed)
                 addChatMessageUseCase.invoke(
                     chatId,
                     System.currentTimeMillis(),
                     UserType.Bot,
-                    result,
+                    llmResult.text,
                     ChatMessageStatus.Viewed
                 )
                 onSuccess()
@@ -51,17 +51,15 @@ internal class LlmTalkDelegate @Inject constructor(
     private suspend fun llmRequest(
         promptText: String,
         history: List<ChatMessage>,
-        chatSettings: ChatSettings
-    ): Result<String> {
-        return requestUseCase.exec(
-            modelSettings = chatSettings.model,
-            systemPrompt = chatSettings.systemPromt,
-            messages = history.map { chatMessage ->
-                chatMessage.mapToRequestMessage()
-            },
-            promptText = promptText,
-        )
-    }
+        chatSettings: com.example.day.core.core_features.chat.domain.model.ChatSettings
+    ) = requestUseCase.exec(
+        modelSettings = chatSettings.model,
+        systemPrompt = chatSettings.systemPromt,
+        messages = history.map { chatMessage ->
+            chatMessage.mapToRequestMessage()
+        },
+        promptText = promptText,
+    )
 
     private fun ChatMessage.mapToRequestMessage(): ModelRequest.Message = ModelRequest.Message(
         role = user.type.mapToRequestRole(),

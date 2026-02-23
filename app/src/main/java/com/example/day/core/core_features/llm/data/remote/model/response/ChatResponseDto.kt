@@ -77,6 +77,8 @@ internal data class MessageDto(
  * @property promptTokens Количество токенов в запросе
  * @property completionTokens Количество токенов в ответе
  * @property totalTokens Общее количество использованных токенов
+ * @property cost Общая стоимость в USD
+ * @property costDetails Детализация стоимости
  */
 @Serializable
 internal data class UsageDto(
@@ -85,7 +87,25 @@ internal data class UsageDto(
     @SerialName("completion_tokens")
     val completionTokens: Int? = null,
     @SerialName("total_tokens")
-    val totalTokens: Int
+    val totalTokens: Int? = null,
+    @SerialName("cost")
+    val cost: Double? = null,
+    @SerialName("cost_details")
+    val costDetails: CostDetailsDto? = null
+)
+
+/**
+ * Детализация стоимости от OpenRouter
+ *
+ * @property upstreamInferencePromptCost Стоимость входных данных
+ * @property upstreamInferenceCompletionsCost Стоимость сгенерированного ответа
+ */
+@Serializable
+internal data class CostDetailsDto(
+    @SerialName("upstream_inference_prompt_cost")
+    val upstreamInferencePromptCost: Double? = null,
+    @SerialName("upstream_inference_completions_cost")
+    val upstreamInferenceCompletionsCost: Double? = null
 )
 
 /**

@@ -1,10 +1,11 @@
 package com.example.day.features.console.impl.ui.delegates
 
+import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ChangeMessageStatusUseCase
+import com.example.day.core.core_features.chat.domain.usecase.CreateChatUseCase
 import com.example.day.features.console.impl.domain.agents.AgMessageHandler
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.launchIn
@@ -16,12 +17,14 @@ import javax.inject.Inject
 internal class AgentsTalkDelegate @Inject constructor(
     private val addChatMessageUseCase: AddChatMessageUseCase,
     private val changeMessageUseCase: ChangeMessageStatusUseCase,
+    private val createChatUseCase: CreateChatUseCase,
     private val agMessageHandler: AgMessageHandler
 ) : TalkDelegate {
+
     override suspend fun tryAddUserMessage(
         chatId: Long,
         inputText: String,
-        chatSettings: ChatSettings,
+        chat: Chat,
         onSuccess: () -> Unit
     ) {
         // добавить сообщение
@@ -32,20 +35,32 @@ internal class AgentsTalkDelegate @Inject constructor(
             inputText,
             ChatMessageStatus.Sending
         )
+        
+        // Получаем groupId из чата
+        val groupId = chat.chatGroup.id
+        
+        // Функция создания нового чата - принимает имя модели и возвращает Pair<chatId, chatName>
+        val createChat: suspend (String) -> Pair<Long, String> = { modelName ->
+            // Создаем новый чат с именем модели
+            val chatTitle = modelName
+            val chatId = createChatUseCase.invoke(chatTitle, groupId)
+            Pair(chatId, chatTitle)
+        }
+        
         coroutineScope {
             agMessageHandler
-                .handleUserMessage(inputText, chatSettings)
+                .handleUserMessage(inputText, chat.settings, createChat)
                 .onStart {
                     // сообщение пользователя подтверждаем как просмотренное
                     changeMessageUseCase(messageId, ChatMessageStatus.Viewed)
                 }
-                .onEach { result ->
+                .onEach { response ->
                     // добавляем в чат ответ бота
                     addChatMessageUseCase.invoke(
-                        chatId,
+                        response.chatId,
                         System.currentTimeMillis(),
                         UserType.Bot,
-                        result,
+                        response.message,
                         ChatMessageStatus.Viewed
                     )
                 }

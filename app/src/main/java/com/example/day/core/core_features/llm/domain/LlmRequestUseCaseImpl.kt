@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.llm.domain
 
+import com.example.day.core.core_features.llm.domain.model.LlmResult
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.ModelResult
 import com.example.day.core.core_features.llm.domain.model.ModelSettings
@@ -15,7 +16,7 @@ internal class LlmRequestUseCaseImpl @Inject constructor(
         systemPrompt: String?,
         messages: List<ModelRequest.Message>,
         promptText: String,
-    ): Result<String> {
+    ): Result<LlmResult> {
         val request = ModelRequest(
             model = modelSettings.name,
             messages = buildList {
@@ -79,7 +80,7 @@ internal class LlmRequestUseCaseImpl @Inject constructor(
         return null
     }
 
-    private fun mapResult(result: ModelResult): Result<String> {
+    private fun mapResult(result: ModelResult): Result<LlmResult> {
         return when (result) {
             is ModelResult.Error -> {
                 Result.failure(Exception("API Error: ${result.message}"))
@@ -88,12 +89,19 @@ internal class LlmRequestUseCaseImpl @Inject constructor(
                 Result.failure(Exception("API Error: ${result.message}"))
             }
             is ModelResult.Success -> {
+                // TODO refactor
                 val message = result.choices.firstOrNull()?.message
                 if (message?.content?.isNotBlank() == true) {
-                    Result.success(message.content)
+                    Result.success(LlmResult(
+                        text = message.content,
+                        source = result
+                    ))
                 } else {
                     // Если content пуст, берем из размышлений
-                    Result.success(message?.reasoning ?: "Empty response")
+                    Result.success(LlmResult(
+                        text = message?.reasoning ?: "Empty response",
+                        source = result
+                    ))
                 }
 
             }

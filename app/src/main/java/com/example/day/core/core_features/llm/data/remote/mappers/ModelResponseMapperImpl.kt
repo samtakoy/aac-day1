@@ -33,7 +33,21 @@ internal class ModelResponseMapperImpl @Inject constructor() : ModelResponseMapp
                     ),
                     finishReason = choiceDto.finishReason
                 )
-            }.toImmutableList()
+            }.toImmutableList(),
+            usage = chatResponseDto.usage?.let { usageDto ->
+                ModelResult.Success.Usage(
+                    promptTokens = usageDto.promptTokens,
+                    completionTokens = usageDto.completionTokens,
+                    totalTokens = usageDto.totalTokens,
+                    cost = usageDto.cost,
+                    costDetails = usageDto.costDetails?.let { costDetailsDto ->
+                        ModelResult.Success.CostDetails(
+                            upstreamInferencePromptCost = costDetailsDto.upstreamInferencePromptCost,
+                            upstreamInferenceCompletionsCost = costDetailsDto.upstreamInferenceCompletionsCost
+                        )
+                    }
+                )
+            }
         )
     }
 
