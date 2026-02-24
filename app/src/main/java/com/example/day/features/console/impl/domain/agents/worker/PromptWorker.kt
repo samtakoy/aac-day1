@@ -1,6 +1,6 @@
 package com.example.day.features.console.impl.domain.agents.worker
 
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.getContent
 import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
@@ -15,12 +15,12 @@ internal class PromptWorker @Inject constructor(
 ) : AWorker {
     override suspend fun doWork(
         task: String,
-        chatSettings: ChatSettings
+        chat: Chat
     ): Flow<WorkerEvent> = callbackFlow {
         // 1. составим промпт
         val promptResult = with(llmRequestUseCase) {
             askLlm(
-                chatSettings = chatSettings,
+                chatSettings = chat.settings,
                 userPrompt = "Составь промпт для LLM для решения задачи: $task\n",
                 systemPrompt = SYSTEM_PROMPT
             )
@@ -47,7 +47,7 @@ internal class PromptWorker @Inject constructor(
         // 2. Даем задание в виде промпта:
         with(llmRequestUseCase) {
             askLlm(
-                chatSettings = chatSettings,
+                chatSettings = chat.settings,
                 userPrompt = generatedPrompt,
             )
         }

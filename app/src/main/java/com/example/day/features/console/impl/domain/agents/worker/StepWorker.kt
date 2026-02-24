@@ -1,6 +1,6 @@
 package com.example.day.features.console.impl.domain.agents.worker
 
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.getContent
@@ -17,7 +17,7 @@ internal class StepWorker @Inject constructor(
 ) : AWorker {
     override suspend fun doWork(
         task: String,
-        chatSettings: ChatSettings
+        chat: Chat
     ): Flow<WorkerEvent> = callbackFlow {
 
         // История сообщений для поддержания контекста
@@ -35,7 +35,7 @@ internal class StepWorker @Inject constructor(
             send(WorkerEvent.Speech("--- Думаю над шагом №$currentStep ---"))
             val response = with(llmRequestUseCase) {
                 askLlm(
-                    chatSettings = chatSettings,
+                    chatSettings = chat.settings,
                     userPrompt = nextUserMessage,
                     systemPrompt = STEP_BY_STEP_SYSTEM_PROMPT,
                     history = messageHistory

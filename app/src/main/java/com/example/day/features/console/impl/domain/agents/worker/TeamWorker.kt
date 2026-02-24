@@ -1,5 +1,6 @@
 package com.example.day.features.console.impl.domain.agents.worker
 
+import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
@@ -20,7 +21,7 @@ internal class TeamWorker @Inject constructor(
 
     override suspend fun doWork(
         task: String,
-        chatSettings: ChatSettings
+        chat: Chat
     ): Flow<WorkerEvent> = callbackFlow {
 
         val messageHistory = mutableListOf<ModelRequest.Message>()
@@ -37,7 +38,7 @@ internal class TeamWorker @Inject constructor(
             val promptText = "Твоя роль: $name. Задача: $mission. " +
                     if (messageHistory.isNotEmpty()) "Учитывай мнение предыдущих экспертов. Контекст: $task" else "Контекст: $task"
 
-            askExpert(chatSettings, promptText, messageHistory)
+            askExpert(chat.settings, promptText, messageHistory)
                 .onSuccess { llmResult ->
                     val rawAnswer = llmResult.getContent()
                     val result = extractResult(rawAnswer) ?: rawAnswer
@@ -57,7 +58,7 @@ internal class TeamWorker @Inject constructor(
         val managerPrompt = "Ты — Менеджер. Собери воедино мнения аналитика и инженера, " +
                 "учти замечания критика и выдай финальный пошаговый план реализации задачи: $task"
 
-        val finalResponse = askExpert(chatSettings, managerPrompt, messageHistory)
+        val finalResponse = askExpert(chat.settings, managerPrompt, messageHistory)
 
         finalResponse.onSuccess { llmResult ->
             // Логируем для отладки, если пусто

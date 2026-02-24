@@ -1,5 +1,6 @@
 package com.example.day.features.console.impl.di
 
+import com.example.day.core.core_features.agent.domain.model.AContextOwner
 import com.example.day.core.core_features.chat.domain.ChatRepository
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ChangeMessageStatusUseCase

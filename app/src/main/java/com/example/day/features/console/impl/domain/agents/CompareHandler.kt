@@ -1,5 +1,6 @@
 package com.example.day.features.console.impl.domain.agents
 
+import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.model.getContent
 import com.example.day.features.console.impl.domain.agents.utils.ModelReportBuilder
@@ -21,14 +22,15 @@ internal class CompareHandler @Inject constructor(
      * Обрабатывает команду сравнения
      *
      * @param inputWithoutCommand - сообщение очищенное от стартовой команды
-     * @param chatSettings настройки чата
+     * @param chat настройки чата
      * @param tools инструменты для работы с чатом
      */
     suspend fun handle(
         inputWithoutCommand: String,
-        chatSettings: ChatSettings,
+        chat: Chat,
         tools: WorkerTools
     ) {
+        val chatSettings = chat.settings
         val parameters = inputWithoutCommand.extractFromStartBrackets()
         if (parameters.isNullOrBlank()) {
             // параметров нет - вернемся к обычной обработке
@@ -64,7 +66,7 @@ internal class CompareHandler @Inject constructor(
             runComparisonForModel(
                 modelName = modelName,
                 taskMessage = taskMessage,
-                originalChatSettings = chatSettings,
+                originalChat = chat,
                 tools = tools
             )
         }
@@ -76,30 +78,36 @@ internal class CompareHandler @Inject constructor(
     private suspend fun runComparisonForModel(
         modelName: String,
         taskMessage: String,
-        originalChatSettings: ChatSettings,
+        originalChat: Chat,
         tools: WorkerTools,
     ) {
         try {
             // Создаем новый чат для этой модели
             val newChatName = modelName
             // TODO если чат с таким именем существует - то не создавать его а переиспользовать
-            val newChatId = tools.createChat(newChatName)
+            val newChatId = tools.createChat(newChatName, originalChat.chatGroup.id)
 
             // Создаем настройки чата с новой моделью
-            val newChatSettings = originalChatSettings.copy(
+            val newChatSettings = originalChat.settings.copy(
                 chatId = newChatId,
-                model = originalChatSettings.model.copy(name = modelName)
+                model = originalChat.settings.model.copy(name = modelName)
+            )
+
+            // Создаем временный Chat для передачи в Worker
+            val tempChat = originalChat.copy(
+                id = newChatId,
+                settings = newChatSettings
             )
 
             // Отправляем сообщение о начале обработки модели
             tools.addBotMessage(
-                originalChatSettings.chatId,
+                originalChat.settings.chatId,
                 "▶️ Запускаю модель: $modelName в чате \"$newChatName\""
             )
 
             // Запускаем SimpleWorker
             var startTime = 0L
-            simpleWorker.doWork(taskMessage, newChatSettings).collect { workerEvent ->
+            simpleWorker.doWork(taskMessage, tempChat).collect { workerEvent ->
                 when (workerEvent) {
                     is WorkerEvent.Speech -> {
                         // Добавляем ответ модели в её собственный чат (newChatId)
@@ -119,7 +127,7 @@ internal class CompareHandler @Inject constructor(
                         // Отправляем уведомление о получении ответа в основной чат
                         val shortModelAnswer = workerEvent.result.getContent().take(30) + "..."
                         tools.addBotMessage(
-                            originalChatSettings.chatId,
+                            originalChat.settings.chatId,
                             "✅ Модель $modelName ответила в чате \"$newChatName\": $shortModelAnswer"
                         )
 
@@ -129,13 +137,13 @@ internal class CompareHandler @Inject constructor(
                             durationSeconds = durationSeconds,
                             modelResult = workerEvent.result
                         )
-                        tools.addBotMessage(originalChatSettings.chatId, report)
+                        tools.addBotMessage(originalChat.settings.chatId, report)
                     }
                 }
             }
         } catch (e: Exception) {
             tools.addBotMessage(
-                originalChatSettings.chatId,
+                originalChat.settings.chatId,
                 "❌ Ошибка при запуске модели $modelName: ${e.message}"
             )
         }
