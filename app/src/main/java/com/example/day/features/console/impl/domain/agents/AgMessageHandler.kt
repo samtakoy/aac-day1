@@ -1,16 +1,12 @@
 package com.example.day.features.console.impl.domain.agents
 
 import com.example.day.core.core_features.chat.domain.model.Chat
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
 import com.example.day.features.console.impl.domain.agents.worker.PromptWorker
 import com.example.day.features.console.impl.domain.agents.worker.SimpleWorker
 import com.example.day.features.console.impl.domain.agents.worker.StepWorker
 import com.example.day.features.console.impl.domain.agents.worker.TeamWorker
 import com.example.day.features.console.impl.domain.agents.worker.TalkWorker
-import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 /**
@@ -23,7 +19,7 @@ internal class AgMessageHandler @Inject constructor(
     promptWorker: PromptWorker,
     teamWorker: TeamWorker,
     talkWorker: TalkWorker,
-    private val modelsComparator: CompareHandler
+    compareWorker: CompareWorker
 ) {
 
     private val commandToWorker: Map<ChatCommand, AWorker> = mapOf(
@@ -32,6 +28,7 @@ internal class AgMessageHandler @Inject constructor(
         ChatCommand.PromptWork to promptWorker,
         ChatCommand.TeamWork to teamWorker,
         ChatCommand.Talk to talkWorker,
+        ChatCommand.Compare to compareWorker,
     )
 
     /** Обработка нового сообщения от пользователя.
@@ -50,42 +47,18 @@ internal class AgMessageHandler @Inject constructor(
     ) {
         val trimmedMessage = userMessage.trim()
 
-        // Обработка команды сравнения
-        if (trimmedMessage.startsWith(ChatCommand.Compare.title, ignoreCase = true)) {
-            val inputWithoutCommand = trimmedMessage
-                .substring(ChatCommand.Compare.title.length)
-                .trimCmd()
-            modelsComparator.handle(inputWithoutCommand, chat, tools)
-            return
-        }
-
         // Маршрутизация к соответствующему worker
         for ((command, worker) in commandToWorker.entries) {
             if (trimmedMessage.startsWith(command.title, ignoreCase = true)) {
-                coroutineScope {
-                    worker.doWork(
-                        trimmedMessage.substring(command.title.length).trimCmd(),
-                        chat
-                    ).collectWorkerEvents(chat.id, tools)
-                }
+                worker.doWork(
+                    task = trimmedMessage.substring(command.title.length).trimCmd(),
+                    chat = chat,
+                    onEvent = null // Технические события (RequestStart, RequestSuccess, RequestError) можно обрабатывать при необходимости
+                )
                 return
             }
         }
 
         tools.addBotMessage(chat.id, "Команда не распознана")
-    }
-
-    /** Слушает и обрабатывает события от конкретного AWorker */
-    private suspend fun Flow<WorkerEvent>.collectWorkerEvents(chatId: Long, tools: WorkerTools) {
-        collect { workerEvent ->
-            when (workerEvent) {
-                is WorkerEvent.RequestError,
-                WorkerEvent.RequestStart,
-                is WorkerEvent.RequestSuccess -> Unit
-                is WorkerEvent.Speech -> {
-                    tools.addBotMessage(chatId, workerEvent.text)
-                }
-            }
-        }
     }
 }

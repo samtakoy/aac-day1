@@ -1,6 +1,7 @@
 package com.example.day.features.console.impl.domain.agents
 
 import com.example.day.core.core_features.agent.domain.model.AContextOwner
+import com.example.day.core.core_features.chat.domain.model.Chat
 
 /**
  * Интерфейс инструментов для взаимодействия агента с внешним миром.
@@ -8,5 +9,6 @@ import com.example.day.core.core_features.agent.domain.model.AContextOwner
  */
 interface WorkerTools : AContextOwner {
     suspend fun createChat(chatTitle: String, groupId: Long): Long
+    suspend fun getOrCreateChat(chatTitle: String, groupId: Long): Chat
     suspend fun addBotMessage(chatId: Long, message: String)
 }

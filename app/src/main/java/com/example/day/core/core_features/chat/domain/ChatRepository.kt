@@ -49,4 +49,7 @@ interface ChatRepository {
     // ChatSettings methods
     suspend fun getChatSettings(chatId: Long): ChatSettings?
     suspend fun updateChatSettings(settings: ChatSettings)
+
+    // Get or create chat by title and group
+    suspend fun getOrCreateChat(title: String, chatGroupId: Long): Chat
 }

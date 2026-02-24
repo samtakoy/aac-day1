@@ -4,22 +4,22 @@ import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.getContent
+import com.example.day.features.console.impl.domain.agents.WorkerTools
 import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
 import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
 import com.example.day.features.console.impl.domain.agents.worker.base.askLlm
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import javax.inject.Inject
 
 internal class StepWorker @Inject constructor(
-    private val llmRequestUseCase: LlmRequestUseCase
+    private val llmRequestUseCase: LlmRequestUseCase,
+    private val tools: WorkerTools
 ) : AWorker {
     override suspend fun doWork(
         task: String,
-        chat: Chat
-    ): Flow<WorkerEvent> = callbackFlow {
-
+        chat: Chat,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ) {
         // История сообщений для поддержания контекста
         val messageHistory = mutableListOf<ModelRequest.Message>()
 
@@ -32,29 +32,27 @@ internal class StepWorker @Inject constructor(
                 "Если задача решена, напиши $DONE. \nЗадача: $task"
 
         while (!isFinished && cycleCount <= MAX_STEPS) {
-            send(WorkerEvent.Speech("--- Думаю над шагом №$currentStep ---"))
-            val response = with(llmRequestUseCase) {
-                askLlm(
-                    chatSettings = chat.settings,
-                    userPrompt = nextUserMessage,
-                    systemPrompt = STEP_BY_STEP_SYSTEM_PROMPT,
-                    history = messageHistory
-                )
-            }
+            tools.addBotMessage(chat.id, "--- Думаю над шагом №$currentStep ---")
+            val response = llmRequestUseCase.askLlm(
+                chatSettings = chat.settings,
+                userPrompt = nextUserMessage,
+                systemPrompt = STEP_BY_STEP_SYSTEM_PROMPT,
+                history = messageHistory,
+                onEvent = onEvent
+            )
 
             response.onSuccess { llmResult ->
                 val rawAnswer = llmResult.getContent()
                 val results = extractResults(rawAnswer)
 
                 if (results.isEmpty()) {
-                    send(WorkerEvent.Speech(text = "Вот мой финальный ответ:\n$rawAnswer"))
-                    close()
-                    return@callbackFlow
+                    tools.addBotMessage(chat.id, "Вот мой финальный ответ:\n$rawAnswer")
+                    return
                 }
 
-                // Отправляем промежуточные результаты в UI
+                // Отправляем промежуточные результаты в чат
                 results.forEach { content ->
-                    send(WorkerEvent.Speech(text = content))
+                    tools.addBotMessage(chat.id, content)
                     currentStep++
                 }
 
@@ -68,11 +66,11 @@ internal class StepWorker @Inject constructor(
 
                 if (rawAnswer.contains(DONE)) {
                     isFinished = true
-                    send(WorkerEvent.Speech(text = "✅ Задача завершена"))
+                    tools.addBotMessage(chat.id, "✅ Задача завершена")
                 } else {
                     nextUserMessage = "Выполни следующий шаг или заверши работу тегом $DONE"
                     cycleCount++
-                    send(WorkerEvent.Speech(text = "--- Думаю над шагом №$currentStep ---"))
+                    tools.addBotMessage(chat.id, "--- Думаю над шагом №$currentStep ---")
                     // на всякий случай уменьшим частоту ddos-атаки
                     delay(1000)
                 }
@@ -81,8 +79,7 @@ internal class StepWorker @Inject constructor(
             }
         }
 
-        if (cycleCount > MAX_STEPS) send(WorkerEvent.Speech(text = "⚠️ Превышен лимит шагов"))
-        close()
+        if (cycleCount > MAX_STEPS) tools.addBotMessage(chat.id, "⚠️ Превышен лимит шагов")
     }
 
     private fun extractResults(answer: String): List<String> {
@@ -97,13 +94,13 @@ internal class StepWorker @Inject constructor(
         private const val MAX_STEPS = 5
 
         private const val STEP_BY_STEP_SYSTEM_PROMPT = """Ты — технический исполнитель.
-Решай задачу строго пошагово. Один ответ = один логический шаг.
-Ответ давай на русском языке.
-Если результат финальный — обязательно добавь тег $DONE.
+ Решай задачу строго пошагово. Один ответ = один логический шаг.
+ Ответ давай на русском языке.
+ Если результат финальный — обязательно добавь тег $DONE.
 
-Формат:
-$START
-(описание шага или результат)
-$END"""
+ Формат:
+ $START
+ (описание шага или результат)
+ $END"""
     }
 }

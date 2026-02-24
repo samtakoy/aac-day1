@@ -31,4 +31,8 @@ internal interface ChatDao {
     
     @Query("SELECT COUNT(*) FROM chats WHERE chat_group_id = :groupId")
     suspend fun getChatsCountInGroup(groupId: Long): Int
+
+    @Transaction
+    @Query("SELECT * FROM chats WHERE title = :title AND chat_group_id = :groupId")
+    suspend fun getChatByTitleAndGroupId(title: String, groupId: Long): ChatWithGroupAndSettings?
 }

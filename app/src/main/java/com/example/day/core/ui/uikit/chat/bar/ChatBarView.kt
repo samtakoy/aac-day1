@@ -24,6 +24,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -67,7 +73,29 @@ fun ChatBarView(
                     text = newText
                     onEvent(ChatBarUiEvent.TextChange(newText))
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onPreviewKeyEvent { keyEvent ->
+                        // Проверяем нажатие Enter
+                        val isEnter = keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter
+                        val isDown = keyEvent.type == KeyEventType.KeyDown
+
+                        if (isEnter && isDown) {
+                            // TODO на эмулаторе Shift не ловится
+                            if (!keyEvent.isShiftPressed) {
+                                // ОБЫЧНЫЙ ENTER: отправляем
+                                if (text.isNotBlank()) {
+                                    onEvent(ChatBarUiEvent.SendClick)
+                                    text = ""
+                                    // focusManager.clearFocus()
+                                }
+                                return@onPreviewKeyEvent true // Поглощаем событие
+                            }
+                            // SHIFT + ENTER: возвращаем false, чтобы TextField сам вставил \n
+                            return@onPreviewKeyEvent false
+                        }
+                        false
+                    },
                 textStyle = androidx.compose.ui.text.TextStyle(
                     color = colors.inputText
                 ),
@@ -80,7 +108,7 @@ fun ChatBarView(
                         if (text.isNotBlank()) {
                             onEvent(ChatBarUiEvent.SendClick)
                             text = ""
-                            focusManager.clearFocus()
+                            // focusManager.clearFocus()
                         }
                     }
                 ),
@@ -94,7 +122,8 @@ fun ChatBarView(
                         }
                         innerTextField()
                     }
-                }
+                },
+                singleLine = false
             )
             
             // Clear button (shown when text is not empty)
@@ -122,7 +151,7 @@ fun ChatBarView(
                 if (text.isNotBlank()) {
                     onEvent(ChatBarUiEvent.SendClick)
                     text = ""
-                    focusManager.clearFocus()
+                    // focusManager.clearFocus()
                 }
             }
         )

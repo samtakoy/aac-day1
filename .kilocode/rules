@@ -79,6 +79,67 @@ data class ModelSettingsEntity(
 // In mapper, use Json.encodeToString/decodeFromString
 ```
 
+### Mappers (Data Layer)
+```kotlin
+// ALWAYS use @Inject constructor for mappers - NEVER extension functions
+internal class ChatMapper @Inject constructor(
+    private val groupMapper: ChatGroupMapper,
+    private val settingsMapper: ChatSettingsMapper
+) {
+    fun toDomain(entity: ChatWithGroupAndSettings): Chat {
+        val settings = entity.settings?.let { settingsMapper.toDomain(it) }
+            ?: createDefaultSettings(entity.chat.id)
+        
+        return Chat(
+            id = entity.chat.id,
+            title = entity.chat.title,
+            chatGroup = groupMapper.toDomain(entity.groupWithType),
+            settings = settings
+        )
+    }
+
+    fun toEntity(model: Chat): ChatEntity = ChatEntity(
+        id = model.id,
+        title = model.title,
+        chatGroupId = model.chatGroup.id
+    )
+}
+
+// Simple mapper without dependencies
+internal class MessageMapper @Inject constructor() {
+    fun toDomain(entity: MessageEntity, user: User): ChatMessage = ChatMessage(
+        id = entity.id,
+        chatId = entity.chatId,
+        timestamp = entity.timestamp,
+        user = user,
+        text = entity.text,
+        status = fromDbStatus(entity.status)
+    )
+
+    fun toEntity(message: ChatMessage, userId: Long): MessageEntity = MessageEntity(
+        id = message.id,
+        chatId = message.chatId,
+        userId = userId,
+        timestamp = message.timestamp,
+        text = message.text,
+        status = toDbStatus(message.status)
+    )
+    
+    fun toDbStatus(status: ChatMessageStatus): Int = when (status) {
+        ChatMessageStatus.Sending -> ChatDbConst.MESSAGE_STATUS_SENDING
+        ChatMessageStatus.Delivered -> ChatDbConst.MESSAGE_STATUS_DELIVERED
+        ChatMessageStatus.Viewed -> ChatDbConst.MESSAGE_STATUS_VIEWED
+    }
+    
+    fun fromDbStatus(status: Int): ChatMessageStatus = when (status) {
+        ChatDbConst.MESSAGE_STATUS_SENDING -> ChatMessageStatus.Sending
+        ChatDbConst.MESSAGE_STATUS_DELIVERED -> ChatMessageStatus.Delivered
+        ChatDbConst.MESSAGE_STATUS_VIEWED -> ChatMessageStatus.Viewed
+        else -> ChatMessageStatus.Sending
+    }
+}
+```
+
 ### Thread Safety
 ```kotlin
 // Use Mutex for thread-safe operations
@@ -95,6 +156,7 @@ override suspend fun someOperation() = mutex.withLock {
 3. **DON'T** use `ordinal()` for enum mapping
 4. **DON'T** put magic numbers in code - use `*Const` objects
 5. **DON'T** make data layer classes public
+6. **DON'T** use extension functions for mappers - use `@Inject constructor` pattern
 
 ## File References
 

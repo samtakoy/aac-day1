@@ -9,13 +9,12 @@ import com.example.day.core.core_features.chat.data.local.dao.UserDao
 import com.example.day.core.core_features.chat.data.local.mapper.ChatGroupMapper
 import com.example.day.core.core_features.chat.data.local.mapper.ChatMapper
 import com.example.day.core.core_features.chat.data.local.mapper.ChatSettingsMapper
-import com.example.day.core.core_features.chat.data.local.mapper.toDomain
+import com.example.day.core.core_features.chat.data.local.mapper.MessageMapper
+import com.example.day.core.core_features.chat.data.local.mapper.UserMapper
 import com.example.day.core.core_features.chat.data.local.model.ChatDbConst
 import com.example.day.core.core_features.chat.data.local.model.ChatEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatGroupEntity
-import com.example.day.core.core_features.chat.data.local.model.ChatSettingsEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatTypeEntity
-import com.example.day.core.core_features.chat.data.local.model.MessageEntity
 import com.example.day.core.core_features.chat.data.local.model.UserEntity
 import com.example.day.core.core_features.chat.domain.ChatRepository
 import com.example.day.core.core_features.chat.domain.model.Chat
@@ -43,31 +42,15 @@ internal class ChatRepositoryImpl @Inject constructor(
     private val chatSettingsDao: ChatSettingsDao,
     private val chatMapper: ChatMapper,
     private val chatGroupMapper: ChatGroupMapper,
-    private val chatSettingsMapper: ChatSettingsMapper
+    private val chatSettingsMapper: ChatSettingsMapper,
+    private val messageMapper: MessageMapper,
+    private val userMapper: UserMapper
 ) : ChatRepository {
 
     private val mutex = Mutex()
 
-    // TODO убрать в мапперы
-    private fun ChatMessageStatus.toDbStatus(): Int = when (this) {
-        ChatMessageStatus.Sending -> ChatDbConst.MESSAGE_STATUS_SENDING
-        ChatMessageStatus.Delivered -> ChatDbConst.MESSAGE_STATUS_DELIVERED
-        ChatMessageStatus.Viewed -> ChatDbConst.MESSAGE_STATUS_VIEWED
-    }
-
     override suspend fun createChat(title: String, chatGroupId: Long): Long = mutex.withLock {
-        getOrCreateDefaultUsers()
-        val chatId = chatDao.insert(ChatEntity(title = title, chatGroupId = chatGroupId))
-        
-        // Создаем настройки по умолчанию для нового чата
-        val defaultSettings = ChatSettings(
-            chatId = chatId,
-            systemPromt = "",
-            model = ModelSettings(name = ModelConst.DEFAULT_MODEL)
-        )
-        chatSettingsDao.insert(chatSettingsMapper.toEntity(defaultSettings))
-        
-        return chatId
+        return@withLock createChatInternal(title, chatGroupId)
     }
 
     override suspend fun getChatById(chatId: Long): Chat? {
@@ -91,12 +74,16 @@ internal class ChatRepositoryImpl @Inject constructor(
             UserType.Bot -> users.second
         }
 
-        val entity = MessageEntity(
-            chatId = chatId,
-            userId = userEntity.id,
-            timestamp = timestamp,
-            text = text,
-            status = status.toDbStatus()
+        val entity = messageMapper.toEntity(
+            ChatMessage(
+                id = 0,
+                chatId = chatId,
+                timestamp = timestamp,
+                user = userEntity,
+                text = text,
+                status = status
+            ),
+            userEntity.id
         )
 
         return messageDao.insert(entity)
@@ -107,7 +94,7 @@ internal class ChatRepositoryImpl @Inject constructor(
     }
 
     override suspend fun changeMessageStatus(messageId: Long, status: ChatMessageStatus) {
-        messageDao.updateStatus(messageId, status.toDbStatus())
+        messageDao.updateStatus(messageId, messageMapper.toDbStatus(status))
     }
 
     override fun getChatMessagesAsFlow(chatId: Long): Flow<List<ChatMessage>> {
@@ -119,7 +106,7 @@ internal class ChatRepositoryImpl @Inject constructor(
                 } ?: userDao.getUserByType(ChatDbConst.BOT_TYPE)
 
                 userEntity?.let {
-                    entity.toDomain(it.toDomain())
+                    messageMapper.toDomain(entity, userMapper.toDomain(it))
                 }
             }
         }
@@ -129,13 +116,13 @@ internal class ChatRepositoryImpl @Inject constructor(
         chatId: Long,
         status: ChatMessageStatus
     ): List<ChatMessage> {
-        return messageDao.getMessagesByChatIdAndStatus(chatId, status.toDbStatus()).mapNotNull { entity ->
+        return messageDao.getMessagesByChatIdAndStatus(chatId, messageMapper.toDbStatus(status)).mapNotNull { entity ->
             val userEntity = userDao.getUserByType(ChatDbConst.USER_TYPE)?.let { user ->
                 if (entity.userId == user.id) user else userDao.getUserByType(ChatDbConst.BOT_TYPE)
             } ?: userDao.getUserByType(ChatDbConst.BOT_TYPE)
 
             userEntity?.let {
-                entity.toDomain(it.toDomain())
+                messageMapper.toDomain(entity, userMapper.toDomain(it))
             }
         }
     }
@@ -154,8 +141,8 @@ internal class ChatRepositoryImpl @Inject constructor(
         }
 
         return Pair(
-            userEntity.toDomain(),
-            botEntity.toDomain()
+            userMapper.toDomain(userEntity),
+            userMapper.toDomain(botEntity)
         )
     }
 
@@ -234,5 +221,35 @@ internal class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun updateChatSettings(settings: ChatSettings) {
         chatSettingsDao.insert(chatSettingsMapper.toEntity(settings))
+    }
+
+    override suspend fun getOrCreateChat(title: String, chatGroupId: Long): Chat = mutex.withLock {
+        // Сначала пробуем найти существующий чат
+        val existingChat = chatDao.getChatByTitleAndGroupId(title, chatGroupId)
+        if (existingChat != null) {
+            return@withLock chatMapper.toDomain(existingChat)
+        }
+
+        // Создаем новый чат, используя существующий метод
+        createChatInternal(title, chatGroupId)
+
+        // Возвращаем созданный чат
+        return@withLock chatMapper.toDomain(chatDao.getChatByTitleAndGroupId(title, chatGroupId)!!)
+    }
+
+    // Внутренний метод для создания чата без возврата ID
+    private suspend fun createChatInternal(title: String, chatGroupId: Long): Long {
+        getOrCreateDefaultUsers()
+        val chatId = chatDao.insert(ChatEntity(title = title, chatGroupId = chatGroupId))
+
+        // Создаем настройки по умолчанию для нового чата
+        val defaultSettings = ChatSettings(
+            chatId = chatId,
+            systemPromt = "",
+            model = ModelSettings(name = ModelConst.DEFAULT_MODEL)
+        )
+        chatSettingsDao.insert(chatSettingsMapper.toEntity(defaultSettings))
+
+        return chatId
     }
 }

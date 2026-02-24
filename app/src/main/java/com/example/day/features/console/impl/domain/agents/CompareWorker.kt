@@ -1,10 +1,10 @@
 package com.example.day.features.console.impl.domain.agents
 
 import com.example.day.core.core_features.chat.domain.model.Chat
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.model.getContent
 import com.example.day.features.console.impl.domain.agents.utils.ModelReportBuilder
 import com.example.day.features.console.impl.domain.agents.worker.SimpleWorker
+import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
 import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
 import javax.inject.Inject
 
@@ -13,10 +13,11 @@ import javax.inject.Inject
  * Отвечает за парсинг параметров, запуск параллельного сравнения моделей
  * и формирование отчетов.
  */
-internal class CompareHandler @Inject constructor(
+internal class CompareWorker @Inject constructor(
     private val simpleWorker: SimpleWorker,
-    private val reportBuilder: ModelReportBuilder
-) {
+    private val reportBuilder: ModelReportBuilder,
+    private val tools: WorkerTools
+) : AWorker {
 
     /**
      * Обрабатывает команду сравнения
@@ -25,11 +26,12 @@ internal class CompareHandler @Inject constructor(
      * @param chat настройки чата
      * @param tools инструменты для работы с чатом
      */
-    suspend fun handle(
-        inputWithoutCommand: String,
+    override suspend fun doWork(
+        task: String,
         chat: Chat,
-        tools: WorkerTools
+        onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
+        val inputWithoutCommand = task
         val chatSettings = chat.settings
         val parameters = inputWithoutCommand.extractFromStartBrackets()
         if (parameters.isNullOrBlank()) {
@@ -82,10 +84,10 @@ internal class CompareHandler @Inject constructor(
         tools: WorkerTools,
     ) {
         try {
-            // Создаем новый чат для этой модели
+            // Получаем или создаем чат для этой модели
             val newChatName = modelName
-            // TODO если чат с таким именем существует - то не создавать его а переиспользовать
-            val newChatId = tools.createChat(newChatName, originalChat.chatGroup.id)
+            val newChat = tools.getOrCreateChat(newChatName, originalChat.chatGroup.id)
+            val newChatId = newChat.id
 
             // Создаем настройки чата с новой моделью
             val newChatSettings = originalChat.settings.copy(
@@ -105,15 +107,10 @@ internal class CompareHandler @Inject constructor(
                 "▶️ Запускаю модель: $modelName в чате \"$newChatName\""
             )
 
-            // Запускаем SimpleWorker
+            // Запускаем SimpleWorker - он сам отправляет сообщения в чат через tools
             var startTime = 0L
-            simpleWorker.doWork(taskMessage, tempChat).collect { workerEvent ->
+            simpleWorker.doWork(taskMessage, tempChat) { workerEvent ->
                 when (workerEvent) {
-                    is WorkerEvent.Speech -> {
-                        // Добавляем ответ модели в её собственный чат (newChatId)
-                        tools.addBotMessage(newChatId, workerEvent.text.replace("<br>", "\n"))
-                    }
-                    // TODO тут будет инфо сообщение в чат
                     is WorkerEvent.RequestError -> Unit
                     WorkerEvent.RequestStart -> {
                         // Время старта запроса
@@ -149,7 +146,7 @@ internal class CompareHandler @Inject constructor(
         }
     }
 
-    companion object {
+    companion object Companion {
         private const val INPUT_DELIMITER = ","
     }
 }

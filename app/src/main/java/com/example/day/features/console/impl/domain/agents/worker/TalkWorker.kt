@@ -1,6 +1,5 @@
 package com.example.day.features.console.impl.domain.agents.worker
 
-import com.example.day.core.core_features.agent.domain.model.AContextOwner
 import com.example.day.core.core_features.agent.domain.model.addAssistantMessage
 import com.example.day.core.core_features.agent.domain.model.addUserMessage
 import com.example.day.core.core_features.agent.domain.model.toModelRequestMessages
@@ -11,8 +10,6 @@ import com.example.day.features.console.impl.domain.agents.WorkerTools
 import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
 import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
 import com.example.day.features.console.impl.domain.agents.worker.base.askLlm
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import javax.inject.Inject
 
 /**
@@ -30,8 +27,9 @@ internal class TalkWorker @Inject constructor(
 
     override suspend fun doWork(
         task: String,
-        chat: Chat
-    ): Flow<WorkerEvent> = callbackFlow {
+        chat: Chat,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ) {
         // 1. Получить контекст агента
         val context = tools.getContext(AGENT_NAME)
 
@@ -39,14 +37,13 @@ internal class TalkWorker @Inject constructor(
         val history = context.messages.toModelRequestMessages()
 
         // 3. Запрос к LLM с контекстом
-        with(llmRequestUseCase) {
-            askLlm(
-                chatSettings = chat.settings,
-                userPrompt = task,
-                systemPrompt = chat.settings.systemPromt, // из ChatSettings TODO - не правильно - надо из контекста
-                history = history
-            )
-        }.onSuccess { result ->
+        llmRequestUseCase.askLlm(
+            chatSettings = chat.settings,
+            userPrompt = task,
+            systemPrompt = chat.settings.systemPromt,
+            history = history,
+            onEvent = onEvent
+        ).onSuccess { result ->
             val content = result.getContent()
 
             // 4. Сохранить сообщения в контекст
@@ -55,12 +52,10 @@ internal class TalkWorker @Inject constructor(
                 .addAssistantMessage(content)
             tools.saveContext(updatedContext)
 
-            // 5. Отправить результат
-            send(WorkerEvent.Speech(content))
+            // 5. Отправить результат в чат
+            tools.addBotMessage(chat.id, content)
         }.onFailure { exception ->
-            send(WorkerEvent.Speech(exception.stackTraceToString()))
+            tools.addBotMessage(chat.id, exception.stackTraceToString())
         }
-
-        close()
     }
 }

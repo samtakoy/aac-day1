@@ -3,8 +3,6 @@ package com.example.day.core.core_features.chat.data.local.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
-import com.example.day.core.core_features.chat.data.local.mapper.toDomain
-import com.example.day.core.core_features.chat.data.local.model.ChatDbConst
 import com.example.day.core.core_features.chat.data.local.model.MessageEntity
 import kotlinx.coroutines.flow.Flow
 

@@ -2,44 +2,34 @@ package com.example.day.features.console.impl.domain.agents.worker
 
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
-import com.example.day.core.core_features.llm.domain.model.ModelRequest
-import com.example.day.core.core_features.llm.domain.model.ModelResult
 import com.example.day.core.core_features.llm.domain.model.getContent
+import com.example.day.features.console.impl.domain.agents.WorkerTools
 import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
 import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
 import com.example.day.features.console.impl.domain.agents.worker.base.askLlm
-import kotlinx.coroutines.channels.ProducerScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import javax.inject.Inject
 
 internal class SimpleWorker @Inject constructor(
-    private val llmRequestUseCase: LlmRequestUseCase
+    private val llmRequestUseCase: LlmRequestUseCase,
+    private val tools: WorkerTools
 ) : AWorker {
     override suspend fun doWork(
         task: String,
-        chat: Chat
-    ): Flow<WorkerEvent> {
-        return callbackFlow {
-            // просто выполним запрос и вернем результат
-            with(llmRequestUseCase) {
-                askLlm(
-                    chatSettings = chat.settings,
-                    userPrompt = task,
-                    systemPrompt = "Ответ давай на русском языке."
-                )
-                    .onSuccess { result ->
-                        send(WorkerEvent.Speech(result.getContent()))
-                    }
-                    .onFailure { exception ->
-                        send(
-                            WorkerEvent.Speech(
-                                text = exception.stackTraceToString()
-                            )
-                        )
-                    }
+        chat: Chat,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ) {
+        // просто выполним запрос и вернем результат
+        llmRequestUseCase.askLlm(
+            chatSettings = chat.settings,
+            userPrompt = task,
+            systemPrompt = "Ответ давай на русском языке.",
+            onEvent = onEvent
+        )
+            .onSuccess { result ->
+                tools.addBotMessage(chat.id, result.getContent())
             }
-            close()
-        }
+            .onFailure { exception ->
+                tools.addBotMessage(chat.id, exception.stackTraceToString())
+            }
     }
 }
