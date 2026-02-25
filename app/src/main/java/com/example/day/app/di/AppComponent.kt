@@ -3,6 +3,7 @@ package com.example.day.app.di
 import android.content.Context
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.example.day.core.core_features.agent.di.AgentCoreFeatureModule
 import com.example.day.core.core_features.chat.di.ChatCoreFeatureModule
 import com.example.day.core.core_features.llm.di.LlmCoreFeatureModule
 import com.example.day.core.di.NetworkModule
@@ -22,6 +23,7 @@ import javax.inject.Singleton
     modules = [
         NetworkModule::class,
         ChatCoreFeatureModule::class,
+        AgentCoreFeatureModule::class,
         ConsoleFeatureApiModule::class,
         ChatsFeatureApiModule::class,
         GroupChoiceFeatureApiModule::class,
