@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.example.day.core.core_features.agent.data.local.model.AgentEntity
 import com.example.day.core.core_features.agent.data.local.model.AgentToChatEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -48,4 +49,18 @@ internal interface AgentToChatDao {
         )
     """)
     suspend fun isAgentBoundToChat(agentId: Long, chatId: Long): Boolean
+    
+    /**
+     * Find agent bound to a specific chat by system name.
+     * Used when isCommon = false to find chat-specific agent.
+     */
+    @Query("""
+        SELECT a.* FROM agents a
+        INNER JOIN agent_to_chat atc ON a.id = atc.agent_id
+        WHERE a.system_name = :systemName 
+        AND a.is_common = 0 
+        AND atc.chat_id = :chatId
+        LIMIT 1
+    """)
+    suspend fun getAgentBySystemNameAndChatId(systemName: String, chatId: Long): AgentEntity?
 }

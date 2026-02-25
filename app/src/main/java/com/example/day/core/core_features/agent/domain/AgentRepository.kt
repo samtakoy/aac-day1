@@ -97,10 +97,15 @@ interface AgentRepository {
     /**
      * Get or create agent by systemName and isCommon flag.
      * 
-     * Logic:
-     * 1. Find agent by systemName + isCommon
-     * 2. If not found - create new agent with title = systemName
-     * 3. If isCommon = false - ensure agent is bound to chatId
+     * New Logic (as of implementation):
+     * 
+     * If isCommon = true:
+     *   1. Find agent by systemName only (common agents)
+     *   2. If not found - create new common agent
+     * 
+     * If isCommon = false:
+     *   1. Find agent by systemName + chatId (chat-specific)
+     *   2. If not found - create new agent and bind to chatId
      * 
      * @param systemName system name of the agent
      * @param isCommon if true, agent can be used in any chat without binding

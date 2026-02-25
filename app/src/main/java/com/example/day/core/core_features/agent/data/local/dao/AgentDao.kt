@@ -43,6 +43,13 @@ internal interface AgentDao {
     suspend fun getByChatUserId(chatUserId: Long): AgentEntity?
     
     /**
+     * Get common agent by system name only.
+     * Used when isCommon = true
+     */
+    @Query("SELECT * FROM agents WHERE system_name = :systemName AND is_common = 1 LIMIT 1")
+    suspend fun getCommonAgentBySystemName(systemName: String): AgentEntity?
+    
+    /**
      * Get agent by system name and isCommon flag.
      * Used for finding existing agent or creating new one.
      */
