@@ -13,8 +13,8 @@ import com.example.day.features.console.impl.domain.agents.worker.base.askLlm
 import javax.inject.Inject
 
 /**
- * Агент с поддержкой контекста (Context Management).
- * Сохраняет историю сообщений между запросами.
+ * Agent with context support (Context Management).
+ * Saves message history between requests to database.
  */
 internal class TalkWorker @Inject constructor(
     private val llmRequestUseCase: LlmRequestUseCase,
@@ -30,13 +30,20 @@ internal class TalkWorker @Inject constructor(
         chat: Chat,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
-        // 1. Получить контекст агента
-        val context = tools.getContext(AGENT_NAME)
+        // 0. Get or create agent instance
+        val agent = tools.getOrCreateAgent(
+            systemName = AGENT_NAME,
+            chatId = chat.id,
+            isCommonAgent = false
+        )
 
-        // 2. Подготовить историю сообщений для LLM
+        // 1. Get agent context by agentId
+        val context = tools.getContext(agent.id)
+
+        // 2. Prepare message history for LLM
         val history = context.messages.toModelRequestMessages()
 
-        // 3. Запрос к LLM с контекстом
+        // 3. Request to LLM with context
         llmRequestUseCase.askLlm(
             chatSettings = chat.settings,
             userPrompt = task,
@@ -46,13 +53,13 @@ internal class TalkWorker @Inject constructor(
         ).onSuccess { result ->
             val content = result.getContent()
 
-            // 4. Сохранить сообщения в контекст
+            // 4. Save messages to context (using agentId)
             val updatedContext = context
                 .addUserMessage(task)
                 .addAssistantMessage(content)
-            tools.saveContext(updatedContext)
+            tools.saveContext(agent.id, updatedContext)
 
-            // 5. Отправить результат в чат
+            // 5. Send result to chat
             tools.addBotMessage(chat.id, content)
         }.onFailure { exception ->
             tools.addBotMessage(chat.id, exception.stackTraceToString())

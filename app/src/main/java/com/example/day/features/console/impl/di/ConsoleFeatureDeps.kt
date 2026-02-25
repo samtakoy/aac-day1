@@ -1,5 +1,6 @@
 package com.example.day.features.console.impl.di
 
+import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.model.AContextOwner
 import com.example.day.core.core_features.chat.domain.ChatRepository
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
@@ -25,4 +26,5 @@ interface ConsoleFeatureDeps {
     val createChatUseCase: CreateChatUseCase
     val getOrCreateChatUseCase: GetOrCreateChatUseCase
     val chatRepository: ChatRepository
+    val agentRepository: AgentRepository
 }

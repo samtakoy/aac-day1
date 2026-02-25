@@ -1,40 +1,43 @@
 package com.example.day.core.core_features.agent.domain.model
 
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toImmutableList
 
 /**
- * In-memory реализация [AContextOwner] для хранения контекста агента в памяти.
+ * In-memory implementation of [AContextOwner] for storing agent context in memory.
  * 
- * Для MVP (без ограничений памяти, без привязки к чату)
+ * This is useful for MVP or testing purposes. For production, consider using
+ * [DbContextOwner] implementation that stores context in the database.
+ * 
+ * Note: Context is stored in memory and will be lost on app restart.
+ * Use [DbContextOwner] for persistent context storage.
  */
 internal class InMemoryContextOwner : AContextOwner {
 
-    private val contexts = mutableMapOf<String, AContext>()
+    private val contexts = mutableMapOf<Long, AContext>()
 
-    override fun getContext(agentName: String): AContext {
-        return contexts.getOrPut(agentName) {
+    override suspend fun getContext(agentId: Long): AContext {
+        return contexts.getOrPut(agentId) {
             AContext(
-                agentName = agentName,
+                agentName = "",
                 systemPrompt = "",
                 messages = persistentListOf()
             )
         }
     }
 
-    override fun saveContext(context: AContext) {
-        contexts[context.agentName] = context
+    override suspend fun saveContext(agentId: Long, context: AContext) {
+        contexts[agentId] = context
     }
 
     /**
-     * Очистить контекст конкретного агента
+     * Clear context for a specific agent
      */
-    fun clearContext(agentName: String) {
-        contexts.remove(agentName)
+    fun clearContext(agentId: Long) {
+        contexts.remove(agentId)
     }
 
     /**
-     * Очистить все контексты
+     * Clear all contexts
      */
     fun clearAll() {
         contexts.clear()

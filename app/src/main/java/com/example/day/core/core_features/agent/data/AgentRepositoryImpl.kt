@@ -127,6 +127,47 @@ internal class AgentRepositoryImpl @Inject constructor(
         return agentToChatDao.isAgentBoundToChat(agentId, chatId)
     }
     
+    // ==================== Agent Factory ====================
+    
+    override suspend fun getOrCreateAgent(
+        systemName: String,
+        isCommon: Boolean,
+        chatId: Long
+    ): Agent {
+        val isCommonInt = if (isCommon) AgentMapper.IS_COMMON_TRUE else AgentMapper.IS_COMMON_FALSE
+        
+        // 1. Try to find existing agent by systemName + isCommon
+        val existingAgent = agentDao.getBySystemNameAndIsCommon(systemName, isCommonInt)
+        if (existingAgent != null) {
+            val agent = agentMapper.toDomain(existingAgent)
+            
+            // If agent is not common, ensure it's bound to chat
+            if (!isCommon && !agentToChatDao.isAgentBoundToChat(agent.id, chatId)) {
+                bindAgentToChat(agent.id, chatId)
+            }
+            
+            return agent
+        }
+        
+        // 2. Create new agent
+        // Get or create default bot user
+        val botUser = chatRepository.getOrCreateDefaultUsers().second
+        
+        val newAgentId = createAgent(
+            systemName = systemName,
+            title = systemName,  // Using systemName as title
+            chatUserId = botUser.id,
+            isCommon = isCommon
+        )
+        
+        // 3. If not common, bind to chat
+        if (!isCommon) {
+            bindAgentToChat(newAgentId, chatId)
+        }
+        
+        return getAgentById(newAgentId) ?: throw IllegalStateException("Failed to create agent")
+    }
+    
     // ==================== Agent Context ====================
     
     override suspend fun saveAgentContext(agentId: Long, context: AContext) {
