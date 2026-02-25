@@ -1,4 +1,4 @@
-package com.example.day.features.console.impl.domain.agents.worker.base
+package com.example.day.core.core_features.agent.domain.workers.base
 
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
@@ -6,7 +6,8 @@ import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.ModelResult
 
 /**
- * Функция расширение для LlmRequestUseCase, отправляет запрос к LLM и уведомляет о событиях через onEvent
+ * Extension function for LlmRequestUseCase that sends a request to LLM 
+ * and notifies about events via onEvent.
  */
 internal suspend fun LlmRequestUseCase.askLlm(
     chatSettings: ChatSettings,

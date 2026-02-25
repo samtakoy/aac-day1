@@ -1,8 +1,7 @@
 package com.example.day.features.console.impl.di
 
-import com.example.day.core.core_features.agent.domain.AgentRepository
-import com.example.day.core.core_features.agent.domain.model.AContextOwner
-import com.example.day.core.core_features.chat.domain.ChatRepository
+import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
+import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ChangeMessageStatusUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ClearChatNotViewedMessageUseCase
@@ -25,6 +24,7 @@ interface ConsoleFeatureDeps {
     val updateChatSettingsUseCase: UpdateChatSettingsUseCase
     val createChatUseCase: CreateChatUseCase
     val getOrCreateChatUseCase: GetOrCreateChatUseCase
-    val chatRepository: ChatRepository
-    val agentRepository: AgentRepository
+    // Tools для агентов
+    val agentTools: AgentTools
+    val chatTools: ChatTools
 }

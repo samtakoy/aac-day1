@@ -1,15 +1,16 @@
-package com.example.day.features.console.impl.domain.agents.worker
+package com.example.day.core.core_features.agent.domain.workers
 
 import com.example.day.core.core_features.agent.domain.model.addAssistantMessage
 import com.example.day.core.core_features.agent.domain.model.addUserMessage
 import com.example.day.core.core_features.agent.domain.model.toModelRequestMessages
+import com.example.day.core.core_features.agent.domain.workers.base.AWorker
+import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
+import com.example.day.core.core_features.agent.domain.workers.base.askLlm
+import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.getContent
-import com.example.day.features.console.impl.domain.agents.WorkerTools
-import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
-import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
-import com.example.day.features.console.impl.domain.agents.worker.base.askLlm
 import javax.inject.Inject
 
 /**
@@ -18,7 +19,8 @@ import javax.inject.Inject
  */
 internal class TalkWorker @Inject constructor(
     private val llmRequestUseCase: LlmRequestUseCase,
-    private val tools: WorkerTools
+    private val agentTools: AgentTools,
+    private val chatTools: ChatTools
 ) : AWorker {
 
     companion object {
@@ -31,14 +33,14 @@ internal class TalkWorker @Inject constructor(
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         // 0. Get or create agent instance
-        val agent = tools.getOrCreateAgent(
+        val agent = agentTools.getOrCreateAgent(
             systemName = AGENT_NAME,
             chatId = chat.id,
             isCommonAgent = false
         )
 
         // 1. Get agent context by agentId
-        val context = tools.getContext(agent.id)
+        val context = agentTools.getContext(agent.id)
 
         // 2. Prepare message history for LLM
         val history = context.messages.toModelRequestMessages()
@@ -57,12 +59,12 @@ internal class TalkWorker @Inject constructor(
             val updatedContext = context
                 .addUserMessage(task)
                 .addAssistantMessage(content)
-            tools.saveContext(agent.id, updatedContext)
+            agentTools.saveContext(agent.id, updatedContext)
 
             // 5. Send result to chat
-            tools.addBotMessage(chat.id, content)
+            chatTools.addBotMessage(chat.id, content)
         }.onFailure { exception ->
-            tools.addBotMessage(chat.id, exception.stackTraceToString())
+            chatTools.addBotMessage(chat.id, exception.stackTraceToString())
         }
     }
 }

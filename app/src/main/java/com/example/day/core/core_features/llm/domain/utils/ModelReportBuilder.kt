@@ -1,15 +1,15 @@
-package com.example.day.features.console.impl.domain.agents.utils
+package com.example.day.core.core_features.llm.domain.utils
 
 import com.example.day.core.core_features.llm.domain.model.ModelResult
 import javax.inject.Inject
 
 /**
- * Построитель отчетов о результатах запроса модели
+ * Builder for reports about model query results.
  */
 internal class ModelReportBuilder @Inject constructor() {
 
     /**
-     * Формирует отчет о результатах запроса к модели
+     * Builds a report about model query results.
      */
     fun build(
         modelName: String,
@@ -19,10 +19,10 @@ internal class ModelReportBuilder @Inject constructor() {
         appendLine("📊 Отчет по модели: $modelName")
         appendLine("---")
 
-        // Добавляем время ответа
+        // Add response time
         appendLine("⏱️ Время ответа: ${String.format("%.2f", durationSeconds)} сек.")
 
-        // Добавляем информацию об использовании токенов
+        // Add token usage information
         modelResult.usage?.let { usage ->
             appendLine("📝 Токены:")
             appendLine("  - Prompt токены: ${usage.promptTokens}")

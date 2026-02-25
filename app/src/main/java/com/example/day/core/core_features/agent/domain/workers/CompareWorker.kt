@@ -1,30 +1,33 @@
-package com.example.day.features.console.impl.domain.agents
+package com.example.day.core.core_features.agent.domain.workers
 
+import com.example.day.core.core_features.agent.domain.workers.base.AWorker
+import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
+import com.example.day.core.core_features.agent.domain.utils.extractFromStartBrackets
+import com.example.day.core.core_features.agent.domain.utils.ifBlank
+import com.example.day.core.core_features.agent.domain.utils.trimCmd
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.model.getContent
-import com.example.day.features.console.impl.domain.agents.utils.ModelReportBuilder
-import com.example.day.features.console.impl.domain.agents.worker.SimpleWorker
-import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
-import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
+import com.example.day.core.core_features.llm.domain.utils.ModelReportBuilder
 import javax.inject.Inject
 
 /**
- * Обработчик команды сравнения моделей (@@compare)
- * Отвечает за парсинг параметров, запуск параллельного сравнения моделей
- * и формирование отчетов.
+ * Handler for model comparison command (@@compare)
+ * Responsible for parsing parameters, launching parallel model comparison
+ * and generating reports.
  */
 internal class CompareWorker @Inject constructor(
     private val simpleWorker: SimpleWorker,
     private val reportBuilder: ModelReportBuilder,
-    private val tools: WorkerTools
+    private val chatTools: ChatTools
 ) : AWorker {
 
     /**
-     * Обрабатывает команду сравнения
+     * Handles comparison command
      *
-     * @param inputWithoutCommand - сообщение очищенное от стартовой команды
-     * @param chat настройки чата
-     * @param tools инструменты для работы с чатом
+     * @param task - message cleaned from the start command
+     * @param chat chat settings
+     * @param chatTools tools for working with chat
      */
     override suspend fun doWork(
         task: String,
@@ -35,111 +38,108 @@ internal class CompareWorker @Inject constructor(
         val chatSettings = chat.settings
         val parameters = inputWithoutCommand.extractFromStartBrackets()
         if (parameters.isNullOrBlank()) {
-            // параметров нет - вернемся к обычной обработке
-            // Здесь можно вызвать обратно основной обработчик
+            // No parameters - return to normal processing
             return
         }
 
-        // Парсим модельки из параметров (формат: "model1, model2, model3")
+        // Parse models from parameters (format: "model1, model2, model3")
         val modelNames = parameters.split(INPUT_DELIMITER)
             .map { it.trimCmd() }
             .filter { it.isNotBlank() }
 
         if (modelNames.isEmpty()) {
-            tools.addBotMessage(chatId = chatSettings.chatId, message = "Не указаны модели для сравнения")
+            chatTools.addBotMessage(chatId = chatSettings.chatId, message = "Не указаны модели для сравнения")
             return
         }
 
-        // Извлекаем задачу из сообщения (все что после скобок)
+        // Extract task from message (everything after brackets)
         val taskMessage = inputWithoutCommand
             .substringAfter(parameters)
             .substringAfter(")")
             .trimCmd()
             .ifBlank { "Сравни эти модели" }
 
-        // Отправляем сообщение о начале сравнения
-        tools.addBotMessage(
+        // Send message about start of comparison
+        chatTools.addBotMessage(
             chatId = chatSettings.chatId,
             message = "🔄 Начинаю сравнение моделей: ${modelNames.joinToString(", ")}"
         )
 
-        // Запускаем параллельное выполнение для каждой модели
+        // Launch parallel execution for each model
         modelNames.forEach { modelName ->
             runComparisonForModel(
                 modelName = modelName,
                 taskMessage = taskMessage,
-                originalChat = chat,
-                tools = tools
+                originalChat = chat
             )
         }
     }
 
     /**
-     * Запускает сравнение для одной модели
+     * Launches comparison for one model
      */
     private suspend fun runComparisonForModel(
         modelName: String,
         taskMessage: String,
         originalChat: Chat,
-        tools: WorkerTools,
     ) {
         try {
-            // Получаем или создаем чат для этой модели
+            // Get or create chat for this model
             val newChatName = modelName
-            val newChat = tools.getOrCreateChat(newChatName, originalChat.chatGroup.id)
+            val newChat = chatTools.getOrCreateChat(newChatName, originalChat.chatGroup.id)
             val newChatId = newChat.id
 
-            // Создаем настройки чата с новой моделью
+            // Create chat settings with new model
             val newChatSettings = originalChat.settings.copy(
                 chatId = newChatId,
                 model = originalChat.settings.model.copy(name = modelName)
             )
 
-            // Создаем временный Chat для передачи в Worker
+            // Create temporary Chat for passing to Worker
             val tempChat = originalChat.copy(
                 id = newChatId,
                 settings = newChatSettings
             )
 
-            // Отправляем сообщение о начале обработки модели
-            tools.addBotMessage(
+            // Send message about start of model processing
+            chatTools.addBotMessage(
                 originalChat.settings.chatId,
                 "▶️ Запускаю модель: $modelName в чате \"$newChatName\""
             )
 
-            // Запускаем SimpleWorker - он сам отправляет сообщения в чат через tools
+            // Launch SimpleWorker - it sends messages to chat itself via chatTools
             var startTime = 0L
             simpleWorker.doWork(taskMessage, tempChat) { workerEvent ->
                 when (workerEvent) {
                     is WorkerEvent.RequestError -> Unit
                     WorkerEvent.RequestStart -> {
-                        // Время старта запроса
+                        // Request start time
                         startTime = System.currentTimeMillis()
                     }
                     is WorkerEvent.RequestSuccess -> {
-                        // Записываем время окончания
+                        // Record end time
                         val endTime = System.currentTimeMillis()
                         val durationSeconds = (endTime - startTime) / 1000.0
 
-                        // Отправляем уведомление о получении ответа в основной чат
+                        // Send notification about receiving response to main chat
                         val shortModelAnswer = workerEvent.result.getContent().take(30) + "..."
-                        tools.addBotMessage(
+                        chatTools.addBotMessage(
                             originalChat.settings.chatId,
                             "✅ Модель $modelName ответила в чате \"$newChatName\": $shortModelAnswer"
                         )
 
-                        // Формируем итоговый отчет с использованием данных
+                        // Generate final report using data
                         val report = reportBuilder.build(
                             modelName = modelName,
                             durationSeconds = durationSeconds,
                             modelResult = workerEvent.result
                         )
-                        tools.addBotMessage(originalChat.settings.chatId, report)
+                        chatTools.addBotMessage(originalChat.settings.chatId, report)
                     }
                 }
             }
         } catch (e: Exception) {
-            tools.addBotMessage(
+            chatTools.addBotMessage(
                 originalChat.settings.chatId,
                 "❌ Ошибка при запуске модели $modelName: ${e.message}"
             )

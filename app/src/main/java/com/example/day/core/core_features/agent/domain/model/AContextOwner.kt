@@ -8,7 +8,7 @@ interface AContextOwner {
     /**
      * Get context for an agent.
      * @param agentId the agent ID
-     * @return AContext for the agent
+     * @return AContext if found, null otherwise
      */
     suspend fun getContext(agentId: Long): AContext
     
@@ -18,4 +18,10 @@ interface AContextOwner {
      * @param context the context to save
      */
     suspend fun saveContext(agentId: Long, context: AContext)
+
+    /**
+     * Clear agent context from database.
+     * @param agentId the agent ID
+     */
+    suspend fun clearAgentContext(agentId: Long)
 }

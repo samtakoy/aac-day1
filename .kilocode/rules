@@ -15,6 +15,30 @@
 - `data/` - internal implementations, Room entities, DAOs, mappers
 - `ui/` - ViewModels, Screens, Components
 
+### Core Features Structure
+```
+core/core_features/
+├── agent/           # AI Agents core feature
+│   ├── domain/
+│   │   ├── model/  # Agent, AContext, AContextOwner, Role
+│   │   ├── usecase/# GetAgentContext, SaveAgentContext, ClearAgentContext, GetOrCreateAgent
+│   │   ├── utils/  # StringExtensions
+│   │   └── workers/# AgentTools, Workers (Simple, Step, Prompt, Team, Talk, Compare), base/
+│   ├── data/       # AgentRepositoryImpl, Room entities, DAOs, mappers
+│   └── di/         # AgentCoreFeatureModule
+├── chat/           # Chat core feature
+│   ├── domain/
+│   │   ├── model/ # Chat, User, ChatMessage, etc.
+│   │   ├── usecase/
+│   │   └── tools/  # ChatTools, ChatToolsImpl
+│   └── data/
+└── llm/            # LLM core feature
+    ├── domain/
+    │   ├── model/
+    │   └── utils/  # ModelReportBuilder
+    └── data/
+```
+
 ### Feature Structure
 ```
 features/feature_name/
@@ -42,6 +66,7 @@ features/feature_name/
 - DAOs: `*Dao`
 - Mappers: `*Mapper`
 - Constants: `*Const` object (no magic numbers)
+- Tools interfaces: `*Tools` (e.g., `AgentTools`, `ChatTools`)
 
 ### Enum Mapping
 ```kotlin
@@ -140,6 +165,23 @@ internal class MessageMapper @Inject constructor() {
 }
 ```
 
+### Tools Pattern (Domain Layer)
+```kotlin
+// Tools interfaces define domain operations used by Workers
+interface AgentTools {
+    suspend fun getOrCreateAgent(systemName: String, chatId: Long, isCommonAgent: Boolean): Agent
+    suspend fun getContext(agentId: Long): AContext
+    suspend fun saveContext(agentId: Long, context: AContext)
+    suspend fun clearAgentContext(agentId: Long)
+}
+
+interface ChatTools {
+    suspend fun createChat(chatTitle: String, groupId: Long): Long
+    suspend fun getOrCreateChat(chatTitle: String, groupId: Long): Chat
+    suspend fun addBotMessage(chatId: Long, message: String)
+}
+```
+
 ### Thread Safety
 ```kotlin
 // Use Mutex for thread-safe operations
@@ -157,6 +199,7 @@ override suspend fun someOperation() = mutex.withLock {
 4. **DON'T** put magic numbers in code - use `*Const` objects
 5. **DON'T** make data layer classes public
 6. **DON'T** use extension functions for mappers - use `@Inject constructor` pattern
+7. **DON'T** mix Worker responsibilities - use separate Tools interfaces (AgentTools, ChatTools)
 
 ## File References
 

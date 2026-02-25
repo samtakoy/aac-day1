@@ -1,12 +1,15 @@
 package com.example.day.features.console.impl.domain.agents
 
+import com.example.day.core.core_features.agent.domain.workers.CompareWorker
+import com.example.day.core.core_features.agent.domain.workers.PromptWorker
+import com.example.day.core.core_features.agent.domain.workers.RejectWorker
+import com.example.day.core.core_features.agent.domain.workers.SimpleWorker
+import com.example.day.core.core_features.agent.domain.workers.StepWorker
+import com.example.day.core.core_features.agent.domain.workers.TeamWorker
+import com.example.day.core.core_features.agent.domain.workers.TalkWorker
+import com.example.day.core.core_features.agent.domain.utils.trimCmd
+import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.chat.domain.model.Chat
-import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
-import com.example.day.features.console.impl.domain.agents.worker.PromptWorker
-import com.example.day.features.console.impl.domain.agents.worker.SimpleWorker
-import com.example.day.features.console.impl.domain.agents.worker.StepWorker
-import com.example.day.features.console.impl.domain.agents.worker.TeamWorker
-import com.example.day.features.console.impl.domain.agents.worker.TalkWorker
 import javax.inject.Inject
 
 /**
@@ -19,7 +22,8 @@ internal class AgMessageHandler @Inject constructor(
     promptWorker: PromptWorker,
     teamWorker: TeamWorker,
     talkWorker: TalkWorker,
-    compareWorker: CompareWorker
+    compareWorker: CompareWorker,
+    private val rejectWorker: RejectWorker
 ) {
 
     private val commandToWorker: Map<ChatCommand, AWorker> = mapOf(
@@ -37,13 +41,10 @@ internal class AgMessageHandler @Inject constructor(
      *
      * @param userMessage сообщение от пользователя
      * @param chat настройки чата
-     * @param tools доступные операции с чатом
-     * Например, "Команда не распознана" или "Решение вашей задачи..."
      */
     suspend fun handleUserMessage(
         userMessage: String,
-        chat: Chat,
-        tools: WorkerTools
+        chat: Chat
     ) {
         val trimmedMessage = userMessage.trim()
 
@@ -59,6 +60,10 @@ internal class AgMessageHandler @Inject constructor(
             }
         }
 
-        tools.addBotMessage(chat.id, "Команда не распознана")
+        rejectWorker.doWork(
+            task = trimmedMessage,
+            chat = chat,
+            onEvent = null
+        )
     }
 }

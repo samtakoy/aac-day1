@@ -6,10 +6,8 @@ import kotlinx.collections.immutable.persistentListOf
  * In-memory implementation of [AContextOwner] for storing agent context in memory.
  * 
  * This is useful for MVP or testing purposes. For production, consider using
- * [DbContextOwner] implementation that stores context in the database.
- * 
+ *
  * Note: Context is stored in memory and will be lost on app restart.
- * Use [DbContextOwner] for persistent context storage.
  */
 internal class InMemoryContextOwner : AContextOwner {
 
@@ -27,6 +25,10 @@ internal class InMemoryContextOwner : AContextOwner {
 
     override suspend fun saveContext(agentId: Long, context: AContext) {
         contexts[agentId] = context
+    }
+
+    override suspend fun clearAgentContext(agentId: Long) {
+        contexts.remove(agentId)
     }
 
     /**

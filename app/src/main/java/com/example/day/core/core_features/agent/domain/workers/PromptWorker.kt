@@ -1,58 +1,58 @@
-package com.example.day.features.console.impl.domain.agents.worker
+package com.example.day.core.core_features.agent.domain.workers
 
+import com.example.day.core.core_features.agent.domain.workers.base.AWorker
+import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
+import com.example.day.core.core_features.agent.domain.workers.base.askLlm
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.getContent
-import com.example.day.features.console.impl.domain.agents.WorkerTools
-import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
-import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
-import com.example.day.features.console.impl.domain.agents.worker.base.askLlm
 import javax.inject.Inject
 
 internal class PromptWorker @Inject constructor(
     private val llmRequestUseCase: LlmRequestUseCase,
-    private val tools: WorkerTools
+    private val chatTools: ChatTools
 ) : AWorker {
     override suspend fun doWork(
         task: String,
         chat: Chat,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
-        // 1. составим промпт
+        // 1. Compose the prompt
         val promptResult = llmRequestUseCase.askLlm(
             chatSettings = chat.settings,
             userPrompt = "Составь промпт для LLM для решения задачи: $task\n",
             systemPrompt = SYSTEM_PROMPT,
             onEvent = onEvent
         )
-        // Ошибка
+        // Error
         if (promptResult.isFailure) {
             val errorText = promptResult.exceptionOrNull()?.stackTraceToString() ?: "ошибка"
-            tools.addBotMessage(chat.id, errorText)
+            chatTools.addBotMessage(chat.id, errorText)
             return
         }
 
         val llmResult = promptResult.getOrThrow()
         val generatedPrompt = extractResult(llmResult.getContent())
         if (generatedPrompt == null) {
-            tools.addBotMessage(chat.id, "Я не смог выполнить инструкции и написал:\n${llmResult.getContent()}")
+            chatTools.addBotMessage(chat.id, "Я не смог выполнить инструкции и написал:\n${llmResult.getContent()}")
             return
         }
 
-        // Отправляем промпт в чат
-        tools.addBotMessage(chat.id, "Я составил промпт:\n$generatedPrompt")
+        // Send the prompt to chat
+        chatTools.addBotMessage(chat.id, "Я составил промпт:\n$generatedPrompt")
 
-        // 2. Даем задание в виде промпта:
+        // 2. Give the task as a prompt:
         llmRequestUseCase.askLlm(
             chatSettings = chat.settings,
             userPrompt = generatedPrompt,
             onEvent = onEvent
         )
             .onSuccess { result  ->
-                tools.addBotMessage(chat.id, result.getContent())
+                chatTools.addBotMessage(chat.id, result.getContent())
             }
             .onFailure { exception ->
-                tools.addBotMessage(chat.id, exception.stackTraceToString())
+                chatTools.addBotMessage(chat.id, exception.stackTraceToString())
             }
     }
 

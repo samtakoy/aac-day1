@@ -9,14 +9,13 @@ import com.example.day.core.core_features.llm.data.remote.mappers.ModelRequestMa
 import com.example.day.core.core_features.llm.data.remote.mappers.ModelResponseMapper
 import com.example.day.core.core_features.llm.data.remote.mappers.ModelResponseMapperImpl
 import com.example.day.core.core_features.llm.domain.LlmRepository
-import com.example.day.features.console.impl.domain.agents.WorkerTools
-import com.example.day.features.console.impl.domain.agents.WorkerToolsImpl
-import dagger.Binds
 import dagger.Module
 
+/**
+ * DI модуль для console фичи.
+ *
+ * Примечание: AgentTools, ChatTools и Workers теперь находятся в core слое
+ * и должны быть привязаны в AgentCoreFeatureModule.
+ */
 @Module
-internal abstract class ConsoleFeatureModule {
-    // TODO посмотреть на предмет - правильности модуля и расположения
-    @Binds
-    abstract fun bindWorkerTools(impl: WorkerToolsImpl): WorkerTools
-}
+internal abstract class ConsoleFeatureModule

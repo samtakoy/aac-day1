@@ -1,21 +1,21 @@
-package com.example.day.features.console.impl.domain.agents.worker
+package com.example.day.core.core_features.agent.domain.workers
 
+import com.example.day.core.core_features.agent.domain.workers.base.AWorker
+import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
+import com.example.day.core.core_features.agent.domain.workers.base.askLlm
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.ModelResult
 import com.example.day.core.core_features.llm.domain.model.getContent
-import com.example.day.features.console.impl.domain.agents.WorkerTools
-import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
-import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
-import com.example.day.features.console.impl.domain.agents.worker.base.askLlm
 import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 internal class TeamWorker @Inject constructor(
     private val llmRequestUseCase: LlmRequestUseCase,
-    private val tools: WorkerTools
+    private val chatTools: ChatTools
 ) : AWorker {
 
     override suspend fun doWork(
@@ -30,9 +30,9 @@ internal class TeamWorker @Inject constructor(
             "КРИТИК" to "найди слабые места в предложениях коллег и риски"
         )
 
-        // 1. Опрос экспертов
+        // 1. Survey experts
         experts.forEach { (name, mission) ->
-            tools.addBotMessage(chat.id, "--- 🧠 Выступает $name ---")
+            chatTools.addBotMessage(chat.id, "--- 🧠 Выступает $name ---")
 
             val promptText = "Твоя роль: $name. Задача: $mission. " +
                     if (messageHistory.isNotEmpty()) "Учитывай мнение предыдущих экспертов. Контекст: $task" else "Контекст: $task"
@@ -41,35 +41,35 @@ internal class TeamWorker @Inject constructor(
                 .onSuccess { llmResult ->
                     val rawAnswer = llmResult.getContent()
                     val result = extractResult(rawAnswer) ?: rawAnswer
-                    tools.addBotMessage(chat.id, result)
+                    chatTools.addBotMessage(chat.id, result)
                     messageHistory.add(ModelRequest.Message(ModelRequest.Role.User, promptText))
                     messageHistory.add(ModelRequest.Message(ModelRequest.Role.Assistant, rawAnswer))
                 }
                 .onFailure {
-                    tools.addBotMessage(chat.id, "что-то пошло не так: ${it.message}")
+                    chatTools.addBotMessage(chat.id, "что-то пошло не так: ${it.message}")
                 }
             delay(2000)
         }
 
-        // 2. Финальное резюме от Менеджера
-        tools.addBotMessage(chat.id, "--- 📋 МЕНЕДЖЕР ПРОЕКТА (Сводный план) ---")
+        // 2. Final summary from Manager
+        chatTools.addBotMessage(chat.id, "--- 📋 МЕНЕДЖЕР ПРОЕКТА (Сводный план) ---")
         val managerPrompt = "Ты — Менеджер. Собери воедино мнения аналитика и инженера, " +
                 "учти замечания критика и выдай финальный пошаговый план реализации задачи: $task"
 
         val finalResponse = askExpert(chat.settings, managerPrompt, messageHistory, onEvent)
 
         finalResponse.onSuccess { llmResult ->
-            // Логируем для отладки, если пусто
+            // Log for debugging if empty
             val raw = llmResult.getContent()
             val result = extractResult(raw)
             if (result != null) {
-                tools.addBotMessage(chat.id, result)
+                chatTools.addBotMessage(chat.id, result)
             } else {
-                // Если совсем ничего не нашли в content, пробуем заглянуть в reasoning (крайний случай)
-                tools.addBotMessage(chat.id, "Ошибка парсинга: ${raw.take(100)}...")
+                // If nothing found in content, try to look into reasoning (last resort)
+                chatTools.addBotMessage(chat.id, "Ошибка парсинга: ${raw.take(100)}...")
             }
         }.onFailure {
-            tools.addBotMessage(chat.id, "Ошибка менеджера: ${it.message}")
+            chatTools.addBotMessage(chat.id, "Ошибка менеджера: ${it.message}")
         }
     }
 
@@ -92,7 +92,7 @@ internal class TeamWorker @Inject constructor(
         val regex = Regex("\\[RESULT_START\\](.*)\\[RESULT_END\\]", RegexOption.DOT_MATCHES_ALL)
         val match = regex.find(answer)?.groupValues?.get(1)?.trim()
 
-        // Если тегов нет, но текст явно полезный (не пустой), возвращаем как есть
+        // If there are no tags but the text is clearly useful (not empty), return as is
         return match ?: if (answer.isNotBlank() && !answer.contains("reasoning")) answer.trim() else null
     }
 

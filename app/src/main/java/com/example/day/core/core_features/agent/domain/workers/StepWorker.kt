@@ -1,38 +1,38 @@
-package com.example.day.features.console.impl.domain.agents.worker
+package com.example.day.core.core_features.agent.domain.workers
 
+import com.example.day.core.core_features.agent.domain.workers.base.AWorker
+import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
+import com.example.day.core.core_features.agent.domain.workers.base.askLlm
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.getContent
-import com.example.day.features.console.impl.domain.agents.WorkerTools
-import com.example.day.features.console.impl.domain.agents.worker.base.AWorker
-import com.example.day.features.console.impl.domain.agents.worker.base.WorkerEvent
-import com.example.day.features.console.impl.domain.agents.worker.base.askLlm
 import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 internal class StepWorker @Inject constructor(
     private val llmRequestUseCase: LlmRequestUseCase,
-    private val tools: WorkerTools
+    private val chatTools: ChatTools
 ) : AWorker {
     override suspend fun doWork(
         task: String,
         chat: Chat,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
-        // История сообщений для поддержания контекста
+        // Message history for maintaining context
         val messageHistory = mutableListOf<ModelRequest.Message>()
 
         var isFinished = false
         var cycleCount = 1
         var currentStep = 1
 
-        // Первый запрос: ставим задачу
+        // First request: set the task
         var nextUserMessage = "Реши задачу пошагово. Каждый шаг пиши отдельно. " +
                 "Если задача решена, напиши $DONE. \nЗадача: $task"
 
         while (!isFinished && cycleCount <= MAX_STEPS) {
-            tools.addBotMessage(chat.id, "--- Думаю над шагом №$currentStep ---")
+            chatTools.addBotMessage(chat.id, "--- Думаю над шагом №$currentStep ---")
             val response = llmRequestUseCase.askLlm(
                 chatSettings = chat.settings,
                 userPrompt = nextUserMessage,
@@ -46,17 +46,17 @@ internal class StepWorker @Inject constructor(
                 val results = extractResults(rawAnswer)
 
                 if (results.isEmpty()) {
-                    tools.addBotMessage(chat.id, "Вот мой финальный ответ:\n$rawAnswer")
+                    chatTools.addBotMessage(chat.id, "Вот мой финальный ответ:\n$rawAnswer")
                     return
                 }
 
-                // Отправляем промежуточные результаты в чат
+                // Send intermediate results to chat
                 results.forEach { content ->
-                    tools.addBotMessage(chat.id, content)
+                    chatTools.addBotMessage(chat.id, content)
                     currentStep++
                 }
 
-                // Сохраняем в историю, чтобы LLM помнила, что она ответила
+                // Save to history so LLM remembers what it answered
                 messageHistory.add(
                     ModelRequest.Message(role = ModelRequest.Role.User, content = nextUserMessage)
                 )
@@ -66,12 +66,12 @@ internal class StepWorker @Inject constructor(
 
                 if (rawAnswer.contains(DONE)) {
                     isFinished = true
-                    tools.addBotMessage(chat.id, "✅ Задача завершена")
+                    chatTools.addBotMessage(chat.id, "✅ Задача завершена")
                 } else {
                     nextUserMessage = "Выполни следующий шаг или заверши работу тегом $DONE"
                     cycleCount++
-                    tools.addBotMessage(chat.id, "--- Думаю над шагом №$currentStep ---")
-                    // на всякий случай уменьшим частоту ddos-атаки
+                    chatTools.addBotMessage(chat.id, "--- Думаю над шагом №$currentStep ---")
+                    // Just in case reduce the frequency of ddos-attack
                     delay(1000)
                 }
             }.onFailure {
@@ -79,7 +79,7 @@ internal class StepWorker @Inject constructor(
             }
         }
 
-        if (cycleCount > MAX_STEPS) tools.addBotMessage(chat.id, "⚠️ Превышен лимит шагов")
+        if (cycleCount > MAX_STEPS) chatTools.addBotMessage(chat.id, "⚠️ Превышен лимит шагов")
     }
 
     private fun extractResults(answer: String): List<String> {
