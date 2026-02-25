@@ -22,7 +22,7 @@ internal interface ConsoleViewModel {
         object SubmitButtonClick : Event
         class InputChanged(val text: String) : Event
         object OpenSettingsClick : Event
-        class SettingsSubmitClick(val result: ChatSettings) : Event
+        class SettingsSubmitClick(val chatTitle: String, val settings: ChatSettings) : Event
         object SettingsCancelClick : Event
     }
 }

@@ -35,4 +35,7 @@ internal interface ChatDao {
     @Transaction
     @Query("SELECT * FROM chats WHERE title = :title AND chat_group_id = :groupId")
     suspend fun getChatByTitleAndGroupId(title: String, groupId: Long): ChatWithGroupAndSettings?
+
+    @Query("UPDATE chats SET title = :title WHERE id = :chatId")
+    suspend fun updateChatTitle(chatId: Long, title: String)
 }

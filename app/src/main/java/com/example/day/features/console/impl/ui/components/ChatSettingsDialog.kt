@@ -1,0 +1,49 @@
+package com.example.day.features.console.impl.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.core.ui.uikit.chat.ChatUiColors
+import com.example.day.core.ui.uikit.chat.LocalChatColors
+
+/**
+ * A modal dialog wrapper for ChatSettingsView.
+ * Displays chat settings in a dialog with proper styling.
+ *
+ * @param state The UI model containing settings state
+ * @param onDismiss Callback when dialog is dismissed
+ * @param onSubmit Callback when settings are submitted
+ * @param colors Chat UI colors
+ */
+@Composable
+fun ChatSettingsDialog(
+    state: ChatSettingsUiModel,
+    onDismiss: () -> Unit,
+    onSubmit: (chatTitle: String, settings: ChatSettings) -> Unit,
+    colors: ChatUiColors = LocalChatColors.current
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp)),
+            color = colors.background
+        ) {
+            ChatSettingsView(
+                state = state,
+                onSubmit = onSubmit,
+                onCancel = onDismiss,
+                colors = colors
+            )
+        }
+    }
+}

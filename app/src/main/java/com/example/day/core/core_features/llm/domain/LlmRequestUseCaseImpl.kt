@@ -29,10 +29,16 @@ internal class LlmRequestUseCaseImpl @Inject constructor(
                 add(promptText.reqUserMessage())
             },
             responseFormat = modelSettings.reqResponseFormat(),
-            maxTokens = modelSettings.reqMaxTokensOrNull(),
-            temperature = modelSettings.reqTemperatureOrNull(),
+            maxTokens = modelSettings.maxTokens,
+            maxCompletionTokens = modelSettings.maxCompletionTokens,
+            temperature = modelSettings.temperature,
+            topP = modelSettings.topP,
+            topK = modelSettings.topK,
             stopSequence = modelSettings.reqStopSequenceOrNull(),
-            reasoningEffort = modelSettings.reqReasoning()
+            presencePenalty = modelSettings.presencePenalty,
+            frequencyPenalty = modelSettings.frequencyPenalty,
+            reasoningEffort = modelSettings.reqReasoning(),
+            seed = modelSettings.seed
         )
         val result = repository.sendRequest(request)
         return mapResult(result)
@@ -62,13 +68,8 @@ internal class LlmRequestUseCaseImpl @Inject constructor(
     private fun ModelSettings.reqStopSequenceOrNull(): ImmutableList<String>? =
         stopSequence.ifEmpty { null }
 
-    private fun ModelSettings.reqMaxTokensOrNull(): Int? =
-        maxTokens.takeIf { it > 0 }
-
     private fun ModelSettings.reqResponseFormat(): ModelRequest.ResponseFormat =
         if (jsonFormat) ModelRequest.ResponseFormat.JsonObject else ModelRequest.ResponseFormat.None
-
-    private fun ModelSettings.reqTemperatureOrNull(): Double? = temperature
 
     private fun ModelSettings.reqReasoning(): ModelRequest.Reasoning? {
         reasoningEffort ?: return null

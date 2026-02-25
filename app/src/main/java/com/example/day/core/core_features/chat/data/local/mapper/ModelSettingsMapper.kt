@@ -19,8 +19,14 @@ internal class ModelSettingsMapper @Inject constructor() {
             name = entity.name,
             stopSequence = entity.stopSequence.toImmutableList(),
             maxTokens = entity.maxTokens,
+            maxCompletionTokens = entity.maxCompletionTokens,
             jsonFormat = entity.jsonFormat,
             temperature = entity.temperature,
+            topP = entity.topP,
+            topK = entity.topK,
+            presencePenalty = entity.presencePenalty,
+            frequencyPenalty = entity.frequencyPenalty,
+            seed = entity.seed,
             reasoningEffort = entity.reasoningEffort
         )
     }
@@ -30,8 +36,14 @@ internal class ModelSettingsMapper @Inject constructor() {
             name = model.name,
             stopSequence = model.stopSequence.toList(),
             maxTokens = model.maxTokens,
+            maxCompletionTokens = model.maxCompletionTokens,
             jsonFormat = model.jsonFormat,
             temperature = model.temperature,
+            topP = model.topP,
+            topK = model.topK,
+            presencePenalty = model.presencePenalty,
+            frequencyPenalty = model.frequencyPenalty,
+            seed = model.seed,
             reasoningEffort = model.reasoningEffort
         )
     }

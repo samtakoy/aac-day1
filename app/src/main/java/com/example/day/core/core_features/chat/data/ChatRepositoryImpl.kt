@@ -223,6 +223,10 @@ internal class ChatRepositoryImpl @Inject constructor(
         chatSettingsDao.insert(chatSettingsMapper.toEntity(settings))
     }
 
+    override suspend fun updateChatTitle(chatId: Long, title: String) {
+        chatDao.updateChatTitle(chatId, title)
+    }
+
     override suspend fun getOrCreateChat(title: String, chatGroupId: Long): Chat = mutex.withLock {
         // Сначала пробуем найти существующий чат
         val existingChat = chatDao.getChatByTitleAndGroupId(title, chatGroupId)

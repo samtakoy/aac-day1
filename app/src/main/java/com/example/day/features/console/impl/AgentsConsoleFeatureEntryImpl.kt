@@ -30,7 +30,7 @@ class AgentsConsoleFeatureEntryImpl @Inject constructor(): AgentsConsoleFeatureE
         }
         
         val viewModel: ConsoleViewModelImpl = viewModel(
-            key = chatId.toString(),
+            key = "${ConsoleViewModelImpl::class.qualifiedName}_$chatId",
             // обычный разговор
             // factory = featureComponent.getViewModelFactory(),
             // разговор с агентами

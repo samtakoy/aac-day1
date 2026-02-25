@@ -30,7 +30,7 @@ class ConsoleFeatureEntryIml @Inject constructor(): ConsoleFeatureEntry {
         }
 
         val viewModel: ConsoleViewModelImpl = viewModel(
-            key = chatId.toString(),
+            key = "${ConsoleViewModelImpl::class.qualifiedName}_$chatId",
             factory = featureComponent.getViewModelFactory(),
             extras = extras
         )

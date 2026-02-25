@@ -95,7 +95,9 @@ private fun ConsoleScreenInternal(
         if (state.settings != null) {
             ChatSettingsView(
                 state = state.settings,
-                onSubmit = { onEvent(ConsoleViewModel.Event.SettingsSubmitClick(it)) },
+                onSubmit = { chatTitle, settings ->
+                        onEvent(ConsoleViewModel.Event.SettingsSubmitClick(chatTitle, settings))
+                    },
                 onCancel = { onEvent(ConsoleViewModel.Event.SettingsCancelClick) },
                 modifier = Modifier.fillMaxSize()
             )

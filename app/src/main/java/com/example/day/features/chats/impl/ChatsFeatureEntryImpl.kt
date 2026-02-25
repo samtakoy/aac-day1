@@ -31,7 +31,7 @@ class ChatsFeatureEntryIml @Inject constructor(): ChatsFeatureEntry {
         }
 
         val viewModel: ChatsViewModelImpl = viewModel(
-            key = groupId.toString(),
+            key = "${ChatsViewModelImpl::class.qualifiedName}_$groupId",
             factory = featureComponent.getViewModelFactory(),
             extras = extras
         )

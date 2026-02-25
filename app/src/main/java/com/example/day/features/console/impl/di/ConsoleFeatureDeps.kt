@@ -11,6 +11,7 @@ import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsF
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesWithStatusUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetOrCreateChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.UpdateChatSettingsUseCase
+import com.example.day.core.core_features.chat.domain.usecase.UpdateChatTitleUseCase
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 
 interface ConsoleFeatureDeps {
@@ -24,6 +25,7 @@ interface ConsoleFeatureDeps {
     val updateChatSettingsUseCase: UpdateChatSettingsUseCase
     val createChatUseCase: CreateChatUseCase
     val getOrCreateChatUseCase: GetOrCreateChatUseCase
+    val updateChatTitleUseCase: UpdateChatTitleUseCase
     // Tools для агентов
     val agentTools: AgentTools
     val chatTools: ChatTools
