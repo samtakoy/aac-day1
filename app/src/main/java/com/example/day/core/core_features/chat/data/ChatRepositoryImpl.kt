@@ -69,9 +69,11 @@ internal class ChatRepositoryImpl @Inject constructor(
         status: ChatMessageStatus
     ): Long {
         val users = getOrCreateDefaultUsers()
+        val infoUser = getOrCreateInfoUser()
         val userEntity = when (userType) {
             UserType.User -> users.first
             UserType.Bot -> users.second
+            UserType.Info -> infoUser
         }
 
         val entity = messageMapper.toEntity(
@@ -105,7 +107,15 @@ internal class ChatRepositoryImpl @Inject constructor(
                     if (entity.userId == user.id) user else userDao.getUserByType(ChatDbConst.BOT_TYPE)
                 } ?: userDao.getUserByType(ChatDbConst.BOT_TYPE)
 
-                userEntity?.let {
+                // Also check for Info user
+                val infoUserEntity = userDao.getUserByType(ChatDbConst.INFO_TYPE)
+                val finalUserEntity = if (infoUserEntity != null && entity.userId == infoUserEntity.id) {
+                    infoUserEntity
+                } else {
+                    userEntity
+                }
+
+                finalUserEntity?.let {
                     messageMapper.toDomain(entity, userMapper.toDomain(it))
                 }
             }
@@ -121,7 +131,15 @@ internal class ChatRepositoryImpl @Inject constructor(
                 if (entity.userId == user.id) user else userDao.getUserByType(ChatDbConst.BOT_TYPE)
             } ?: userDao.getUserByType(ChatDbConst.BOT_TYPE)
 
-            userEntity?.let {
+            // Also check for Info user
+            val infoUserEntity = userDao.getUserByType(ChatDbConst.INFO_TYPE)
+            val finalUserEntity = if (infoUserEntity != null && entity.userId == infoUserEntity.id) {
+                infoUserEntity
+            } else {
+                userEntity
+            }
+
+            finalUserEntity?.let {
                 messageMapper.toDomain(entity, userMapper.toDomain(it))
             }
         }
@@ -130,20 +148,62 @@ internal class ChatRepositoryImpl @Inject constructor(
     override suspend fun getOrCreateDefaultUsers(): Pair<User, User> {
         var userEntity = userDao.getUserByType(ChatDbConst.USER_TYPE)
         if (userEntity == null) {
-            val id = userDao.insert(UserEntity(name = ChatDbConst.DEFAULT_USER_NAME, type = ChatDbConst.USER_TYPE))
-            userEntity = UserEntity(id = id, name = ChatDbConst.DEFAULT_USER_NAME, type = ChatDbConst.USER_TYPE)
+            val id = userDao.insert(
+                UserEntity(
+                    name = ChatDbConst.DEFAULT_USER_NAME,
+                    type = ChatDbConst.USER_TYPE,
+                    avatar = ChatDbConst.DEFAULT_USER_AVATAR
+                )
+            )
+            userEntity = UserEntity(
+                id = id,
+                name = ChatDbConst.DEFAULT_USER_NAME,
+                type = ChatDbConst.USER_TYPE,
+                avatar = ChatDbConst.DEFAULT_USER_AVATAR
+            )
         }
 
         var botEntity = userDao.getUserByType(ChatDbConst.BOT_TYPE)
         if (botEntity == null) {
-            val id = userDao.insert(UserEntity(name = ChatDbConst.DEFAULT_BOT_NAME, type = ChatDbConst.BOT_TYPE))
-            botEntity = UserEntity(id = id, name = ChatDbConst.DEFAULT_BOT_NAME, type = ChatDbConst.BOT_TYPE)
+            val id = userDao.insert(
+                UserEntity(
+                    name = ChatDbConst.DEFAULT_BOT_NAME,
+                    type = ChatDbConst.BOT_TYPE,
+                    avatar = ChatDbConst.DEFAULT_BOT_AVATAR
+                )
+            )
+            botEntity = UserEntity(
+                id = id,
+                name = ChatDbConst.DEFAULT_BOT_NAME,
+                type = ChatDbConst.BOT_TYPE,
+                avatar = ChatDbConst.DEFAULT_BOT_AVATAR
+            )
         }
 
         return Pair(
             userMapper.toDomain(userEntity),
             userMapper.toDomain(botEntity)
         )
+    }
+
+    private suspend fun getOrCreateInfoUser(): User {
+        var infoEntity = userDao.getUserByType(ChatDbConst.INFO_TYPE)
+        if (infoEntity == null) {
+            val id = userDao.insert(
+                UserEntity(
+                    name = ChatDbConst.DEFAULT_INFO_NAME,
+                    type = ChatDbConst.INFO_TYPE,
+                    avatar = ChatDbConst.DEFAULT_INFO_AVATAR
+                )
+            )
+            infoEntity = UserEntity(
+                id = id,
+                name = ChatDbConst.DEFAULT_INFO_NAME,
+                type = ChatDbConst.INFO_TYPE,
+                avatar = ChatDbConst.DEFAULT_INFO_AVATAR
+            )
+        }
+        return userMapper.toDomain(infoEntity)
     }
 
     override suspend fun clearChat(chatId: Long) {

@@ -17,6 +17,7 @@ import com.example.day.core.ui.uikit.chat.bar.model.ChatBarUiModel
 import com.example.day.core.ui.uikit.chat.bar.model.ChatSendButtonType
 import com.example.day.core.ui.uikit.chat.list.model.ChatListUiModel
 import com.example.day.core.ui.uikit.chat.list.model.ChatMessageUiModel
+import com.example.day.core.ui.uikit.chat.list.model.ChatMessageUiType
 import com.example.day.core.ui.uikit.chat.list.model.UiMessageStatus
 import com.example.day.features.console.impl.ui.components.ChatSettingsUiModel
 import com.example.day.features.console.impl.ui.delegates.AgentsTalkDelegate
@@ -84,12 +85,17 @@ internal class ConsoleViewModelImpl(
                                 ChatMessageUiModel(
                                     id = msg.id,
                                     text = msg.text,
-                                    isUser = msg.user.type == UserType.User,
+                                    userType = when (msg.user.type) {
+                                        com.example.day.core.core_features.chat.domain.model.UserType.User -> ChatMessageUiType.User
+                                        com.example.day.core.core_features.chat.domain.model.UserType.Bot -> ChatMessageUiType.Bot
+                                        com.example.day.core.core_features.chat.domain.model.UserType.Info -> ChatMessageUiType.Info
+                                    },
                                     status = when (msg.status) {
                                         ChatMessageStatus.Sending -> UiMessageStatus.Sending
                                         ChatMessageStatus.Delivered -> UiMessageStatus.Delivered
                                         ChatMessageStatus.Viewed -> UiMessageStatus.Viewed
-                                    }
+                                    },
+                                    avatarUrl = msg.user.avatar
                                 )
                             }.toPersistentList()
                         )

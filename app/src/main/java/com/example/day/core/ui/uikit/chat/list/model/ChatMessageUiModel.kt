@@ -6,8 +6,7 @@ package com.example.day.core.ui.uikit.chat.list.model
 data class ChatMessageUiModel(
     val id: Long,
     val text: String,
-    val isUser: Boolean,
+    val userType: ChatMessageUiType,
     val status: UiMessageStatus,
-    // TODO
-    // val avatarUrl: String
+    val avatarUrl: String? = null
 )

@@ -17,9 +17,14 @@ data class ChatUiColors(
     val botBubble: Color = Color(0xFFE8E8E8),         // Light gray
     val botText: Color = Color(0xFF1C1B1F),           // Dark
     
+    // Info message colors - ALWAYS light (independent of theme)
+    val infoBubble: Color = Color(0xFFF5F5F5),         // Very light gray
+    val infoText: Color = Color(0xFF1C1B1F),           // Almost black
+    
     // Avatar colors
     val userAvatarBackground: Color = Color(0xFF7C4DFF), // Deep purple
     val botAvatarBackground: Color = Color(0xFF00BCD4),  // Cyan
+    val infoAvatarBackground: Color = Color(0xFF9E9E9E), // Gray
     
     // Status colors
     val sendingStatus: Color = Color(0xFF9E9E9E),       // Gray
@@ -40,14 +45,19 @@ data class ChatUiColors(
 
 /**
  * Alternative dark theme colors for chat
+ * Note: Info messages always use light colors regardless of theme
  */
 val DarkChatUiColors = ChatUiColors(
     userBubble = Color(0xFF7C4DFF),
     userText = Color.White,
     botBubble = Color(0xFF424242),
     botText = Color.White,
+    // Info messages ALWAYS use light colors (independent of theme)
+    infoBubble = Color(0xFFF5F5F5),
+    infoText = Color(0xFF1C1B1F),
     userAvatarBackground = Color(0xFF9C27B0),
     botAvatarBackground = Color(0xFF00ACC1),
+    infoAvatarBackground = Color(0xFF9E9E9E),
     sendingStatus = Color(0xFF757575),
     deliveredStatus = Color(0xFF81C784),
     viewedStatus = Color(0xFF64B5F6),

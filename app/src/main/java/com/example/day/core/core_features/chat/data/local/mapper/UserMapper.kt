@@ -11,12 +11,22 @@ internal class UserMapper @Inject constructor() {
     fun toDomain(entity: UserEntity): User = User(
         id = entity.id,
         name = entity.name,
-        type = if (entity.type == ChatDbConst.BOT_TYPE) UserType.Bot else UserType.User
+        type = when (entity.type) {
+            ChatDbConst.BOT_TYPE -> UserType.Bot
+            ChatDbConst.INFO_TYPE -> UserType.Info
+            else -> UserType.User
+        },
+        avatar = entity.avatar
     )
 
     fun toEntity(user: User): UserEntity = UserEntity(
         id = user.id,
         name = user.name,
-        type = if (user.type == UserType.Bot) ChatDbConst.BOT_TYPE else ChatDbConst.USER_TYPE
+        type = when (user.type) {
+            UserType.Bot -> ChatDbConst.BOT_TYPE
+            UserType.Info -> ChatDbConst.INFO_TYPE
+            UserType.User -> ChatDbConst.USER_TYPE
+        },
+        avatar = user.avatar
     )
 }

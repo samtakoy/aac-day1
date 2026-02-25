@@ -14,5 +14,8 @@ internal data class UserEntity(
     val name: String,
     
     @ColumnInfo(name = "type")
-    val type: Int
+    val type: Int,
+    
+    @ColumnInfo(name = "avatar")
+    val avatar: String? = null
 )

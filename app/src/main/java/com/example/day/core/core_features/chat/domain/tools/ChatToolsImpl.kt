@@ -36,4 +36,14 @@ internal class ChatToolsImpl @Inject constructor(
             ChatMessageStatus.Viewed
         )
     }
+
+    override suspend fun addInfoMessage(chatId: Long, message: String) {
+        addChatMessageUseCase.invoke(
+            chatId,
+            System.currentTimeMillis(),
+            UserType.Info,
+            message,
+            ChatMessageStatus.Viewed
+        )
+    }
 }

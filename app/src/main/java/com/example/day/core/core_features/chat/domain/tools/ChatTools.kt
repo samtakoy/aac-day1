@@ -35,4 +35,12 @@ interface ChatTools {
      * @param message the message content
      */
     suspend fun addBotMessage(chatId: Long, message: String)
+    
+    /**
+     * Add an info message to the chat.
+     * 
+     * @param chatId the chat identifier
+     * @param message the message content
+     */
+    suspend fun addInfoMessage(chatId: Long, message: String)
 }
