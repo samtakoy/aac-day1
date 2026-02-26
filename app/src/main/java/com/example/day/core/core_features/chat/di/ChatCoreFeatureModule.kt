@@ -11,6 +11,8 @@ import com.example.day.core.core_features.chat.data.local.dao.ChatTypeDao
 import com.example.day.core.core_features.chat.data.local.dao.MessageDao
 import com.example.day.core.core_features.chat.data.local.dao.UserDao
 import com.example.day.core.core_features.chat.domain.ChatRepository
+import com.example.day.core.core_features.chat.domain.tools.ChatTools
+import com.example.day.core.core_features.chat.domain.tools.ChatToolsImpl
 import dagger.Binds
 import dagger.Module
 import dagger.Provides

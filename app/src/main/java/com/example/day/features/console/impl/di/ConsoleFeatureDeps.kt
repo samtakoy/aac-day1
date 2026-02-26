@@ -1,5 +1,13 @@
 package com.example.day.features.console.impl.di
 
+import com.example.day.core.core_features.agent.domain.utils.ConsumptionCalculator
+import com.example.day.core.core_features.agent.domain.workers.CompareWorker
+import com.example.day.core.core_features.agent.domain.workers.PromptWorker
+import com.example.day.core.core_features.agent.domain.workers.RejectWorker
+import com.example.day.core.core_features.agent.domain.workers.SimpleWorker
+import com.example.day.core.core_features.agent.domain.workers.StepWorker
+import com.example.day.core.core_features.agent.domain.workers.TalkWorker
+import com.example.day.core.core_features.agent.domain.workers.TeamWorker
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
@@ -26,7 +34,13 @@ interface ConsoleFeatureDeps {
     val createChatUseCase: CreateChatUseCase
     val getOrCreateChatUseCase: GetOrCreateChatUseCase
     val updateChatTitleUseCase: UpdateChatTitleUseCase
-    // Tools для агентов
-    val agentTools: AgentTools
-    val chatTools: ChatTools
+    
+    val worker0: RejectWorker
+    val worker1: CompareWorker
+    val worker2: SimpleWorker
+    val worker3: StepWorker
+    val worker4: PromptWorker
+    val worker5: TeamWorker
+    val worker6: TalkWorker
+    val consuption: ConsumptionCalculator
 }

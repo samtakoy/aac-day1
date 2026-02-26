@@ -2,6 +2,9 @@ package com.example.day.core.core_features.agent.domain.workers.tools
 
 import com.example.day.core.core_features.agent.domain.model.AContext
 import com.example.day.core.core_features.agent.domain.model.Agent
+import com.example.day.core.core_features.agent.domain.model.ContextParameters
+import com.example.day.core.core_features.llm.domain.model.ModelRequest
+import com.example.day.core.core_features.llm.domain.model.ModelSettings
 
 /**
  * Interface for agent operations that workers use.
@@ -44,4 +47,51 @@ interface AgentTools {
      * @param agentId the agent ID
      */
     suspend fun clearAgentContext(agentId: Long)
+    
+    // ==================== Context Compression Methods ====================
+    
+    /**
+     * Сохранить параметры контекста.
+     * @param agentId ID агента
+     * @param msgLimit сколько пар хранить как есть
+     * @param extraLimit сколько пар накопить для сжатия
+     * @param strategy стратегия сжатия
+     */
+    suspend fun saveContextParameters(
+        agentId: Long,
+        msgLimit: Int,
+        extraLimit: Int,
+        strategy: String
+    )
+    
+    /**
+     * Получить полный контекст для LLM запроса.
+     * Включает summary (если есть) + последние asis пар сообщений.
+     * 
+     * @param agentId ID агента
+     * @return список сообщений для LLM (с summary в начале)
+     */
+    suspend fun getFullContext(context: AContext): List<ModelRequest.Message>
+    
+    /**
+     * Обработать оптимизацию контекста.
+     * Проверяет лимиты и при необходимости выполняет сжатие.
+     * 
+     * @param agentId ID агента
+     * @param modelSettings настройки модели для LLM
+     * @return результат оптимизации с информацией о сжатии
+     */
+    suspend fun processContextOptimization(
+        context: AContext,
+        modelSettings: ModelSettings
+    ): AContext
+    
+    /**
+     * Проверить, нужно ли сжатие контекста.
+     * Используется для уведомления пользователя до начала сжатия.
+     * 
+     * @param agentId ID агента
+     * @return true если сжатие требуется
+     */
+    suspend fun shouldCompress(agentId: Long): Boolean
 }

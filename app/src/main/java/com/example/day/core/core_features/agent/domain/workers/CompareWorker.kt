@@ -17,7 +17,7 @@ import javax.inject.Inject
  * Responsible for parsing parameters, launching parallel model comparison
  * and generating reports.
  */
-internal class CompareWorker @Inject constructor(
+class CompareWorker @Inject constructor(
     private val simpleWorker: SimpleWorker,
     private val reportBuilder: ModelReportBuilder,
     private val chatTools: ChatTools

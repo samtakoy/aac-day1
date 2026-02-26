@@ -54,18 +54,17 @@ internal class AgMessageHandler @Inject constructor(
         // Маршрутизация к соответствующему worker
         for ((command, worker) in commandToWorker.entries) {
             if (trimmedMessage.startsWith(command.title, ignoreCase = true)) {
-                // костыль для пост обработки:
-                val events = mutableListOf<WorkerEvent>()
+                val postProcessingEvents = mutableListOf<WorkerEvent>()
                 worker.doWork(
                     task = trimmedMessage.substring(command.title.length).trimCmd(),
                     chat = chat,
                     // Технические события (RequestStart, RequestSuccess, RequestError) можно обрабатывать при необходимости
                     onEvent = { workerEvent ->
-                        events.add(workerEvent)
+                        postProcessingEvents.add(workerEvent)
                     }
                 )
                 // Пост обработка событий
-                events.forEach { workerEvent -> consumptionCalculator.onWorkerEvent(chat, workerEvent) }
+                postProcessingEvents.forEach { workerEvent -> consumptionCalculator.onWorkerEvent(chat, workerEvent) }
                 return
             }
         }

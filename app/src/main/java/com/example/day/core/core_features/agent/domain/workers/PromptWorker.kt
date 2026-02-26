@@ -9,7 +9,7 @@ import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.getContent
 import javax.inject.Inject
 
-internal class PromptWorker @Inject constructor(
+class PromptWorker @Inject constructor(
     private val llmRequestUseCase: LlmRequestUseCase,
     private val chatTools: ChatTools
 ) : AWorker {

@@ -10,7 +10,7 @@ import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.getContent
 import javax.inject.Inject
 
-internal class SimpleWorker @Inject constructor(
+class SimpleWorker @Inject constructor(
     private val llmRequestUseCase: LlmRequestUseCase,
     private val agentTools: AgentTools,
     private val chatTools: ChatTools

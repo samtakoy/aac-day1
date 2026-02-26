@@ -26,6 +26,6 @@ internal interface LlmCoreFeatureModule {
     fun bindsRepository(impl: LlmRepositoryImpl): LlmRepository
     @Binds
     fun bindsLlmRequestUseCase(impl: LlmRequestUseCaseImpl): LlmRequestUseCase
-    @Binds
-    fun bindsModelReportBuilder(impl: ModelReportBuilder): ModelReportBuilder
+    //@Binds
+    //fun bindsModelReportBuilder(impl: ModelReportBuilder): ModelReportBuilder
 }

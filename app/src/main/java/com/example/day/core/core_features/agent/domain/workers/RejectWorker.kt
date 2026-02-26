@@ -10,7 +10,7 @@ import javax.inject.Inject
  * Worker that handles unrecognized commands.
  * Responds with "Команда не распознана" message.
  */
-internal class RejectWorker @Inject constructor(
+class RejectWorker @Inject constructor(
     private val chatTools: ChatTools
 ) : AWorker {
     override suspend fun doWork(

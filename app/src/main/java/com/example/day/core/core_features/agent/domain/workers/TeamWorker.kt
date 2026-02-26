@@ -13,7 +13,7 @@ import com.example.day.core.core_features.llm.domain.model.getContent
 import kotlinx.coroutines.delay
 import javax.inject.Inject
 
-internal class TeamWorker @Inject constructor(
+class TeamWorker @Inject constructor(
     private val llmRequestUseCase: LlmRequestUseCase,
     private val chatTools: ChatTools
 ) : AWorker {

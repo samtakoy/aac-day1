@@ -11,7 +11,7 @@ import com.example.day.core.core_features.llm.domain.model.getContent
 import kotlinx.coroutines.delay
 import javax.inject.Inject
 
-internal class StepWorker @Inject constructor(
+class StepWorker @Inject constructor(
     private val llmRequestUseCase: LlmRequestUseCase,
     private val chatTools: ChatTools
 ) : AWorker {
