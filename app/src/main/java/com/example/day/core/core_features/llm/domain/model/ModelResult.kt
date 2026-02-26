@@ -43,10 +43,12 @@ sealed interface ModelResult {
          *
          * @property upstreamInferencePromptCost Стоимость входных данных
          * @property upstreamInferenceCompletionsCost Стоимость сгенерированного ответа
+         * @property upstreamInferenceCost Общая стоимость вывода
          */
         data class CostDetails(
             val upstreamInferencePromptCost: Double?,
-            val upstreamInferenceCompletionsCost: Double?
+            val upstreamInferenceCompletionsCost: Double?,
+            val upstreamInferenceCost: Double?
         )
     }
 

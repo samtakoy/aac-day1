@@ -10,6 +10,7 @@ import com.example.day.core.core_features.llm.data.remote.mappers.ModelResponseM
 import com.example.day.core.core_features.llm.domain.LlmRepository
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCaseImpl
+import com.example.day.core.core_features.llm.domain.utils.ModelReportBuilder
 import dagger.Binds
 import dagger.Module
 
@@ -25,4 +26,6 @@ internal interface LlmCoreFeatureModule {
     fun bindsRepository(impl: LlmRepositoryImpl): LlmRepository
     @Binds
     fun bindsLlmRequestUseCase(impl: LlmRequestUseCaseImpl): LlmRequestUseCase
+    @Binds
+    fun bindsModelReportBuilder(impl: ModelReportBuilder): ModelReportBuilder
 }

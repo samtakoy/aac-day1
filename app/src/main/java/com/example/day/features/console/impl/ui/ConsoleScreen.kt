@@ -66,6 +66,9 @@ private fun ConsoleScreenInternal(
                         is ChatListUiEvent.ItemLongClick -> {}
                     }
                 },
+                onInfoMessageExpand = { id, isExpanded ->
+                    onEvent(ConsoleViewModel.Event.MessageExpandedChange(id, isExpanded))
+                },
                 modifier = Modifier.fillMaxWidth().weight(1f)
             )
             Row(

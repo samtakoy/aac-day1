@@ -4,6 +4,17 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,7 +62,8 @@ import com.example.day.core.ui.uikit.chat.list.model.UiMessageStatus
 fun ChatMessageView(
     item: ChatMessageUiModel,
     modifier: Modifier = Modifier,
-    colors: ChatUiColors = LocalChatColors.current
+    colors: ChatUiColors = LocalChatColors.current,
+    onInfoMessageExpand: (id: Long, isExpanded: Boolean) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
 
@@ -127,7 +140,11 @@ fun ChatMessageView(
                 avatarUrl = avatarUrl,
                 placeholderText = placeholderText,
                 avatarBackground = avatarBackground,
-                onCopyClick = copyToClipboard
+                onCopyClick = copyToClipboard,
+                isExpanded = item.isExpanded,
+                onExpandChange = { isExpanded ->
+                    onInfoMessageExpand(item.id, isExpanded)
+                }
             )
         }
     }
@@ -294,6 +311,9 @@ private fun BotMessageRow(
 /**
  * Info message row: avatar on LEFT, text with expand/collapse icon on RIGHT
  * Default: single line with truncation, ^V icon to expand/collapse
+ * 
+ * Collapsed state: no avatar, no expand icon, smaller text and padding (compact)
+ * Expanded state: avatar with spring animation, expand/collapse icon with animation
  */
 @Composable
 private fun InfoMessageRow(
@@ -304,10 +324,31 @@ private fun InfoMessageRow(
     placeholderText: String,
     avatarBackground: Color,
     onCopyClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean = false,
+    onExpandChange: (Boolean) -> Unit = {}
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
     val contentColor = LocalContentColor.current
+    val colors = LocalChatColors.current
+    
+    // Animation values for avatar
+    // 1. Анимация аватара (мягко и быстро)
+    val avatarAlpha by animateFloatAsState(
+        targetValue = if (isExpanded) 1f else 0f,
+        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
+        label = "avatarAlpha"
+    )
+
+    val avatarScale by animateFloatAsState(
+        targetValue = if (isExpanded) 1f else 0f,
+        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
+        label = "avatarScale"
+    )
+    
+    // Determine text size and padding based on expanded state
+    val textSize = if (isExpanded) colors.infoExpandedTextSize else colors.infoCollapsedTextSize
+    val horizontalPadding = if (isExpanded) colors.infoExpandedPadding else colors.infoCollapsedPadding
+    val verticalPadding = if (isExpanded) 8.dp else 6.dp
 
     Row(
         modifier = modifier
@@ -316,13 +357,21 @@ private fun InfoMessageRow(
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.Top
     ) {
-        // Avatar on left
-        ChatAvatar(
-            url = avatarUrl,
-            placeholderText = placeholderText,
-            backgroundColor = avatarBackground,
-            modifier = Modifier.padding(top = 4.dp)
-        )
+        // Avatar on left - only visible when expanded, with animation
+        if (avatarAlpha > 0f) {
+            ChatAvatar(
+                url = avatarUrl,
+                placeholderText = placeholderText,
+                backgroundColor = avatarBackground,
+                modifier = Modifier
+                    .graphicsLayer {
+                        scaleX = avatarScale
+                        scaleY = avatarScale
+                        alpha = avatarAlpha
+                    }
+                    .padding(top = 4.dp)
+            )
+        }
 
         // Message bubble with expand/collapse inside
         Box(
@@ -338,32 +387,93 @@ private fun InfoMessageRow(
                         bottomStart = 16.dp
                     )
                 )
-                .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
+                .padding(
+                    start = horizontalPadding,
+                    end = 4.dp,
+                    top = verticalPadding,
+                    bottom = verticalPadding
+                )
         ) {
             Row(
                 verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    text = text,
-                    color = textColor,
-                    fontSize = 14.sp,
-                    maxLines = if (isExpanded) Int.MAX_VALUE else 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-                // Expand/Collapse icon inside the bubble
-                Box(
-                    modifier = Modifier
-                        .padding(start = 4.dp)
-                        .clickable { isExpanded = !isExpanded },
-                    contentAlignment = Alignment.Center
+                // Text with animated visibility
+                AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = expandVertically(
+                        animationSpec = spring(
+                            dampingRatio = 0.7f,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + fadeIn(animationSpec = androidx.compose.animation.core.tween(200)),
+                    exit = shrinkVertically(
+                        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                    ) + fadeOut(animationSpec = androidx.compose.animation.core.tween(150))
                 ) {
-                    Icon(
-                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded) "Collapse" else "Expand",
-                        modifier = Modifier.size(18.dp),
-                        tint = textColor.copy(alpha = 0.6f)
+                    Text(
+                        text = text,
+                        color = textColor,
+                        fontSize = textSize,
+                        maxLines = Int.MAX_VALUE,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
+                }
+                
+                // Collapsed state - show single line with truncation, clickable to expand
+                if (!isExpanded) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .clickable { onExpandChange(true) }
+                    ) {
+                        Text(
+                            text = text,
+                            color = textColor,
+                            fontSize = textSize,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        // Small expand icon in collapsed state
+                        Icon(
+                            imageVector = Icons.Default.ExpandMore,
+                            contentDescription = "Expand",
+                            modifier = Modifier
+                                .size(16.dp)
+                                .padding(start = 2.dp),
+                            tint = textColor.copy(alpha = 0.4f)
+                        )
+                    }
+                }
+                
+                // Expand/Collapse icon - only visible when expanded
+                AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = scaleIn(
+                        animationSpec = spring(
+                            dampingRatio = 0.6f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeIn(animationSpec = androidx.compose.animation.core.tween(200)),
+                    exit = scaleOut(
+                        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)
+                    ) + fadeOut(animationSpec = androidx.compose.animation.core.tween(150))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .clickable { onExpandChange(!isExpanded) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ExpandLess,
+                            contentDescription = "Collapse",
+                            modifier = Modifier.size(18.dp),
+                            tint = textColor.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
         }
@@ -452,7 +562,19 @@ fun ChatMessageViewPreview() {
                 id = 6,
                 text = "Это длинное информационное сообщение, которое по умолчанию отображается в одну строку. При нажатии на иконку раскрытия текст будет показан полностью.",
                 userType = ChatMessageUiType.Info,
-                status = UiMessageStatus.Delivered
+                status = UiMessageStatus.Delivered,
+                isExpanded = false
+            )
+        )
+        
+        // Info message - long (expanded)
+        ChatMessageView(
+            item = ChatMessageUiModel(
+                id = 7,
+                text = "Это длинное информационное сообщение в развернутом состоянии. Здесь видна аватарка с анимацией появления, иконка сворачивания, а также увеличенный размер текста и отступов.",
+                userType = ChatMessageUiType.Info,
+                status = UiMessageStatus.Delivered,
+                isExpanded = true
             )
         )
     }

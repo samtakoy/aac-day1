@@ -63,7 +63,6 @@ internal class TalkWorker @Inject constructor(
 
             // 5. Send result to chat
             chatTools.addBotMessage(chat.id, content)
-            chatTools.addInfoMessage(chat.id, content)
         }.onFailure { exception ->
             chatTools.addBotMessage(chat.id, exception.stackTraceToString())
         }

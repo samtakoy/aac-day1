@@ -24,5 +24,6 @@ internal interface ConsoleViewModel {
         object OpenSettingsClick : Event
         class SettingsSubmitClick(val chatTitle: String, val settings: ChatSettings) : Event
         object SettingsCancelClick : Event
+        class MessageExpandedChange(val messageId: Long, val isExpanded: Boolean) : Event
     }
 }

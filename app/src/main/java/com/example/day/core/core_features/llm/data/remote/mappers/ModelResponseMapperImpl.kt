@@ -43,7 +43,8 @@ internal class ModelResponseMapperImpl @Inject constructor() : ModelResponseMapp
                     costDetails = usageDto.costDetails?.let { costDetailsDto ->
                         ModelResult.Success.CostDetails(
                             upstreamInferencePromptCost = costDetailsDto.upstreamInferencePromptCost,
-                            upstreamInferenceCompletionsCost = costDetailsDto.upstreamInferenceCompletionsCost
+                            upstreamInferenceCompletionsCost = costDetailsDto.upstreamInferenceCompletionsCost,
+                            upstreamInferenceCost = costDetailsDto.upstreamInferenceCost
                         )
                     }
                 )

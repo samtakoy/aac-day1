@@ -1,5 +1,6 @@
 package com.example.day.features.console.impl.domain.agents
 
+import com.example.day.core.core_features.agent.domain.utils.ConsumptionCalculator
 import com.example.day.core.core_features.agent.domain.workers.CompareWorker
 import com.example.day.core.core_features.agent.domain.workers.PromptWorker
 import com.example.day.core.core_features.agent.domain.workers.RejectWorker
@@ -9,6 +10,7 @@ import com.example.day.core.core_features.agent.domain.workers.TeamWorker
 import com.example.day.core.core_features.agent.domain.workers.TalkWorker
 import com.example.day.core.core_features.agent.domain.utils.trimCmd
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
+import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.chat.domain.model.Chat
 import javax.inject.Inject
 
@@ -23,7 +25,8 @@ internal class AgMessageHandler @Inject constructor(
     teamWorker: TeamWorker,
     talkWorker: TalkWorker,
     compareWorker: CompareWorker,
-    private val rejectWorker: RejectWorker
+    private val rejectWorker: RejectWorker,
+    private val consumptionCalculator: ConsumptionCalculator
 ) {
 
     private val commandToWorker: Map<ChatCommand, AWorker> = mapOf(
@@ -51,11 +54,18 @@ internal class AgMessageHandler @Inject constructor(
         // Маршрутизация к соответствующему worker
         for ((command, worker) in commandToWorker.entries) {
             if (trimmedMessage.startsWith(command.title, ignoreCase = true)) {
+                // костыль для пост обработки:
+                val events = mutableListOf<WorkerEvent>()
                 worker.doWork(
                     task = trimmedMessage.substring(command.title.length).trimCmd(),
                     chat = chat,
-                    onEvent = null // Технические события (RequestStart, RequestSuccess, RequestError) можно обрабатывать при необходимости
+                    // Технические события (RequestStart, RequestSuccess, RequestError) можно обрабатывать при необходимости
+                    onEvent = { workerEvent ->
+                        events.add(workerEvent)
+                    }
                 )
+                // Пост обработка событий
+                events.forEach { workerEvent -> consumptionCalculator.onWorkerEvent(chat, workerEvent) }
                 return
             }
         }

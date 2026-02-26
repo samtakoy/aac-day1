@@ -9,6 +9,7 @@ import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.model.getContent
 import com.example.day.core.core_features.llm.domain.utils.ModelReportBuilder
+import com.example.day.core.core_features.llm.domain.utils.toModelConsumption
 import javax.inject.Inject
 
 /**
@@ -130,9 +131,9 @@ internal class CompareWorker @Inject constructor(
 
                         // Generate final report using data
                         val report = reportBuilder.build(
-                            modelName = modelName,
+                            modelName = workerEvent.result.model,
                             durationSeconds = durationSeconds,
-                            modelResult = workerEvent.result
+                            consumption = workerEvent.result.toModelConsumption()
                         )
                         chatTools.addBotMessage(originalChat.settings.chatId, report)
                     }

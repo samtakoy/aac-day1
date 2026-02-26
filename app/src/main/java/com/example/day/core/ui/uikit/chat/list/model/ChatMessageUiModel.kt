@@ -8,5 +8,6 @@ data class ChatMessageUiModel(
     val text: String,
     val userType: ChatMessageUiType,
     val status: UiMessageStatus,
-    val avatarUrl: String? = null
+    val avatarUrl: String? = null,
+    val isExpanded: Boolean = false
 )

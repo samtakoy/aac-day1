@@ -37,7 +37,9 @@ internal class ModelRequestMapperImpl @Inject constructor(): ModelRequestMapper 
             reasoning = mapReasoning(modelRequest.reasoningEffort),
             seed = modelRequest.seed,
             logProbs = modelRequest.logProbs,
-            topLogProbs = modelRequest.topLogProbs
+            topLogProbs = modelRequest.topLogProbs,
+            // Убираем сжатие контекста на стороне бэка (openrouter?)
+            transforms = emptyList()
         )
     }
 

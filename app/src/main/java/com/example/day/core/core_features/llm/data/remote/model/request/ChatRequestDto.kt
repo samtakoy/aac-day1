@@ -20,6 +20,7 @@ import kotlinx.serialization.Serializable
  * @property seed Seed для воспроизводимых результатов
  * @property logProbs Включить лог-вероятности в ответ
  * @property topLogProbs Количество top logprobs для включения
+ * @property transforms Массив трансформаций для применения к ответу модели
  */
 @Serializable
 class ChatRequestDto(
@@ -54,7 +55,9 @@ class ChatRequestDto(
     @SerialName("logprobs")
     val logProbs: Boolean? = null,
     @SerialName("top_logprobs")
-    val topLogProbs: Int? = null
+    val topLogProbs: Int? = null,
+    @SerialName("transforms")
+    val transforms: List<String>? = null
 )
 
 /**

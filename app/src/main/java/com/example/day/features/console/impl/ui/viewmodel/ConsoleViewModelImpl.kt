@@ -23,6 +23,8 @@ import com.example.day.features.console.impl.ui.components.ChatSettingsUiModel
 import com.example.day.features.console.impl.ui.delegates.AgentsTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.LlmTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.TalkDelegate
+import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -64,6 +66,10 @@ internal class ConsoleViewModelImpl(
     // Chat settings loaded from database (derived from chat)
     private var chatSettings: ChatSettings? = null
 
+    // Private expanded states - not exposed externally
+    // TODO Flow тут не используется по факту - рассмотреть вариант Volatile переменной
+    private val _expandedStates = MutableStateFlow(persistentMapOf<Long, Boolean>())
+
     init {
         // Subscribe to chat data to get settings
         getChatByIdAsFlowUseCase(chatId)
@@ -78,6 +84,7 @@ internal class ConsoleViewModelImpl(
         // Subscribe to messages
         getMessagesUseCase(chatId)
             .onEach { messages ->
+                val expandedStates = _expandedStates.value
                 _state.update { state ->
                     state.copy(
                         chatList = state.chatList.copy(
@@ -95,7 +102,8 @@ internal class ConsoleViewModelImpl(
                                         ChatMessageStatus.Delivered -> UiMessageStatus.Delivered
                                         ChatMessageStatus.Viewed -> UiMessageStatus.Viewed
                                     },
-                                    avatarUrl = msg.user.avatar
+                                    avatarUrl = msg.user.avatar,
+                                    isExpanded = expandedStates[msg.id] ?: false
                                 )
                             }.toPersistentList()
                         )
@@ -154,6 +162,25 @@ internal class ConsoleViewModelImpl(
                 viewModelScope.launch {
                     updateChatTitleUseCase(chatId, event.chatTitle)
                     updateChatSettingsUseCase(event.settings)
+                }
+            }
+            is ConsoleViewModel.Event.MessageExpandedChange -> {
+                // Update expanded states map
+                _expandedStates.update { currentStates ->
+                    currentStates.toPersistentMap().put(event.messageId, event.isExpanded)
+                }
+                
+                // Directly update ONLY the specific message in state - no re-mapping of all messages
+                _state.update { state ->
+                    val updatedMessages = state.chatList.messages.map { msg ->
+                        if (msg.id == event.messageId) {
+                            msg.copy(isExpanded = event.isExpanded)
+                        } else {
+                            msg
+                        }
+                    }.toPersistentList()
+                    
+                    state.copy(chatList = state.chatList.copy(messages = updatedMessages))
                 }
             }
         }

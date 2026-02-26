@@ -26,6 +26,7 @@ import com.example.day.core.ui.uikit.chat.list.model.ChatListUiModel
 fun ChatListView(
     model: ChatListUiModel,
     onEvent: (ChatListUiEvent) -> Unit,
+    onInfoMessageExpand: (id: Long, isExpanded: Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     colors: ChatUiColors = LocalChatColors.current
 ) {
@@ -62,7 +63,10 @@ fun ChatListView(
                                 onLongClick = { onEvent(ChatListUiEvent.ItemLongClick(message)) }
                             )
                     ) {
-                        ChatMessageView(item = message)
+                        ChatMessageView(
+                            item = message,
+                            onInfoMessageExpand = onInfoMessageExpand
+                        )
                     }
                 }
             }

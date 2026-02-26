@@ -3,6 +3,10 @@ package com.example.day.core.ui.uikit.chat
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * Chat UI colors - Material Design 3 inspired playful colors
@@ -20,6 +24,12 @@ data class ChatUiColors(
     // Info message colors - ALWAYS light (independent of theme)
     val infoBubble: Color = Color(0xFFF5F5F5),         // Very light gray
     val infoText: Color = Color(0xFF1C1B1F),           // Almost black
+    
+    // Info message text size for collapsed/expanded states
+    val infoCollapsedTextSize: TextUnit = 12.sp,
+    val infoExpandedTextSize: TextUnit = 14.sp,
+    val infoCollapsedPadding: Dp = 8.dp,
+    val infoExpandedPadding: Dp = 12.dp,
     
     // Avatar colors
     val userAvatarBackground: Color = Color(0xFF7C4DFF), // Deep purple
@@ -55,6 +65,10 @@ val DarkChatUiColors = ChatUiColors(
     // Info messages ALWAYS use light colors (independent of theme)
     infoBubble = Color(0xFFF5F5F5),
     infoText = Color(0xFF1C1B1F),
+    infoCollapsedTextSize = 12.sp,
+    infoExpandedTextSize = 14.sp,
+    infoCollapsedPadding = 8.dp,
+    infoExpandedPadding = 12.dp,
     userAvatarBackground = Color(0xFF9C27B0),
     botAvatarBackground = Color(0xFF00ACC1),
     infoAvatarBackground = Color(0xFF9E9E9E),

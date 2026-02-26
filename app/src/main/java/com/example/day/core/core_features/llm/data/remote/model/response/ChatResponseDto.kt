@@ -99,13 +99,16 @@ internal data class UsageDto(
  *
  * @property upstreamInferencePromptCost Стоимость входных данных
  * @property upstreamInferenceCompletionsCost Стоимость сгенерированного ответа
+ * @property upstreamInferenceCost Общая стоимость вывода
  */
 @Serializable
 internal data class CostDetailsDto(
     @SerialName("upstream_inference_prompt_cost")
     val upstreamInferencePromptCost: Double? = null,
     @SerialName("upstream_inference_completions_cost")
-    val upstreamInferenceCompletionsCost: Double? = null
+    val upstreamInferenceCompletionsCost: Double? = null,
+    @SerialName("upstream_inference_cost")
+    val upstreamInferenceCost: Double? = null
 )
 
 /**
