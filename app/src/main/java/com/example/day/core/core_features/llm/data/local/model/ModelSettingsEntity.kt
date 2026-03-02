@@ -1,4 +1,4 @@
-package com.example.day.core.core_features.chat.data.local.model
+package com.example.day.core.core_features.llm.data.local.model
 
 import kotlinx.serialization.Serializable
 

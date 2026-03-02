@@ -1,8 +1,9 @@
 package com.example.day.core.core_features.agent.domain
 
-import com.example.day.core.core_features.agent.domain.model.Agent
+import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.agent.domain.model.AContext
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -14,7 +15,19 @@ interface AgentRepository {
     // ==================== Agent CRUD ====================
     
     /**
-     * Create a new agent
+     * Create a new agent with full settings from ChatSettings
+     * @return id of created agent
+     */
+    suspend fun createAgent(
+        systemName: String,
+        title: String,
+        chatUserId: Long,
+        isCommon: Boolean,
+        chatSettings: ChatSettings
+    ): Long
+    
+    /**
+     * Create a new agent (legacy - without ChatSettings)
      * @return id of created agent
      */
     suspend fun createAgent(
@@ -27,7 +40,7 @@ interface AgentRepository {
     /**
      * Update an existing agent
      */
-    suspend fun updateAgent(agent: Agent)
+    suspend fun updateAgent(agentConfig: AgentConfig)
     
     /**
      * Delete an agent by id
@@ -37,27 +50,27 @@ interface AgentRepository {
     /**
      * Get agent by id
      */
-    suspend fun getAgentById(agentId: Long): Agent?
+    suspend fun getAgentById(agentId: Long): AgentConfig?
     
     /**
      * Get agent by id as Flow
      */
-    fun getAgentByIdAsFlow(agentId: Long): Flow<Agent?>
+    fun getAgentByIdAsFlow(agentId: Long): Flow<AgentConfig?>
     
     /**
      * Get all agents
      */
-    fun getAllAgents(): Flow<List<Agent>>
+    fun getAllAgents(): Flow<List<AgentConfig>>
     
     /**
      * Get all common agents (isCommon = true)
      */
-    fun getCommonAgents(): Flow<List<Agent>>
+    fun getCommonAgents(): Flow<List<AgentConfig>>
     
     /**
      * Get agent by chatUserId (the UserEntity that represents this agent)
      */
-    suspend fun getAgentByChatUserId(chatUserId: Long): Agent?
+    suspend fun getAgentByChatUserId(chatUserId: Long): AgentConfig?
     
     // ==================== Agent-Chat Binding ====================
     
@@ -79,7 +92,7 @@ interface AgentRepository {
     /**
      * Get all agents bound to a specific chat
      */
-    fun getAgentsForChat(chatId: Long): Flow<List<Agent>>
+    fun getAgentsForChat(chatId: Long): Flow<List<AgentConfig>>
     
     /**
      * Check if agent is bound to a specific chat
@@ -97,8 +110,6 @@ interface AgentRepository {
     /**
      * Get or create agent by systemName and isCommon flag.
      * 
-     * New Logic (as of implementation):
-     * 
      * If isCommon = true:
      *   1. Find agent by systemName only (common agents)
      *   2. If not found - create new common agent
@@ -110,28 +121,13 @@ interface AgentRepository {
      * @param systemName system name of the agent
      * @param isCommon if true, agent can be used in any chat without binding
      * @param chatId chat id to bind agent to (if isCommon = false)
+     * @param chatSettings settings from the chat (modelSettings, systemPrompt)
      * @return existing or newly created Agent
      */
     suspend fun getOrCreateAgent(
         systemName: String,
         isCommon: Boolean,
-        chatId: Long
-    ): Agent
-    
-    // ==================== Agent Context ====================
-    
-    /**
-     * Save agent context (conversation history)
-     */
-    suspend fun saveAgentContext(agentId: Long, context: AContext)
-    
-    /**
-     * Get agent context
-     */
-    suspend fun getAgentContext(agentId: Long): AContext?
-    
-    /**
-     * Clear agent context
-     */
-    suspend fun clearAgentContext(agentId: Long)
+        chatId: Long,
+        chatSettings: ChatSettings
+    ): AgentConfig
 }

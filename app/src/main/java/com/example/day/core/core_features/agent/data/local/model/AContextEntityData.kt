@@ -1,32 +1,77 @@
 package com.example.day.core.core_features.agent.data.local.model
 
-import com.example.day.core.core_features.agent.domain.model.AContext.Companion.NO_SUMMARY_LIMIT
 import kotlinx.serialization.Serializable
 
-/**
- * Data layer representation of summarization state for JSON serialization.
- * Groups all summarization-related fields together.
- */
+/** TODO настройки хранить отдельно - чтобы не гонять каждый раз список сообщений да еще и через мапперы */
 @Serializable
-data class SummarizationStateEntityData(
-    val strategy: String = "none",    // none или summarization
-    val msgLimit: Int = NO_SUMMARY_LIMIT,
-    val extraLimit: Int = 8,
-    val summary: String? = null
-)
+sealed interface AContextEntityData {
+    /** состояние стратегии саммаризации контекста */
+    @Serializable
+    data class Summarization(
+        val summary: String,
+        val messages: List<AContextMessageEntityData>
+    ) : AContextEntityData
+    /** состояние стратегии скользящего окна контекста */
+    @Serializable
+    data class SlidingWindow(
+        val messages: List<AContextMessageEntityData>
+    ) : AContextEntityData
+    /** состояние стратегии "храним все" контекста */
+    @Serializable
+    data class Full(
+        val messages: List<AContextMessageEntityData>
+    ) : AContextEntityData
+    /** состояние стратегии Sticky Facts - хранит факты (key-value) + окно сообщений */
+    @Serializable
+    data class StickyFacts(
+        val facts: Map<String, String>,
+        val messages: List<AContextMessageEntityData>
+    ) : AContextEntityData
 
-/**
- * Data layer representation of AContext for JSON serialization.
- * Mirrors [com.example.day.core.core_features.agent.domain.model.AContext]
- */
+    /** состояние стратегии ветвления - хранит Map веток и ID текущей ветки */
+    @Serializable
+    data class Branching(
+        val branches: Map<String, List<AContextMessageEntityData>>,
+        val currentBranchId: String,
+        val defaultBranchId: String
+    ) : AContextEntityData
+
+    @Serializable
+    data object Empty : AContextEntityData
+}
+
 @Serializable
-data class AContextEntityData(
-    val agentName: String,
-    val systemPrompt: String,
-    val messages: List<AContextMessageEntityData>,  // Use List instead of ImmutableList for serialization
-    // Состояние стратегии сжатия (сгруппировано в отдельную сущность)
-    val summarizationState: SummarizationStateEntityData = SummarizationStateEntityData()
-)
+sealed interface AContextEntitySettings {
+    /** состояние стратегии саммаризации контекста */
+    @Serializable
+    data class Summarization(
+        val msgLimit: Int,
+        val extraLimit: Int,
+    ) : AContextEntitySettings
+    /** состояние стратегии скользящего окна контекста */
+    @Serializable
+    data class SlidingWindow(
+        val windowSize: Int,
+    ) : AContextEntitySettings
+    /** состояние стратегии "храним все" контекста */
+    @Serializable
+    data object Full : AContextEntitySettings
+    /** параметры стратегии Sticky Facts */
+    @Serializable
+    data class StickyFacts(
+        val windowSize: Int,
+        val maxFacts: Int
+    ) : AContextEntitySettings
+
+    /** параметры стратегии ветвления */
+    @Serializable
+    data class Branching(
+        val defaultBranchId: String
+    ) : AContextEntitySettings
+
+    @Serializable
+    data object Empty : AContextEntitySettings
+}
 
 /**
  * Data layer representation of AContextMessage for JSON serialization.
@@ -35,6 +80,5 @@ data class AContextEntityData(
 @Serializable
 data class AContextMessageEntityData(
     val role: String,  // Role enum serialized as String
-    val content: String,
-    val orderNumber: Long
+    val content: String
 )

@@ -6,6 +6,7 @@ import com.example.day.core.core_features.chat.data.local.model.ChatEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatGroupEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatSettingsEntity
 
+// TODO это удалить, settings унести в llm и запрашиват при необходимости
 internal data class ChatWithGroupAndSettings(
     @Embedded val chat: ChatEntity,
     @Relation(

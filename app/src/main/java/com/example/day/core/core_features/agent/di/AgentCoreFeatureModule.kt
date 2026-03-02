@@ -1,19 +1,20 @@
 package com.example.day.core.core_features.agent.di
 
+import com.example.day.core.core_features.agent.data.AgentContextRepositoryImpl
 import com.example.day.core.core_features.agent.data.AgentRepositoryImpl
 import com.example.day.core.core_features.agent.data.local.dao.AgentDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentContextMemoryDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentToChatDao
+import com.example.day.core.core_features.agent.data.local.mapper.AgentMapper
+import com.example.day.core.core_features.agent.data.local.mapper.CtxStrategyTypeMapper
+import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.AgentRepository
-import com.example.day.core.core_features.agent.domain.strategy.CompressionStrategy
-import com.example.day.core.core_features.agent.domain.strategy.SummarizationUseCase
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentToolsImpl
 import com.example.day.core.core_features.chat.data.local.ChatDatabase
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.tools.ChatToolsImpl
-import com.example.day.core.core_features.agent.domain.workers.tools.ContextFormatter
-import com.example.day.core.core_features.agent.domain.workers.tools.ContextFormatterImpl
+import com.example.day.core.core_features.llm.data.local.mapper.ModelSettingsMapper
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -34,6 +35,9 @@ internal interface AgentCoreFeatureModule {
     
     @Binds
     fun bindsAgentRepository(impl: AgentRepositoryImpl): AgentRepository
+
+    @Binds
+    fun bindsAgentContextRepository(impl: AgentContextRepositoryImpl): AgentContextRepository
     
     @Binds
     fun bindsAgentTools(impl: AgentToolsImpl): AgentTools
@@ -41,13 +45,14 @@ internal interface AgentCoreFeatureModule {
     @Binds
     fun bindsChatTools(impl: ChatToolsImpl): ChatTools
     
-    @Binds
-    fun bindsContextFormatter(impl: ContextFormatterImpl): ContextFormatter
-    
-    @Binds
-    fun bindsCompressionStrategy(impl: SummarizationUseCase): CompressionStrategy
-    
     companion object {
+        
+        @Provides
+        @Singleton
+        internal fun provideAgentMapper(
+            strategyTypeMapper: CtxStrategyTypeMapper,
+            modelSettingsMapper: ModelSettingsMapper
+        ): AgentMapper = AgentMapper(strategyTypeMapper, modelSettingsMapper)
         
         @Provides
         @Singleton

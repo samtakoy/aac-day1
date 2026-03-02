@@ -1,6 +1,8 @@
 package com.example.day.core.core_features.agent.domain.model
 
 import kotlinx.collections.immutable.persistentListOf
+import com.example.day.core.core_features.agent.domain.model.AContextParams
+import com.example.day.core.core_features.agent.domain.model.AContextState
 
 /**
  * In-memory implementation of [AContextOwner] for storing agent context in memory.
@@ -16,9 +18,8 @@ internal class InMemoryContextOwner : AContextOwner {
     override suspend fun getContext(agentId: Long): AContext {
         return contexts.getOrPut(agentId) {
             AContext(
-                agentName = "",
-                systemPrompt = "",
-                messages = persistentListOf()
+                params = AContextParams.Full,
+                data = AContextState.Full(persistentListOf())
             )
         }
     }

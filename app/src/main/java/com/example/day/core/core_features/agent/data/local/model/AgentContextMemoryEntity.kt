@@ -31,5 +31,8 @@ internal data class AgentContextMemoryEntity(
     val agentId: Long,
     
     @ColumnInfo(name = "context")
-    val context: String  // JSON serialized AContextEntityData
+    val context: String,  // JSON serialized [AContextEntityData]
+
+    /** настройки стратегии - [AContextEntitySettings] как Json строка */
+    val settings: String
 )

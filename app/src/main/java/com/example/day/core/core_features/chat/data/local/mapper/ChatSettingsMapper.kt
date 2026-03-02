@@ -2,6 +2,7 @@ package com.example.day.core.core_features.chat.data.local.mapper
 
 import com.example.day.core.core_features.chat.data.local.model.ChatSettingsEntity
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.core.core_features.llm.data.local.mapper.ModelSettingsMapper
 import javax.inject.Inject
 
 internal class ChatSettingsMapper @Inject constructor(

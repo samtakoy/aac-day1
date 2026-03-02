@@ -43,5 +43,17 @@ internal data class AgentEntity(
     val chatUserId: Long,
     
     @ColumnInfo(name = "is_common")
-    val isCommon: Int  // 1 = true, 0 = false
+    val isCommon: Int,  // 1 = true, 0 = false
+
+    /** Настройки модели llm  (json строка из ModelSettingsEntity) */
+    @ColumnInfo(name = "model_settings")
+    val modelSettings: String = "{}",
+
+    /** Системный промпт агента (по умолчанию пустой) */
+    @ColumnInfo(name = "system_prompt")
+    val systemPrompt: String = "",
+
+    /** тип стратегии по работе с контекстом - enum class Full, Summarization, SlidingWindow */
+    val contextStrategyType: StrategyTypeEntity = StrategyTypeEntity.FULL_CONTEXT,
+
 )

@@ -1,8 +1,7 @@
 package com.example.day.core.core_features.agent.domain.workers.tools
 
 import com.example.day.core.core_features.agent.domain.model.AContext
-import com.example.day.core.core_features.agent.domain.model.Agent
-import com.example.day.core.core_features.agent.domain.model.ContextParameters
+import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.ModelSettings
 
@@ -26,7 +25,7 @@ interface AgentTools {
         systemName: String,
         chatId: Long,
         isCommonAgent: Boolean
-    ): Agent
+    ): AgentConfig
     
     /**
      * Get context for an agent.

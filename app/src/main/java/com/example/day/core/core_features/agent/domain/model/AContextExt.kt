@@ -1,6 +1,8 @@
 package com.example.day.core.core_features.agent.domain.model
 
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.toImmutableList
 
 /**
@@ -10,31 +12,27 @@ import kotlinx.collections.immutable.toImmutableList
 /**
  * Добавить сообщение пользователя в контекст
  */
-fun AContext.addUserMessage(content: String): AContext {
-    val newOrderNumber = if (messages.isEmpty()) 1L else messages.last().orderNumber + 1
+fun PersistentList<AContextMessage>.addUserMessage(content: String): PersistentList<AContextMessage> {
     val newMessage = AContextMessage(
         role = Role.USER,
-        content = content,
-        orderNumber = newOrderNumber
+        content = content
     )
-    return copy(
-        messages = (messages + newMessage).toImmutableList()
-    )
+    return this.mutate {
+        it.add(newMessage)
+    }
 }
 
 /**
  * Добавить сообщение ассистента в контекст
  */
-fun AContext.addAssistantMessage(content: String): AContext {
-    val newOrderNumber = if (messages.isEmpty()) 1L else messages.last().orderNumber + 1
+fun PersistentList<AContextMessage>.addAssistantMessage(content: String): PersistentList<AContextMessage> {
     val newMessage = AContextMessage(
         role = Role.ASSISTANT,
         content = content,
-        orderNumber = newOrderNumber
     )
-    return copy(
-        messages = (messages + newMessage).toImmutableList()
-    )
+    return this.mutate {
+        it.add(newMessage)
+    }
 }
 
 /**

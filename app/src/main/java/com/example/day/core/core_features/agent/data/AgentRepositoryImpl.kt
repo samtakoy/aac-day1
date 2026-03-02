@@ -1,17 +1,23 @@
 package com.example.day.core.core_features.agent.data
 
 import com.example.day.core.core_features.agent.data.local.dao.AgentDao
-import com.example.day.core.core_features.agent.data.local.dao.AgentContextMemoryDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentToChatDao
 import com.example.day.core.core_features.agent.data.local.mapper.AgentContextMapper
 import com.example.day.core.core_features.agent.data.local.mapper.AgentMapper
 import com.example.day.core.core_features.agent.data.local.model.AgentEntity
 import com.example.day.core.core_features.agent.data.local.model.AgentToChatEntity
+import com.example.day.core.core_features.agent.data.local.model.StrategyTypeEntity
 import com.example.day.core.core_features.agent.domain.AgentRepository
-import com.example.day.core.core_features.agent.domain.model.Agent
+import com.example.day.core.core_features.agent.domain.AgentContextRepository
+import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.agent.domain.model.AContext
+import com.example.day.core.core_features.agent.domain.model.AContextParams
+import com.example.day.core.core_features.agent.domain.model.AContextState
 import com.example.day.core.core_features.chat.domain.ChatRepository
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.core.core_features.llm.data.local.mapper.ModelSettingsMapper
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -22,11 +28,11 @@ import javax.inject.Inject
 internal class AgentRepositoryImpl @Inject constructor(
     private val agentDao: AgentDao,
     private val agentToChatDao: AgentToChatDao,
-    private val agentContextMemoryDao: AgentContextMemoryDao,
+    private val agentContextRepository: AgentContextRepository,
     // TODO use chat dao
     private val chatRepository: ChatRepository,
     private val agentMapper: AgentMapper,
-    private val agentContextMapper: AgentContextMapper
+    private val modelSettingsMapper: ModelSettingsMapper,
 ) : AgentRepository {
     
     // ==================== Agent CRUD ====================
@@ -35,46 +41,89 @@ internal class AgentRepositoryImpl @Inject constructor(
         systemName: String,
         title: String,
         chatUserId: Long,
+        isCommon: Boolean,
+        chatSettings: ChatSettings
+    ): Long {
+        // Convert ChatSettings to entity values
+        val modelSettingsJson = modelSettingsMapper.toJson(chatSettings.model)
+        val systemPrompt = chatSettings.systemPromt
+        
+        val entity = AgentEntity(
+            systemName = systemName,
+            title = title,
+            chatUserId = chatUserId,
+            isCommon = if (isCommon) AgentMapper.IS_COMMON_TRUE else AgentMapper.IS_COMMON_FALSE,
+            modelSettings = modelSettingsJson,
+            systemPrompt = systemPrompt,
+            contextStrategyType = StrategyTypeEntity.FULL_CONTEXT
+        )
+        val agentId = agentDao.insert(entity)
+        
+        // Создаем пустую запись контекста для агента
+        createEmptyAgentContext(agentId)
+        
+        return agentId
+    }
+    
+    override suspend fun createAgent(
+        systemName: String,
+        title: String,
+        chatUserId: Long,
         isCommon: Boolean
     ): Long {
+        // Legacy method - uses default values (empty modelSettings "{}")
         val entity = AgentEntity(
             systemName = systemName,
             title = title,
             chatUserId = chatUserId,
             isCommon = if (isCommon) AgentMapper.IS_COMMON_TRUE else AgentMapper.IS_COMMON_FALSE
         )
-        return agentDao.insert(entity)
+        val agentId = agentDao.insert(entity)
+        
+        // Создаем пустую запись контекста для агента
+        createEmptyAgentContext(agentId)
+        
+        return agentId
     }
     
-    override suspend fun updateAgent(agent: Agent) {
-        agentDao.update(agentMapper.toEntity(agent))
+    private suspend fun createEmptyAgentContext(agentId: Long) {
+        // Create proper context for FULL_CONTEXT strategy
+        val context = AContext(
+            params = AContextParams.Full,
+            data = AContextState.Full(messages = persistentListOf())
+        )
+        agentContextRepository.saveContext(agentId, context)
+    }
+    
+    override suspend fun updateAgent(agentConfig: AgentConfig) {
+        agentDao.update(agentMapper.toEntity(agentConfig))
     }
     
     override suspend fun deleteAgent(agentId: Long) {
         agentDao.deleteById(agentId)
     }
     
-    override suspend fun getAgentById(agentId: Long): Agent? {
+    override suspend fun getAgentById(agentId: Long): AgentConfig? {
         return agentDao.getById(agentId)?.let(agentMapper::toDomain)
     }
     
-    override fun getAgentByIdAsFlow(agentId: Long): Flow<Agent?> {
+    override fun getAgentByIdAsFlow(agentId: Long): Flow<AgentConfig?> {
         return agentDao.getByIdAsFlow(agentId).map { it?.let(agentMapper::toDomain) }
     }
     
-    override fun getAllAgents(): Flow<List<Agent>> {
+    override fun getAllAgents(): Flow<List<AgentConfig>> {
         return agentDao.getAll().map { entities ->
             entities.map(agentMapper::toDomain)
         }
     }
     
-    override fun getCommonAgents(): Flow<List<Agent>> {
+    override fun getCommonAgents(): Flow<List<AgentConfig>> {
         return agentDao.getCommonAgents().map { entities ->
             entities.map(agentMapper::toDomain)
         }
     }
     
-    override suspend fun getAgentByChatUserId(chatUserId: Long): Agent? {
+    override suspend fun getAgentByChatUserId(chatUserId: Long): AgentConfig? {
         return agentDao.getByChatUserId(chatUserId)?.let(agentMapper::toDomain)
     }
     
@@ -103,7 +152,7 @@ internal class AgentRepositoryImpl @Inject constructor(
     
     // NOTE(code-advice): This uses map { } with suspend functions inside Flow, which can block.
     // Consider using flatMapConcat or adding a batch DAO method for production use.
-    override fun getAgentsForChat(chatId: Long): Flow<List<Agent>> {
+    override fun getAgentsForChat(chatId: Long): Flow<List<AgentConfig>> {
         return agentToChatDao.getAgentsForChat(chatId).map { agentIds ->
             agentIds.mapNotNull { agentId ->
                 agentDao.getById(agentId)?.let(agentMapper::toDomain)
@@ -132,25 +181,26 @@ internal class AgentRepositoryImpl @Inject constructor(
     override suspend fun getOrCreateAgent(
         systemName: String,
         isCommon: Boolean,
-        chatId: Long
-    ): Agent {
+        chatId: Long,
+        chatSettings: ChatSettings
+    ): AgentConfig {
         return if (isCommon) {
             // ЛОГИКА 1: Общие агенты (isCommon = true)
             getOrCreateCommonAgent(systemName)
         } else {
             // ЛОГИКА 2: Чат-специфичные агенты (isCommon = false)
-            getOrCreateChatSpecificAgent(systemName, chatId)
+            getOrCreateChatSpecificAgent(systemName, chatId, chatSettings)
         }
     }
     
-    private suspend fun getOrCreateCommonAgent(systemName: String): Agent {
+    private suspend fun getOrCreateCommonAgent(systemName: String): AgentConfig {
         // 1. Искать только по systemName (isCommon = 1)
         val existingAgent = agentDao.getCommonAgentBySystemName(systemName)
         if (existingAgent != null) {
             return agentMapper.toDomain(existingAgent)
         }
         
-        // 2. Создать нового общего агента
+        // 2. Создать нового общего агента (без ChatSettings)
         val botUser = chatRepository.getOrCreateDefaultUsers().second
         val newAgentId = createAgent(
             systemName = systemName,
@@ -163,7 +213,11 @@ internal class AgentRepositoryImpl @Inject constructor(
             ?: throw IllegalStateException("Failed to create common agent")
     }
     
-    private suspend fun getOrCreateChatSpecificAgent(systemName: String, chatId: Long): Agent {
+    private suspend fun getOrCreateChatSpecificAgent(
+        systemName: String, 
+        chatId: Long,
+        chatSettings: ChatSettings?
+    ): AgentConfig {
         // 1. Искать агента по systemName + chatId
         val existingAgent = agentToChatDao.getAgentBySystemNameAndChatId(systemName, chatId)
         if (existingAgent != null) {
@@ -172,32 +226,33 @@ internal class AgentRepositoryImpl @Inject constructor(
         
         // 2. Создать нового чат-специфичного агента
         val botUser = chatRepository.getOrCreateDefaultUsers().second
-        val newAgentId = createAgent(
-            systemName = systemName,
-            title = systemName,
-            chatUserId = botUser.id,
-            isCommon = false
-        )
+        
+        val newAgentId = if (chatSettings != null) {
+            // Используем ChatSettings если передан
+            createAgent(
+                systemName = systemName,
+                title = systemName,
+                chatUserId = botUser.id,
+                isCommon = false,
+                chatSettings = chatSettings
+            )
+        } else {
+            // TODO такого выбора не будет (и common агент - сейчас буддет работать некорректно)
+            // Получаем ChatSettings из чата
+            val settings = chatRepository.getChatSettings(chatId)
+            createAgent(
+                systemName = systemName,
+                title = systemName,
+                chatUserId = botUser.id,
+                isCommon = false,
+                chatSettings = settings ?: throw IllegalStateException("Chat settings not found for chat $chatId")
+            )
+        }
         
         // 3. Обязательно привязать к чату
         bindAgentToChat(newAgentId, chatId)
         
         return getAgentById(newAgentId) 
             ?: throw IllegalStateException("Failed to create chat-specific agent")
-    }
-    
-    // ==================== Agent Context ====================
-    
-    override suspend fun saveAgentContext(agentId: Long, context: AContext) {
-        val entity = agentContextMapper.toEntity(agentId, context)
-        agentContextMemoryDao.insertOrUpdate(entity)
-    }
-    
-    override suspend fun getAgentContext(agentId: Long): AContext? {
-        return agentContextMemoryDao.getContext(agentId)?.let(agentContextMapper::toDomain)
-    }
-    
-    override suspend fun clearAgentContext(agentId: Long) {
-        agentContextMemoryDao.delete(agentId)
     }
 }

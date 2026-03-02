@@ -1,7 +1,8 @@
 package com.example.day.core.core_features.agent.domain.usecase
 
 import com.example.day.core.core_features.agent.domain.AgentRepository
-import com.example.day.core.core_features.agent.domain.model.Agent
+import com.example.day.core.core_features.agent.domain.model.AgentConfig
+import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import javax.inject.Inject
 
 /**
@@ -25,17 +26,20 @@ class GetOrCreateAgentUseCase @Inject constructor(
      * @param systemName system name of the agent
      * @param isCommon if true, agent can be used in any chat without binding
      * @param chatId chat id to bind agent to (if isCommon = false)
+     * @param chatSettings settings from the chat (modelSettings, systemPrompt)
      * @return existing or newly created Agent
      */
     suspend operator fun invoke(
         systemName: String,
         isCommon: Boolean,
-        chatId: Long
-    ): Agent {
+        chatId: Long,
+        chatSettings: ChatSettings
+    ): AgentConfig {
         return repository.getOrCreateAgent(
             systemName = systemName,
             isCommon = isCommon,
-            chatId = chatId
+            chatId = chatId,
+            chatSettings = chatSettings
         )
     }
 }

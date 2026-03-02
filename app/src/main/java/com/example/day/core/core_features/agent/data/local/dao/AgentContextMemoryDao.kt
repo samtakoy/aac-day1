@@ -16,7 +16,19 @@ internal interface AgentContextMemoryDao {
     suspend fun insertOrUpdate(contextMemory: AgentContextMemoryEntity)
     
     @Query("SELECT * FROM agent_context_memory WHERE agent_id = :agentId LIMIT 1")
-    suspend fun getContext(agentId: Long): AgentContextMemoryEntity?
+    suspend fun getMemory(agentId: Long): AgentContextMemoryEntity?
+
+    @Query("SELECT context FROM agent_context_memory WHERE agent_id = :agentId LIMIT 1")
+    suspend fun getState(agentId: Long): String?
+
+    @Query("SELECT settings FROM agent_context_memory WHERE agent_id = :agentId LIMIT 1")
+    suspend fun getParams(agentId: Long): String?
+
+    @Query("UPDATE agent_context_memory SET settings = :settings WHERE agent_id = :agentId")
+    suspend fun updateParams(agentId: Long, settings: String)
+
+    @Query("UPDATE agent_context_memory SET context = :context WHERE agent_id = :agentId")
+    suspend fun updateState(agentId: Long, context: String)
     
     @Query("DELETE FROM agent_context_memory WHERE agent_id = :agentId")
     suspend fun delete(agentId: Long)

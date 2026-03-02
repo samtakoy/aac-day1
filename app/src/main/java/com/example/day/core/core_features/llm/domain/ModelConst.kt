@@ -26,4 +26,5 @@ object ModelConst {
     // z-ai/glm-4.5-air
     // meta-llama/llama-3.3-70b-instruct
     const val DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct"
+    // const val DEFAULT_MODEL = "nvidia/nemotron-3-nano-30b-a3b"
 }

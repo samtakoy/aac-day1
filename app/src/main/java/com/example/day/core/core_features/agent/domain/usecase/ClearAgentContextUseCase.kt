@@ -1,14 +1,14 @@
 package com.example.day.core.core_features.agent.domain.usecase
 
-import com.example.day.core.core_features.agent.domain.AgentRepository
+import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import javax.inject.Inject
 
 /**
  * Use case for clearing agent context.
- * Wraps [AgentRepository.clearAgentContext] to follow clean architecture pattern.
+ * Wraps [AgentContextRepository.clearAgentContext] to follow clean architecture pattern.
  */
 class ClearAgentContextUseCase @Inject constructor(
-    private val repository: AgentRepository
+    private val repository: AgentContextRepository
 ) {
     /**
      * Clear agent context from database.

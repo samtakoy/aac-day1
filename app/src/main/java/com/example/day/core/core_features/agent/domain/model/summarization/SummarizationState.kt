@@ -1,6 +1,6 @@
 package com.example.day.core.core_features.agent.domain.model.summarization
 
-// TODO все переделать
+// TODO все переделать - УДАЛИТЬ
 
 /**
  * Интерфейс состояния стратегии сжатия контекста.
