@@ -22,46 +22,44 @@ import javax.inject.Singleton
 
 /**
  * Dagger module for Agent feature dependency injection.
- * 
+ *
  * Содержит привязки для:
  * - AgentTools / AgentToolsImpl
- * - ChatTools / ChatToolsImpl  
+ * - ChatTools / ChatToolsImpl
  * - ContextFormatter / ContextFormatterImpl
  * - Все Workers (SimpleWorker, StepWorker, etc.)
  * - CompressionStrategy / SummarizationStrategy
  */
-@Module
+@Module(
+    includes = [
+        CommandHandlerModule::class,
+        BranchingStrategyModule::class
+    ]
+)
 internal interface AgentCoreFeatureModule {
-    
+
     @Binds
     fun bindsAgentRepository(impl: AgentRepositoryImpl): AgentRepository
 
     @Binds
     fun bindsAgentContextRepository(impl: AgentContextRepositoryImpl): AgentContextRepository
-    
+
     @Binds
     fun bindsAgentTools(impl: AgentToolsImpl): AgentTools
-    
+
     @Binds
     fun bindsChatTools(impl: ChatToolsImpl): ChatTools
-    
+
     companion object {
-        
-        @Provides
-        @Singleton
-        internal fun provideAgentMapper(
-            strategyTypeMapper: CtxStrategyTypeMapper,
-            modelSettingsMapper: ModelSettingsMapper
-        ): AgentMapper = AgentMapper(strategyTypeMapper, modelSettingsMapper)
-        
+
         @Provides
         @Singleton
         internal fun provideAgentDao(db: ChatDatabase): AgentDao = db.agentDao()
-        
+
         @Provides
         @Singleton
         internal fun provideAgentToChatDao(db: ChatDatabase): AgentToChatDao = db.agentToChatDao()
-        
+
         @Provides
         @Singleton
         internal fun provideAgentContextMemoryDao(db: ChatDatabase): AgentContextMemoryDao = db.agentContextMemoryDao()
