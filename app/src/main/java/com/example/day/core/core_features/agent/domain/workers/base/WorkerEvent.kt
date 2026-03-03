@@ -12,4 +12,32 @@ sealed interface WorkerEvent {
     class RequestSuccess(val result: ModelResult.Success) : WorkerEvent
     /** Agent notifies that the LLM request returned an error */
     class RequestError(val text: String) : WorkerEvent
+
+    // ========== PLANNER-SPECIFIC EVENTS ==========
+    
+    /**
+     * Planner suggests creating a new stage chat.
+     * UI should show confirmation button - chat is NOT created automatically.
+     */
+    class StageCreationSuggested(
+        val stageTitle: String,
+        val workingSummary: String
+    ) : WorkerEvent
+    
+    /**
+     * A stage has been marked as completed and artifact saved.
+     */
+    class StageCompleted(
+        val chatId: Long,
+        val artifactContent: String
+    ) : WorkerEvent
+    
+    /**
+     * A fact has been saved to long-term memory.
+     */
+    class FactSaved(
+        val memoryKey: String,
+        val category: String,
+        val fact: String
+    ) : WorkerEvent
 }

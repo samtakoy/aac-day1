@@ -1,7 +1,10 @@
 package com.example.day.features.console.impl.di
 
+import com.example.day.core.core_features.agent.domain.usecase.GetAgentContextUseCase
+import com.example.day.core.core_features.chat.domain.repository.LongTermMemoryRepository
 import com.example.day.core.core_features.agent.domain.utils.ConsumptionCalculator
 import com.example.day.core.core_features.agent.domain.workers.CompareWorker
+import com.example.day.core.core_features.agent.domain.workers.PlannerWorker
 import com.example.day.core.core_features.agent.domain.workers.PromptWorker
 import com.example.day.core.core_features.agent.domain.workers.RejectWorker
 import com.example.day.core.core_features.agent.domain.workers.SimpleWorker
@@ -9,6 +12,7 @@ import com.example.day.core.core_features.agent.domain.workers.StepWorker
 import com.example.day.core.core_features.agent.domain.workers.TalkWorker
 import com.example.day.core.core_features.agent.domain.workers.TeamWorker
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
+import com.example.day.core.core_features.chat.domain.repository.ArtifactRepository
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ChangeMessageStatusUseCase
@@ -19,6 +23,7 @@ import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsF
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesWithStatusUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetOrCreateChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.UpdateChatSettingsUseCase
+import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerStageChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.UpdateChatTitleUseCase
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 
@@ -43,4 +48,12 @@ interface ConsoleFeatureDeps {
     val worker5: TeamWorker
     val worker6: TalkWorker
     val consuption: ConsumptionCalculator
+    
+    // Planner feature dependencies
+    val plannerWorker: PlannerWorker
+    val longTermMemoryRepository: LongTermMemoryRepository
+    val artifactRepository: ArtifactRepository
+    val chatTools: ChatTools
+    val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase
+    val getAgentContextUseCase: GetAgentContextUseCase
 }

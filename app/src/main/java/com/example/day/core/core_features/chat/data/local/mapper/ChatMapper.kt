@@ -20,14 +20,20 @@ internal class ChatMapper @Inject constructor(
             id = entity.chat.id,
             title = entity.chat.title,
             chatGroup = groupMapper.toDomain(entity.groupWithType),
-            settings = settings
+            settings = settings,
+            parentId = entity.chat.parentId,
+            workingSummary = entity.chat.workingSummary,
+            isPlannerMain = entity.chat.isPlannerMain
         )
     }
 
     fun toEntity(model: Chat): ChatEntity = ChatEntity(
         id = model.id,
         title = model.title,
-        chatGroupId = model.chatGroup.id
+        chatGroupId = model.chatGroup.id,
+        parentId = model.parentId,
+        workingSummary = model.workingSummary,
+        isPlannerMain = model.isPlannerMain
     )
     
     private fun createDefaultSettings(chatId: Long): ChatSettings {

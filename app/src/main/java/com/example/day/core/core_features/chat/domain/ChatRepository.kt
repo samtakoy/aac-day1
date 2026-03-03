@@ -53,4 +53,26 @@ interface ChatRepository {
 
     // Get or create chat by title and group
     suspend fun getOrCreateChat(title: String, chatGroupId: Long): Chat
+
+    // Planner-specific methods for hierarchical chat structure
+    suspend fun createSubChat(parentId: Long, title: String, workingSummary: String?): Long
+    fun getSubChats(parentId: Long): Flow<List<Chat>>
+    suspend fun updateWorkingSummary(chatId: Long, summary: String)
+    suspend fun markAsPlannerMain(chatId: Long)
+    suspend fun getMainPlannerChat(groupId: Long): Chat?
+    
+    /**
+     * Creates a PLANNER group with an initial main chat.
+     * This should be used instead of createChatGroup when creating PLANNER-type groups.
+     * 
+     * @param title The group title
+     * @param chatType The chat type (should be ChatType.PLANNER)
+     * @param colorIndex The color index for the group
+     * @return The ID of the created main chat
+     */
+    suspend fun createPlannerGroupWithMainChat(
+        title: String, 
+        chatType: ChatType,
+        colorIndex: Int
+    ): Long
 }

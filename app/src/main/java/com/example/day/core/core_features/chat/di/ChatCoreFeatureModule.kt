@@ -4,15 +4,23 @@ import android.content.Context
 import androidx.room.Room
 import com.example.day.core.core_features.chat.data.ChatRepositoryImpl
 import com.example.day.core.core_features.chat.data.local.ChatDatabase
+import com.example.day.core.core_features.chat.data.local.dao.ArtifactDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatGroupDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatSettingsDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatTypeDao
+import com.example.day.core.core_features.chat.data.local.dao.LongTermMemoryDao
 import com.example.day.core.core_features.chat.data.local.dao.MessageDao
 import com.example.day.core.core_features.chat.data.local.dao.UserDao
+import com.example.day.core.core_features.chat.data.repository.ArtifactRepositoryImpl
+import com.example.day.core.core_features.chat.data.repository.LongTermMemoryRepositoryImpl
 import com.example.day.core.core_features.chat.domain.ChatRepository
+import com.example.day.core.core_features.chat.domain.repository.ArtifactRepository
+import com.example.day.core.core_features.chat.domain.repository.LongTermMemoryRepository
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.tools.ChatToolsImpl
+import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerGroupWithMainChatUseCase
+import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerStageChatUseCase
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -22,6 +30,13 @@ import javax.inject.Singleton
 internal interface ChatCoreFeatureModule {
     @Binds
     fun bindsChatRepository(impl: ChatRepositoryImpl): ChatRepository
+
+    @Binds
+    fun bindsLongTermMemoryRepository(impl: LongTermMemoryRepositoryImpl): LongTermMemoryRepository
+
+    @Binds
+    fun bindsArtifactRepository(impl: ArtifactRepositoryImpl): ArtifactRepository
+
     companion object {
         @Provides
         @Singleton
@@ -51,5 +66,27 @@ internal interface ChatCoreFeatureModule {
 
         @Provides
         internal fun provideChatSettingsDao(db: ChatDatabase): ChatSettingsDao = db.chatSettingsDao()
+
+        @Provides
+        internal fun provideLongTermMemoryDao(db: ChatDatabase): LongTermMemoryDao = db.longTermMemoryDao()
+
+        @Provides
+        internal fun provideArtifactDao(db: ChatDatabase): ArtifactDao = db.artifactDao()
+
+        @Provides
+        @Singleton
+        fun provideCreatePlannerGroupWithMainChatUseCase(
+            chatRepository: ChatRepository
+        ): CreatePlannerGroupWithMainChatUseCase {
+            return CreatePlannerGroupWithMainChatUseCase(chatRepository)
+        }
+
+        @Provides
+        @Singleton
+        fun provideCreatePlannerStageChatUseCase(
+            chatRepository: ChatRepository
+        ): CreatePlannerStageChatUseCase {
+            return CreatePlannerStageChatUseCase(chatRepository)
+        }
     }
 }

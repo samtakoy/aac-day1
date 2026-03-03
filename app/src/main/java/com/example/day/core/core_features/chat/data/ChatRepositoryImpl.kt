@@ -316,4 +316,68 @@ internal class ChatRepositoryImpl @Inject constructor(
 
         return chatId
     }
+
+    // ========== PLANNER-SPECIFIC METHODS ==========
+
+    override suspend fun createSubChat(parentId: Long, title: String, workingSummary: String?): Long = mutex.withLock {
+        val parentChat = chatDao.getChatById(parentId)?.chat ?: throw IllegalArgumentException("Parent chat not found")
+        
+        getOrCreateDefaultUsers()
+        val chatEntity = ChatEntity(
+            title = title,
+            chatGroupId = parentChat.chatGroupId,
+            parentId = parentId,
+            workingSummary = workingSummary
+        )
+        val chatId = chatDao.insert(chatEntity)
+
+        // Create default settings for new chat
+        val defaultSettings = ChatSettings(
+            chatId = chatId,
+            systemPromt = "",
+            model = ModelSettings(name = ModelConst.DEFAULT_MODEL)
+        )
+        chatSettingsDao.insert(chatSettingsMapper.toEntity(defaultSettings))
+
+        return@withLock chatId
+    }
+
+    override fun getSubChats(parentId: Long): Flow<List<Chat>> {
+        return chatDao.getSubChats(parentId).map { entities ->
+            entities.mapNotNull { entity ->
+                getChatById(entity.id)
+            }
+        }
+    }
+
+    override suspend fun updateWorkingSummary(chatId: Long, summary: String) {
+        chatDao.updateWorkingSummary(chatId, summary)
+    }
+
+    override suspend fun markAsPlannerMain(chatId: Long) {
+        chatDao.updateIsPlannerMain(chatId, true)
+    }
+
+    override suspend fun getMainPlannerChat(groupId: Long): Chat? {
+        val entity = chatDao.getMainPlannerChat(groupId)
+        return entity?.let { getChatById(it.id) }
+    }
+
+    override suspend fun createPlannerGroupWithMainChat(
+        title: String,
+        chatType: ChatType,
+        colorIndex: Int
+    ): Long {
+        // Create the group
+        val groupId = createChatGroup(title, chatType, colorIndex)
+        
+        // Create the main planner chat
+        val mainChatTitle = "Main Planner"
+        val mainChatId = createChat(mainChatTitle, groupId)
+        
+        // Mark as main planner chat
+        markAsPlannerMain(mainChatId)
+        
+        return mainChatId
+    }
 }

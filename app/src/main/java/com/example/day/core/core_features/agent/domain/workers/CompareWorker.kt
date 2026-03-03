@@ -137,6 +137,10 @@ class CompareWorker @Inject constructor(
                         )
                         chatTools.addBotMessage(originalChat.settings.chatId, report)
                     }
+                    // Planner-specific events - ignore in CompareWorker
+                    is WorkerEvent.FactSaved -> Unit
+                    is WorkerEvent.StageCompleted -> Unit
+                    is WorkerEvent.StageCreationSuggested -> Unit
                 }
             }
         } catch (e: Exception) {

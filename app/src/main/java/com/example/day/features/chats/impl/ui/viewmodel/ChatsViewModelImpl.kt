@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
+import com.example.day.core.core_features.chat.domain.repository.ArtifactRepository
 import com.example.day.core.core_features.chat.domain.usecase.CreateChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatsByGroupUseCase
 import com.example.day.features.chats.impl.ui.viewmodel.ChatsViewModel.State
@@ -14,7 +15,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -23,6 +27,7 @@ import javax.inject.Inject
 internal class ChatsViewModelImpl(
     private val createChatUseCase: CreateChatUseCase,
     private val getChatsByGroupUseCase: GetChatsByGroupUseCase,
+    private val artifactRepository: ArtifactRepository,
     // private val savedStateHandle: SavedStateHandle,
     private val groupId: Long,
 ) : ViewModel(), ChatsViewModel {
@@ -40,7 +45,20 @@ internal class ChatsViewModelImpl(
 
     private fun loadChats() {
         getChatsByGroupUseCase(groupId)
-            .onEach { chatModels ->
+            .flatMapLatest { chatModels ->
+                // Find the main planner chat to get artifacts for all its stage chats
+                val mainPlannerChatId = chatModels.firstOrNull { !it.isStageChat }?.id
+                val artifactsFlow = if (mainPlannerChatId != null) {
+                    artifactRepository.getArtifactsForParent(mainPlannerChatId)
+                } else {
+                    flowOf(emptyList())
+                }
+                artifactsFlow.map { artifacts ->
+                    val completedIds = artifacts.map { it.chatId }.toSet()
+                    chatModels to completedIds
+                }
+            }
+            .onEach { (chatModels, completedIds) ->
                 _state.update { state ->
                     val selectedIndex = state.chips.indexOfFirst { it.isSelected }
                     state.copy(
@@ -49,7 +67,9 @@ internal class ChatsViewModelImpl(
                                 id = model.id,
                                 chatType = model.chatGroup.chatType,
                                 title = model.title,
-                                isSelected = selectedIndex == idx
+                                isSelected = selectedIndex == idx,
+                                isStageChat = model.isStageChat,
+                                isCompleted = model.isStageChat && model.id in completedIds
                             )
                         }.toPersistentList()
                     )
@@ -113,7 +133,8 @@ internal class ChatsViewModelImpl(
 
     class Factory @Inject constructor(
         private val createChatUseCase: CreateChatUseCase,
-        private val getChatsByGroupUseCase: GetChatsByGroupUseCase
+        private val getChatsByGroupUseCase: GetChatsByGroupUseCase,
+        private val artifactRepository: ArtifactRepository
     ): ViewModelProvider.Factory {
         override fun <T : ViewModel> create(
             modelClass: Class<T>,
@@ -124,6 +145,7 @@ internal class ChatsViewModelImpl(
             return ChatsViewModelImpl(
                 createChatUseCase,
                 getChatsByGroupUseCase,
+                artifactRepository,
                 // savedStateHandle,
                 groupId = groupId
             ) as T

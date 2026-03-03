@@ -14,7 +14,8 @@ internal interface GroupChoiceFeatureModule {
                 deps.createChatGroupUseCase,
                 deps.updateChatGroupUseCase,
                 deps.deleteChatGroupUseCase,
-                deps.getChatTypesUseCase
+                deps.getChatTypesUseCase,
+                deps.createPlannerGroupWithMainChatUseCase
             )
         }
     }

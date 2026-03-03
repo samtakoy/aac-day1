@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,6 +75,7 @@ private fun ChatsScreenInternal(
     val appComponent = LocalAppComponent.current
     val agentsChatEntry = appComponent.getAgentsConsoleFeatureEntry()
     val historyChatEntry = appComponent.getConsoleFeatureEntry()
+    val plannerChatEntry = appComponent.getPlannerConsoleFeatureEntry()
 
     // Create pager state at the top level to share between chips and pager
     val pagerState = rememberPagerState(initialPage = 0) { state.chips.size }
@@ -126,6 +128,10 @@ private fun ChatsScreenInternal(
                             ChatType.AGENT_COMMANDS -> {
                                 agentsChatEntry.EntryPoint(chatId = chip.id, modifier = Modifier.fillMaxSize())
                             }
+                            ChatType.PLANNER -> {
+                                // PLANNER groups use PlannerTalkDelegate with PlannerWorker
+                                plannerChatEntry.EntryPoint(chatId = chip.id, modifier = Modifier.fillMaxSize())
+                            }
                         }
                     }
                 }
@@ -166,10 +172,32 @@ private fun ChipsRow(
                 ) { index, chat ->
                     FilterChip(
                         selected = pagerState.currentPage == index,
-                        onClick = {
-                            onChipClick(chat.id, index)
+                        onClick = { onChipClick(chat.id, index) },
+                        label = {
+                            val label = when {
+                                chat.isCompleted -> "✓ ${chat.title}"
+                                chat.isStageChat -> "↳ ${chat.title}"
+                                else -> chat.title
+                            }
+                            Text(
+                                text = label,
+                                style = if (chat.isStageChat)
+                                    MaterialTheme.typography.labelSmall
+                                else
+                                    MaterialTheme.typography.bodyMedium
+                            )
                         },
-                        label = { Text(text = chat.title) }
+                        colors = when {
+                            chat.isCompleted -> FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                selectedContainerColor = MaterialTheme.colorScheme.tertiary
+                            )
+                            chat.isStageChat -> FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                selectedContainerColor = MaterialTheme.colorScheme.secondary
+                            )
+                            else -> FilterChipDefaults.filterChipColors()
+                        }
                     )
                 }
             }

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.day.core.core_features.chat.domain.model.ChatGroup
 import com.example.day.core.core_features.chat.domain.model.ChatType
 import com.example.day.core.core_features.chat.domain.usecase.CreateChatGroupUseCase
+import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerGroupWithMainChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.DeleteChatGroupUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatGroupsUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatTypesUseCase
@@ -23,7 +24,8 @@ internal class GroupChoiceViewModelImpl(
     private val createChatGroupUseCase: CreateChatGroupUseCase,
     private val updateChatGroupUseCase: UpdateChatGroupUseCase,
     private val deleteChatGroupUseCase: DeleteChatGroupUseCase,
-    private val getChatTypesUseCase: GetChatTypesUseCase
+    private val getChatTypesUseCase: GetChatTypesUseCase,
+    private val createPlannerGroupWithMainChatUseCase: CreatePlannerGroupWithMainChatUseCase
 ) : ViewModel(), GroupChoiceViewModel {
 
     private val _state = MutableStateFlow(GroupChoiceViewModel.State())
@@ -73,7 +75,16 @@ internal class GroupChoiceViewModelImpl(
                 val dialog = _state.value.editDialog
                 if (dialog != null && dialog.title.isNotBlank()) {
                     if (dialog.isCreateMode) {
-                        createChatGroupUseCase(dialog.title.trim(), dialog.selectedType)
+                        // For PLANNER groups, create group with main chat
+                        if (dialog.selectedType == ChatType.PLANNER) {
+                            createPlannerGroupWithMainChatUseCase(
+                                title = dialog.title.trim(),
+                                chatType = dialog.selectedType,
+                                colorIndex = 0 // Default color
+                            )
+                        } else {
+                            createChatGroupUseCase(dialog.title.trim(), dialog.selectedType)
+                        }
                     } else {
                         val currentGroup = _state.value.groups.find { it.title == dialog.title && it.chatType == dialog.selectedType }
                         if (currentGroup != null) {
@@ -117,7 +128,8 @@ internal class GroupChoiceViewModelImpl(
         private val createChatGroupUseCase: CreateChatGroupUseCase,
         private val updateChatGroupUseCase: UpdateChatGroupUseCase,
         private val deleteChatGroupUseCase: DeleteChatGroupUseCase,
-        private val getChatTypesUseCase: GetChatTypesUseCase
+        private val getChatTypesUseCase: GetChatTypesUseCase,
+        private val createPlannerGroupWithMainChatUseCase: CreatePlannerGroupWithMainChatUseCase
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             return GroupChoiceViewModelImpl(
@@ -125,7 +137,8 @@ internal class GroupChoiceViewModelImpl(
                 createChatGroupUseCase,
                 updateChatGroupUseCase,
                 deleteChatGroupUseCase,
-                getChatTypesUseCase
+                getChatTypesUseCase,
+                createPlannerGroupWithMainChatUseCase
             ) as T
         }
     }

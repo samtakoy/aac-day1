@@ -7,11 +7,16 @@ import com.example.day.core.core_features.agent.data.local.dao.AgentContextMemor
 import com.example.day.core.core_features.agent.data.local.dao.AgentToChatDao
 import com.example.day.core.core_features.agent.data.local.mapper.AgentMapper
 import com.example.day.core.core_features.agent.data.local.mapper.CtxStrategyTypeMapper
+import com.example.day.core.core_features.agent.domain.AIAgentFactory
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.AgentRepository
+import com.example.day.core.core_features.agent.domain.workers.PlannerWorker
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentToolsImpl
 import com.example.day.core.core_features.chat.data.local.ChatDatabase
+import com.example.day.core.core_features.chat.domain.ChatRepository
+import com.example.day.core.core_features.chat.domain.repository.ArtifactRepository
+import com.example.day.core.core_features.chat.domain.repository.LongTermMemoryRepository
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.tools.ChatToolsImpl
 import com.example.day.core.core_features.llm.data.local.mapper.ModelSettingsMapper
@@ -63,5 +68,23 @@ internal interface AgentCoreFeatureModule {
         @Provides
         @Singleton
         internal fun provideAgentContextMemoryDao(db: ChatDatabase): AgentContextMemoryDao = db.agentContextMemoryDao()
+
+        @Provides
+        @Singleton
+        internal fun providePlannerWorker(
+            aiAgentFactory: AIAgentFactory,
+            longTermMemoryRepository: LongTermMemoryRepository,
+            chatRepository: ChatRepository,
+            artifactRepository: ArtifactRepository,
+            chatTools: ChatTools
+        ): PlannerWorker {
+            return PlannerWorker(
+                aiAgentFactory = aiAgentFactory,
+                longTermMemoryRepository = longTermMemoryRepository,
+                chatRepository = chatRepository,
+                artifactRepository = artifactRepository,
+                chatTools = chatTools
+            )
+        }
     }
 }

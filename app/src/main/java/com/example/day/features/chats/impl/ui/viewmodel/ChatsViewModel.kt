@@ -17,7 +17,9 @@ internal interface ChatsViewModel {
             val id: Long,
             val chatType: ChatType,
             val title: String,
-            val isSelected: Boolean
+            val isSelected: Boolean,
+            val isStageChat: Boolean = false,
+            val isCompleted: Boolean = false
         )
     }
 

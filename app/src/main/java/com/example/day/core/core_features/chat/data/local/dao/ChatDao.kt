@@ -38,4 +38,19 @@ internal interface ChatDao {
 
     @Query("UPDATE chats SET title = :title WHERE id = :chatId")
     suspend fun updateChatTitle(chatId: Long, title: String)
+
+    @Query("SELECT * FROM chats WHERE parent_id = :parentId ORDER BY id ASC")
+    fun getSubChats(parentId: Long): Flow<List<ChatEntity>>
+
+    @Query("SELECT * FROM chats WHERE parent_id = :parentId ORDER BY id ASC")
+    suspend fun getSubChatsOnce(parentId: Long): List<ChatEntity>
+
+    @Query("UPDATE chats SET working_summary = :summary WHERE id = :chatId")
+    suspend fun updateWorkingSummary(chatId: Long, summary: String)
+
+    @Query("UPDATE chats SET is_planner_main = :isMain WHERE id = :chatId")
+    suspend fun updateIsPlannerMain(chatId: Long, isMain: Boolean)
+
+    @Query("SELECT * FROM chats WHERE chat_group_id = :groupId AND is_planner_main = 1 LIMIT 1")
+    suspend fun getMainPlannerChat(groupId: Long): ChatEntity?
 }

@@ -3,6 +3,7 @@ package com.example.day.features.console.impl.di
 import androidx.compose.runtime.Immutable
 import com.example.day.features.console.impl.ui.delegates.AgentsTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.LlmTalkDelegate
+import com.example.day.features.console.impl.ui.delegates.PlannerTalkDelegate
 import com.example.day.features.console.impl.ui.viewmodel.ConsoleViewModelImpl
 import dagger.Component
 
@@ -17,6 +18,8 @@ internal interface ConsoleFeatureComponent {
 
     fun getViewModelFactory(): ConsoleViewModelImpl.Factory
     fun getAgentsViewModelFactory(): ConsoleViewModelImpl.AgentFactory
+    fun getPlannerViewModelFactory(): ConsoleViewModelImpl.PlannerFactory
     fun getLlmTalkDelegate(): LlmTalkDelegate
     fun getAgentsTalkDelegate(): AgentsTalkDelegate
+    fun getPlannerTalkDelegate(): PlannerTalkDelegate
 }

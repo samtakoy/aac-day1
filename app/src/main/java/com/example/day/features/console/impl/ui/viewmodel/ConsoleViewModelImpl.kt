@@ -7,10 +7,13 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
-import com.example.day.core.core_features.chat.domain.model.UserType
+import com.example.day.core.core_features.chat.domain.model.LongTermMemory
 import com.example.day.core.core_features.chat.domain.usecase.ClearChatNotViewedMessageUseCase
+import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerStageChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatByIdAsFlowUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsFlowUseCase
+import com.example.day.core.core_features.chat.domain.repository.ArtifactRepository
+import com.example.day.core.core_features.chat.domain.usecase.GetLongTermMemoryByGroupUseCase
 import com.example.day.core.core_features.chat.domain.usecase.UpdateChatSettingsUseCase
 import com.example.day.core.core_features.chat.domain.usecase.UpdateChatTitleUseCase
 import com.example.day.core.ui.uikit.chat.bar.model.ChatBarUiModel
@@ -20,10 +23,16 @@ import com.example.day.core.ui.uikit.chat.list.model.ChatMessageUiModel
 import com.example.day.core.ui.uikit.chat.list.model.ChatMessageUiType
 import com.example.day.core.ui.uikit.chat.list.model.UiMessageStatus
 import com.example.day.features.console.impl.ui.components.ChatSettingsUiModel
+import com.example.day.features.console.impl.ui.components.LongTermFactItem
+import com.example.day.features.console.impl.ui.components.MemoryInspectorUiModel
+import com.example.day.features.console.impl.ui.components.ShortTermMemoryItem
 import com.example.day.features.console.impl.ui.delegates.AgentsTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.LlmTalkDelegate
+import com.example.day.features.console.impl.ui.delegates.PlannerTalkDelegate
+import com.example.day.features.console.impl.ui.delegates.PlannerUiEvent
 import com.example.day.features.console.impl.ui.delegates.TalkDelegate
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CancellationException
@@ -31,6 +40,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -44,8 +55,9 @@ internal class ConsoleViewModelImpl(
     private val getChatByIdAsFlowUseCase: GetChatByIdAsFlowUseCase,
     private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
     private val updateChatTitleUseCase: UpdateChatTitleUseCase,
-    // TODO
-    // private val savedStateHandle: SavedStateHandle,
+    private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
+    private val getLtmByGroupUseCase: GetLongTermMemoryByGroupUseCase?,
+    private val artifactRepository: ArtifactRepository?,
     private val chatId: Long
 ) : ViewModel(), ConsoleViewModel {
 
@@ -60,24 +72,41 @@ internal class ConsoleViewModelImpl(
         )
     )
 
-    // Chat object loaded from database
     private var chat: Chat? = null
-
-    // Chat settings loaded from database (derived from chat)
     private var chatSettings: ChatSettings? = null
+    private var currentLtmFacts: List<LongTermMemory> = emptyList()
 
-    // Private expanded states - not exposed externally
-    // TODO Flow тут не используется по факту - рассмотреть вариант Volatile переменной
     private val _expandedStates = MutableStateFlow(persistentMapOf<Long, Boolean>())
 
+    private val _stageCreationState = MutableStateFlow<ConsoleViewModel.StageCreationSuggestion?>(null)
+
+    private val _memoryInspectorState = MutableStateFlow(MemoryInspectorUiModel())
+
     init {
-        // Subscribe to chat data to get settings
+        // Subscribe to Planner events (stage creation suggestions)
+        talkDelegate.getPlannerEvents<PlannerUiEvent>()
+            ?.onEach { event ->
+                when (event) {
+                    is PlannerUiEvent.StageCreationSuggested -> {
+                        _stageCreationState.value = ConsoleViewModel.StageCreationSuggestion(
+                            stageTitle = event.stageTitle,
+                            workingSummary = event.workingSummary
+                        )
+                    }
+                    is PlannerUiEvent.FactSaved -> { /* no-op: LTM flow handles the update */ }
+                    is PlannerUiEvent.StageCompleted -> {
+                        _state.update { it.copy(isStageCompleted = true) }
+                    }
+                }
+            }
+            ?.launchIn(viewModelScope)
+
+        // Subscribe to chat data
         getChatByIdAsFlowUseCase(chatId)
             .onEach { chatData ->
                 chat = chatData
-                chatData?.settings?.let { settings ->
-                    chatSettings = settings
-                }
+                chatData?.settings?.let { settings -> chatSettings = settings }
+                refreshMemoryInspector()
             }
             .launchIn(viewModelScope)
 
@@ -109,11 +138,67 @@ internal class ConsoleViewModelImpl(
                         )
                     )
                 }
+                refreshMemoryInspector()
             }
             .launchIn(viewModelScope)
+
+        // Subscribe to LTM reactively (only for PLANNER chats where UseCase is provided)
+        getLtmByGroupUseCase?.let { ltmUseCase ->
+            getChatByIdAsFlowUseCase(chatId)
+                .filterNotNull()
+                .flatMapLatest { chat -> ltmUseCase(chat.chatGroup.id) }
+                .onEach { facts ->
+                    currentLtmFacts = facts
+                    refreshMemoryInspector()
+                }
+                .launchIn(viewModelScope)
+        }
+
+        // Subscribe to artifacts — marks stage as completed when artifact is saved
+        artifactRepository?.getArtifactsForChat(chatId)
+            ?.onEach { artifacts ->
+                if (artifacts.isNotEmpty()) {
+                    _state.update { it.copy(isStageCompleted = true) }
+                }
+            }
+            ?.launchIn(viewModelScope)
     }
 
     override fun getStateAsFlow(): StateFlow<ConsoleViewModel.State> = _state
+
+    override fun getStageCreationState(): StateFlow<ConsoleViewModel.StageCreationSuggestion?> = _stageCreationState
+
+    override fun getMemoryInspectorState(): StateFlow<MemoryInspectorUiModel> = _memoryInspectorState
+
+    private fun refreshMemoryInspector() {
+        val currentChat = chat
+        val currentMessages = _state.value.chatList.messages
+
+        val shortTermMessages = currentMessages.map { msg ->
+            ShortTermMemoryItem(
+                role = if (msg.userType == ChatMessageUiType.User) "user" else "assistant",
+                content = msg.text,
+                timestamp = msg.id
+            )
+        }
+
+        val longTermFacts = currentLtmFacts.map { ltm ->
+            LongTermFactItem(
+                memoryKey = ltm.memoryKey,
+                category = ltm.category,
+                fact = ltm.fact,
+                updatedAt = ltm.updatedAt
+            )
+        }
+
+        _memoryInspectorState.update { current ->
+            current.copy(
+                shortTermMessages = shortTermMessages.toImmutableList(),
+                workingMemory = currentChat?.workingSummary,
+                longTermFacts = longTermFacts.toImmutableList()
+            )
+        }
+    }
 
     private fun onInputChanged(text: String) {
         _state.update { state ->
@@ -158,31 +243,50 @@ internal class ConsoleViewModelImpl(
             is ConsoleViewModel.Event.SettingsSubmitClick -> {
                 chatSettings = event.settings
                 _state.update { it.copy(settings = null) }
-                // Save settings to database
                 viewModelScope.launch {
                     updateChatTitleUseCase(chatId, event.chatTitle)
                     updateChatSettingsUseCase(event.settings)
                 }
             }
             is ConsoleViewModel.Event.MessageExpandedChange -> {
-                // Update expanded states map
                 _expandedStates.update { currentStates ->
                     currentStates.toPersistentMap().put(event.messageId, event.isExpanded)
                 }
-                
-                // Directly update ONLY the specific message in state - no re-mapping of all messages
                 _state.update { state ->
                     val updatedMessages = state.chatList.messages.map { msg ->
-                        if (msg.id == event.messageId) {
-                            msg.copy(isExpanded = event.isExpanded)
-                        } else {
-                            msg
-                        }
+                        if (msg.id == event.messageId) msg.copy(isExpanded = event.isExpanded) else msg
                     }.toPersistentList()
-                    
                     state.copy(chatList = state.chatList.copy(messages = updatedMessages))
                 }
             }
+
+            ConsoleViewModel.Event.ConfirmStageCreation -> {
+                val currentState = _stageCreationState.value ?: return
+                val mainChat = chat ?: return
+                viewModelScope.launch {
+                    try {
+                        createPlannerStageChatUseCase(
+                            parentChatId = mainChat.id,
+                            stageTitle = currentState.stageTitle,
+                            workingSummary = currentState.workingSummary
+                        )
+                    } catch (e: Exception) {
+                        // Keep state so user can retry
+                        return@launch
+                    }
+                    _stageCreationState.value = null
+                }
+            }
+
+            ConsoleViewModel.Event.DeclineStageCreation -> {
+                _stageCreationState.value = null
+            }
+
+            ConsoleViewModel.Event.OpenMemoryInspector -> {
+                refreshMemoryInspector()
+            }
+
+            ConsoleViewModel.Event.ToggleMemoryInspector -> { /* tab-based UI — no-op */ }
         }
     }
 
@@ -190,13 +294,12 @@ internal class ConsoleViewModelImpl(
         val currentChat = chat ?: return
         changeSendBar("", ChatSendButtonType.ArrowDisabled)
         launchCatching(
-            onError = { error ->
+            onError = {
                 restoreSendButton()
                 clearUnviewedUseCase.invoke(chatId)
             }
         ) {
             clearUnviewedUseCase.invoke(chatId)
-            // делегат отправки сообщения куда-то
             talkDelegate.tryAddUserMessage(currentChat, inputText) {
                 restoreSendButton()
             }
@@ -219,7 +322,6 @@ internal class ConsoleViewModelImpl(
         }
     }
 
-    /** TODO дублирование */
     private fun launchCatching(
         onError: (suspend (Throwable) -> Unit)? = null,
         onFinally: (suspend () -> Unit)? = null,
@@ -245,13 +347,9 @@ internal class ConsoleViewModelImpl(
         private val getChatByIdAsFlowUseCase: GetChatByIdAsFlowUseCase,
         private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
         private val updateChatTitleUseCase: UpdateChatTitleUseCase,
-    ): ViewModelProvider.Factory {
-        override fun <T : ViewModel> create(
-            modelClass: Class<T>,
-            extras: CreationExtras
-        ): T {
-            // TODO
-            // val savedStateHandle = extras.createSavedStateHandle()
+        private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
+    ) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
             val id = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
             return ConsoleViewModelImpl(
                 getMessagesUseCase,
@@ -260,6 +358,9 @@ internal class ConsoleViewModelImpl(
                 getChatByIdAsFlowUseCase,
                 updateChatSettingsUseCase,
                 updateChatTitleUseCase,
+                createPlannerStageChatUseCase,
+                getLtmByGroupUseCase = null,
+                artifactRepository = null,
                 id
             ) as T
         }
@@ -272,13 +373,9 @@ internal class ConsoleViewModelImpl(
         private val getChatByIdAsFlowUseCase: GetChatByIdAsFlowUseCase,
         private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
         private val updateChatTitleUseCase: UpdateChatTitleUseCase,
-    ): ViewModelProvider.Factory {
-        override fun <T : ViewModel> create(
-            modelClass: Class<T>,
-            extras: CreationExtras
-        ): T {
-            // TODO
-            // val savedStateHandle = extras.createSavedStateHandle()
+        private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
+    ) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
             val chatId = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
             return ConsoleViewModelImpl(
                 getMessagesUseCase,
@@ -287,6 +384,37 @@ internal class ConsoleViewModelImpl(
                 getChatByIdAsFlowUseCase,
                 updateChatSettingsUseCase,
                 updateChatTitleUseCase,
+                createPlannerStageChatUseCase,
+                getLtmByGroupUseCase = null,
+                artifactRepository = null,
+                chatId = chatId
+            ) as T
+        }
+    }
+
+    class PlannerFactory @Inject constructor(
+        private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
+        private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
+        private val talkDelegate: PlannerTalkDelegate,
+        private val getChatByIdAsFlowUseCase: GetChatByIdAsFlowUseCase,
+        private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
+        private val updateChatTitleUseCase: UpdateChatTitleUseCase,
+        private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
+        private val getLtmByGroupUseCase: GetLongTermMemoryByGroupUseCase,
+        private val artifactRepository: ArtifactRepository,
+    ) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+            val chatId = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
+            return ConsoleViewModelImpl(
+                getMessagesUseCase,
+                clearUnviewedUseCase,
+                talkDelegate,
+                getChatByIdAsFlowUseCase,
+                updateChatSettingsUseCase,
+                updateChatTitleUseCase,
+                createPlannerStageChatUseCase,
+                getLtmByGroupUseCase = getLtmByGroupUseCase,
+                artifactRepository = artifactRepository,
                 chatId = chatId
             ) as T
         }

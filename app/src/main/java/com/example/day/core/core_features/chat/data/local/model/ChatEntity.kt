@@ -14,9 +14,18 @@ import androidx.room.PrimaryKey
             parentColumns = ["id"],
             childColumns = ["chat_group_id"],
             onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = ChatEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["parent_id"],
+            onDelete = ForeignKey.SET_NULL
         )
     ],
-    indices = [Index(value = ["chat_group_id"])]
+    indices = [
+        Index(value = ["chat_group_id"]),
+        Index(value = ["parent_id"])
+    ]
 )
 internal data class ChatEntity(
     @PrimaryKey(autoGenerate = true)
@@ -27,5 +36,14 @@ internal data class ChatEntity(
     val title: String,
     
     @ColumnInfo(name = "chat_group_id")
-    val chatGroupId: Long
+    val chatGroupId: Long,
+    
+    @ColumnInfo(name = "parent_id")
+    val parentId: Long? = null,
+    
+    @ColumnInfo(name = "working_summary")
+    val workingSummary: String? = null,
+    
+    @ColumnInfo(name = "is_planner_main")
+    val isPlannerMain: Boolean = false
 )

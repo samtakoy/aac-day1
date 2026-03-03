@@ -8,17 +8,21 @@ import com.example.day.core.core_features.agent.data.local.dao.AgentToChatDao
 import com.example.day.core.core_features.agent.data.local.model.AgentEntity
 import com.example.day.core.core_features.agent.data.local.model.AgentToChatEntity
 import com.example.day.core.core_features.agent.data.local.model.AgentContextMemoryEntity
+import com.example.day.core.core_features.chat.data.local.dao.ArtifactDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatGroupDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatSettingsDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatTypeDao
+import com.example.day.core.core_features.chat.data.local.dao.LongTermMemoryDao
 import com.example.day.core.core_features.chat.data.local.dao.MessageDao
 import com.example.day.core.core_features.chat.data.local.dao.UserDao
 import com.example.day.core.core_features.chat.data.local.model.ChatEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatGroupEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatSettingsEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatTypeEntity
+import com.example.day.core.core_features.chat.data.local.model.LongTermMemoryEntity
 import com.example.day.core.core_features.chat.data.local.model.MessageEntity
+import com.example.day.core.core_features.chat.data.local.model.ProjectArtifactEntity
 import com.example.day.core.core_features.chat.data.local.model.UserEntity
 
 @Database(
@@ -31,9 +35,11 @@ import com.example.day.core.core_features.chat.data.local.model.UserEntity
         ChatSettingsEntity::class,
         AgentEntity::class,
         AgentToChatEntity::class,
-        AgentContextMemoryEntity::class
+        AgentContextMemoryEntity::class,
+        LongTermMemoryEntity::class,
+        ProjectArtifactEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 internal abstract class ChatDatabase : RoomDatabase() {
@@ -46,4 +52,6 @@ internal abstract class ChatDatabase : RoomDatabase() {
     abstract fun agentDao(): AgentDao
     abstract fun agentToChatDao(): AgentToChatDao
     abstract fun agentContextMemoryDao(): AgentContextMemoryDao
+    abstract fun longTermMemoryDao(): LongTermMemoryDao
+    abstract fun artifactDao(): ArtifactDao
 }
