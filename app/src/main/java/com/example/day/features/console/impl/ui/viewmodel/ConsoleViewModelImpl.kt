@@ -185,6 +185,7 @@ internal class ConsoleViewModelImpl(
         val longTermFacts = currentLtmFacts.map { ltm ->
             LongTermFactItem(
                 memoryKey = ltm.memoryKey,
+                categoryId = ltm.categoryId,
                 category = ltm.category,
                 fact = ltm.fact,
                 updatedAt = ltm.updatedAt

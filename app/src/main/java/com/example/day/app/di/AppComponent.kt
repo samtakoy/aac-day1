@@ -15,6 +15,8 @@ import com.example.day.features.console.impl.di.ConsoleFeatureDeps
 import com.example.day.features.console.impl.di.ConsoleFeatureApiModule
 import com.example.day.features.group_choice.impl.di.GroupChoiceFeatureApiModule
 import com.example.day.features.group_choice.impl.di.GroupChoiceFeatureDeps
+import com.example.day.features.user_settings.impl.di.UserSettingsFeatureApiModule
+import com.example.day.features.user_settings.impl.di.UserSettingsFeatureDeps
 import dagger.BindsInstance
 import dagger.Component
 import javax.inject.Singleton
@@ -29,11 +31,12 @@ import javax.inject.Singleton
         ConsoleFeatureApiModule::class,
         ChatsFeatureApiModule::class,
         GroupChoiceFeatureApiModule::class,
+        UserSettingsFeatureApiModule::class,
         LlmCoreFeatureModule::class
     ]
 )
 @Immutable
-interface AppComponent : FeatureEntryProvider, ConsoleFeatureDeps, ChatsFeatureDeps, GroupChoiceFeatureDeps {
+interface AppComponent : FeatureEntryProvider, ConsoleFeatureDeps, ChatsFeatureDeps, GroupChoiceFeatureDeps, UserSettingsFeatureDeps {
 
     @Component.Factory
     interface Factory {

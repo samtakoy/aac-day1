@@ -5,6 +5,7 @@ import com.example.day.core.core_features.agent.domain.usecase.GetOrCreateAgentU
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
+import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProviderFactory
 import javax.inject.Inject
 
@@ -21,19 +22,19 @@ class AIAgentFactory @Inject constructor(
 ) {
     suspend fun getOrCreate(
         systemName: String,
-        isCommonAgent: Boolean,
-        chat: Chat
+        chatId: Long,
+        systemPromt: String,
+        model: ModelSettings
     ): AIAgent {
         val config = getOrCreateAgentUseCase(
             systemName = systemName,
-            isCommon = isCommonAgent,
-            chatSettings = chat.settings
+            chatId = chatId,
+            systemPromt = systemPromt,
+            model = model
         )
         val strategy = strategyFactory.create(config.contextStrategyType)
         val memoryProvider = memoryProviderFactory.create(
             memoryTypes = config.memoryTypes,
-            chatId = chat.id,
-            chatGroupId = chat.chatGroup.id
         )
         return AIAgent(
             config,

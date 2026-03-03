@@ -58,7 +58,7 @@ class InnerCommandParser {
      * @return Pair of (key, value) or null if invalid
      */
     private fun parseParameter(param: String): Pair<String, String?>? {
-        val pair = param.trim().split(" ").filter { it.isNotBlank() }
+        val pair = param.trim().split(" ", limit=2).filter { it.isNotBlank() }
         return when {
             pair.isEmpty() -> null
             pair.size > 1 -> Pair(pair[0], pair[1])

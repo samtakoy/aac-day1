@@ -10,8 +10,6 @@ class MemoryProviderFactory @Inject constructor(
 ) {
     fun create(
         memoryTypes: List<MemoryType>,
-        chatId: Long,
-        chatGroupId: Long
     ): MemoryProvider {
         if (memoryTypes.isNotEmpty()) {
             return CompositeMemoryProvider(

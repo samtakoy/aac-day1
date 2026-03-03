@@ -12,7 +12,7 @@ import androidx.room.Index
  */
 @Entity(
     tableName = "long_term_memory",
-    primaryKeys = ["memory_key", "ltm_group_id"],
+    primaryKeys = ["memory_key", "category_id", "ltm_group_id"],
     foreignKeys = [
         ForeignKey(
             entity = LTMGroupEntity::class,

@@ -12,30 +12,37 @@ class UpsertFactForProfileUseCase @Inject constructor(
     private val getCurrentUserProfile: GetCurrentUserProfileUseCase,
     private val upsertFactWithCategory: UpsertFactWithCategoryUseCase
 ) {
-    suspend operator fun invoke(rawFact: String): Result<Unit> {
-        val parts = rawFact.split(":")
-        if (parts.size < 3) {
-            return Result.failure(
-                IllegalArgumentException("Неверный формат. Ожидается: key:category:текст_факта")
-            )
+    /**
+     * Если [memoryKey] == "" то факты уйдут в категорию "User"
+     * */
+    suspend operator fun invoke(memoryKey: String, category: String, fact: String): Result<Unit> {
+        val category = category.trim()
+        val fact = fact.trim()
+        val memoryKey = if (memoryKey.isBlank()) {
+            // по умолчанию факты о пользователе
+            DEFAULT_PROFILE_KEY
+        } else {
+            memoryKey
         }
-        val key = parts[0].trim()
-        val category = parts[1].trim()
-        val text = parts.drop(2).joinToString(":").trim()
 
-        if (key.isBlank() || category.isBlank() || text.isBlank()) {
-            return Result.failure(IllegalArgumentException("key, category и текст не могут быть пустыми"))
+        if (category.isBlank() || fact.isBlank()) {
+            return Result.failure(IllegalArgumentException("category и текст не могут быть пустыми"))
         }
+
 
         val profile = getCurrentUserProfile()
             ?: return Result.failure(IllegalStateException("Профиль не привязан. Используйте @@talk(profile --bind NAME)"))
 
         upsertFactWithCategory.invokeByLTMGroup(
             ltmGroupId = profile.ltmGroupId,
-            memoryKey = key,
+            memoryKey = memoryKey,
             categoryTitle = category,
-            fact = text
+            fact = fact
         )
         return Result.success(Unit)
+    }
+
+    companion object {
+        const val DEFAULT_PROFILE_KEY = "User"
     }
 }

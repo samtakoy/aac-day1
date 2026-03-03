@@ -14,6 +14,7 @@ package com.example.day.core.core_features.memory.domain.model
 data class LongTermMemoryFact(
     val memoryKey: String,
     val ltmGroupId: Long,
+    val categoryId: Long,
     val category: String,
     val fact: String,
     val updatedAt: Long = System.currentTimeMillis()

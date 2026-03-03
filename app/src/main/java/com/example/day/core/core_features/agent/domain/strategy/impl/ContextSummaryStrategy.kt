@@ -39,9 +39,10 @@ class ContextSummaryStrategy(
         val state = store.getContextState(agent.id) as? AContextState.Summary
             ?: AContextState.Summary("", persistentListOf())
         return ContextSnapshot(
-            messages = state.messages.addUserMessage(userPrompt).mutate {
+            messages = state.messages.addUserMessage(userPrompt).mutate { list ->
                 if (state.summary.isNotBlank()) {
-                    it.addFirst(
+                    list.add(
+                        0,
                         AContextMessage(
                             role = Role.ASSISTANT,
                             content = "Previous conversation summary: ${state.summary}"

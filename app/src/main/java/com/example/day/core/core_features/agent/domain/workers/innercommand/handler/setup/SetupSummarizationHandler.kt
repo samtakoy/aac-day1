@@ -46,8 +46,9 @@ class SetupSummarizationHandler @Inject constructor(
     private suspend fun getOrCreateAgent(chat: Chat): AgentConfig =
         agentRepository.getOrCreateAgent(
             systemName = AGENT_NAME,
-            isCommon = false,
-            chatSettings = chat.settings
+            chatId = chat.id,
+            systemPromt = chat.settings.systemPromt,
+            model = chat.settings.model
         )
 
     companion object {

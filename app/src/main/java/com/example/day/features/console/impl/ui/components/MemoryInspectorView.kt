@@ -30,7 +30,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.day.core.ui.uikit.components.ltm.LongTermFactUiItem
+import com.example.day.core.ui.uikit.components.ltm.LongTermFactsListView
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 
 private val tabs = listOf("Краткосрочная", "Рабочая", "Долгосрочная")
 
@@ -66,7 +69,12 @@ fun MemoryInspectorView(
             when (selectedTab) {
                 0 -> ShortTermContent(uiModel.shortTermMessages)
                 1 -> WorkingMemoryContent(uiModel.workingMemory)
-                2 -> LongTermContent(uiModel.longTermFacts)
+                2 -> LongTermFactsListView(
+                    facts = uiModel.longTermFacts.map {
+                        LongTermFactUiItem(it.memoryKey, it.categoryId, it.category, it.fact, it.updatedAt)
+                    }.toImmutableList(),
+                    showPromptPreview = true
+                )
             }
         }
     }
@@ -175,103 +183,6 @@ private fun WorkingMemoryContent(workingMemory: String?) {
                     text = workingMemory,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────
-// Долгосрочная память (LTM)
-// ─────────────────────────────────────────────────────────
-
-@Composable
-private fun LongTermContent(facts: ImmutableList<LongTermFactItem>) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        MemoryInfoBanner("Постоянные факты о пользователе. Агент сохраняет их командой SAVE_FACT и автоматически учитывает в каждом ответе этой группы.")
-
-        if (facts.isEmpty()) {
-            EmptyPlaceholder("Фактов пока нет.\nАгент сохранит их сам — например:\nSAVE_FACT[primary_language:skills:Kotlin]")
-            return@Column
-        }
-
-        val grouped = facts.groupBy { it.category }
-
-        // Show prompt preview at the top so user understands how LTM reaches the agent
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            item {
-                Spacer(Modifier.height(4.dp))
-                LtmPromptPreview(facts)
-                Spacer(Modifier.height(12.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(4.dp))
-            }
-
-            grouped.forEach { (category, items) ->
-                item {
-                    Text(
-                        text = category.uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp, start = 4.dp)
-                    )
-                }
-                items(items) { fact ->
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
-                            Text(
-                                text = fact.memoryKey,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = fact.fact,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            }
-
-            item { Spacer(Modifier.height(8.dp)) }
-        }
-    }
-}
-
-/** Показывает как агент ВИДИТ LTM — в виде строк системного промпта */
-@Composable
-private fun LtmPromptPreview(facts: ImmutableList<LongTermFactItem>) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            Text(
-                text = "Как агент видит эти данные в промпте:",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(4.dp))
-            facts.forEach { fact ->
-                Text(
-                    text = "- [${fact.category}] ${fact.memoryKey}: ${fact.fact}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                 )
             }
         }

@@ -18,7 +18,7 @@ class ContextCommandHandler @Inject constructor(
         chat: Chat
     ): CommandResult {
         val agent = aiAgentFactory.getOrCreate(
-            AGENT_NAME, false, chat
+            AGENT_NAME, chat.id, chat.settings.systemPromt, chat.settings.model
         )
         return CommandResult.Success(agent.getFullContext())
     }

@@ -23,8 +23,9 @@ class AgentMemoryCommandHandler @Inject constructor(
         val paramsMap = params.toMap()
         val agentConfig = agentRepository.getOrCreateAgent(
             systemName = AGENT_NAME,
-            isCommon = false,
-            chatSettings = chat.settings
+            chatId = chat.id,
+            systemPromt = chat.settings.systemPromt,
+            model = chat.settings.model
         )
         return when {
             "add" in paramsMap    -> handleAdd(agentConfig.id, paramsMap["add"])

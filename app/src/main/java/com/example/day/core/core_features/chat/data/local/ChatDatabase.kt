@@ -59,7 +59,7 @@ import com.example.day.core.core_features.memory.data.local.model.user.UserProfi
         LTMGroupToUserProfileEntity::class,
         UserToProfileEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 internal abstract class ChatDatabase : RoomDatabase() {

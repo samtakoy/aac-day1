@@ -11,7 +11,7 @@
 @@talk(profile --remove NAME)         // Удалить профиль по имени
 @@talk(profile --bind NAME)           // Привязать профиль NAME к текущему пользователю
 @@talk(profile --show_facts)          // Показать факты привязанного профиля
-@@talk(profile --add_fact key:cat:text) // Добавить факт в профиль
+@@talk(profile --add_fact cat:text) // Добавить факт в профиль
 @@talk(profile --avatar reset)        // Сбросить текстовый аватар
 @@talk(profile --avatar generate)     // Сгенерировать аватар через LLM (30x30 псевдографика)
 @@talk(profile --avatar show)         // Показать текущий аватар
@@ -372,7 +372,7 @@ class ProfileCommandHandler @Inject constructor(
 - `params = [("create", "NAME")]`
 - `params = [("unbind", null)]`
 - `params = [("avatar", "generate")]`
-- `params = [("add_fact", "key:category:text")]`
+- `params = [("add_fact", "category:text")]`
 
 **handleAvatar** разбирает sub-value: `"reset"`, `"generate"`, `"show"`
 
@@ -487,7 +487,7 @@ abstract fun bindUserProfileRepository(impl: UserProfileRepositoryImpl): UserPro
 
 - [ ] `@@talk(profile --create TestUser)` → профиль создан
 - [ ] `@@talk(profile --bind TestUser)` → профиль привязан к пользователю
-- [ ] `@@talk(profile --add_fact lang:skills:Kotlin)` → факт добавлен
+- [ ] `@@talk(profile --add_fact skills:Kotlin)` → факт добавлен
 - [ ] `@@talk(profile --show_facts)` → показаны факты
 - [ ] `@@talk(profile --avatar generate)` → аватар сгенерирован и сохранён
 - [ ] `@@talk(profile --avatar show)` → аватар показан

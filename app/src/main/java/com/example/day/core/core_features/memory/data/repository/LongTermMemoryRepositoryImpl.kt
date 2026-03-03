@@ -45,6 +45,10 @@ internal class LongTermMemoryRepositoryImpl @Inject constructor(
         memoryDao.deleteByKeyAndGroup(memoryKey, ltmGroupId)
     }
 
+    override suspend fun deleteFact(ltmGroupId: Long, memoryKey: String, categoryId: Long) {
+        memoryDao.deleteByKeyAndCategoryAndGroup(memoryKey, categoryId, ltmGroupId)
+    }
+
     override suspend fun clearFactsByGroup(ltmGroupId: Long) {
         memoryDao.clearByGroup(ltmGroupId)
     }

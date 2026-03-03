@@ -7,6 +7,7 @@ import com.example.day.features.console.api.AgentsConsoleFeatureEntry
 import com.example.day.features.console.api.ConsoleFeatureEntry
 import com.example.day.features.console.api.PlannerConsoleFeatureEntry
 import com.example.day.features.group_choice.api.GroupChoiceFeatureEntry
+import com.example.day.features.user_settings.api.UserSettingsFeatureEntry
 
 @Immutable
 interface FeatureEntryProvider {
@@ -20,4 +21,6 @@ interface FeatureEntryProvider {
     fun getConsoleFeatureEntry(): ConsoleFeatureEntry
     @Stable
     fun getPlannerConsoleFeatureEntry(): PlannerConsoleFeatureEntry
+    @Stable
+    fun getUserSettingsFeatureEntry(): UserSettingsFeatureEntry
 }

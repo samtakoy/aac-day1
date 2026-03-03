@@ -6,9 +6,9 @@ package com.example.day.core.core_features.memory.domain.provider.base
  * */
 enum class MemoryType(val dbName: String) {
     /** Память из текущего UserProfile */
-    UserProfile("uProfile"),
+    UserProfile("user_profile"),
     /** Память из текущего чата */
     Chat("chat"),
     /** Память из текущей группы чатов */
-    ChatGroup("chatGroup"),
+    ChatGroup("chat_group"),
 }

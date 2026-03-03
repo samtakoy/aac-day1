@@ -50,4 +50,9 @@ interface UserProfileRepository {
      * Pass null to reset the avatar.
      */
     suspend fun updateTextAvatar(profileId: Long, avatar: String?)
+
+    /**
+     * Returns all profiles ordered by title.
+     */
+    suspend fun getAllProfiles(): List<UserProfile>
 }

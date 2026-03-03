@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.agent.domain
 
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.AIAgentResult
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.agent.domain.model.toModelRequestMessages
@@ -46,6 +47,8 @@ class AIAgent(
         // Порядок: System Prompt -> Memory (LTM/Working) -> History -> User Prompt
         val history = (memoryMessages + snapshot.messages).toModelRequestMessages()
 
+        val requestDebugInfo = buildRequestDebugInfo(config.systemPrompt, memoryMessages, userPrompt)
+
         return llmProvider.askLlm(
             chatSettings = chat,
             userPrompt = userPrompt,
@@ -55,8 +58,28 @@ class AIAgent(
         ).map { result ->
             val responseText = result.getContent()
             val strategyResult = strategy.afterResponse(chat, config, userPrompt, responseText, contextRepository)
-            AIAgentResult(responseText, strategyResult.reportMessage)
+            AIAgentResult(responseText, strategyResult.reportMessage, requestDebugInfo)
         }
+    }
+
+    private fun buildRequestDebugInfo(
+        systemPrompt: String?,
+        memoryMessages: List<AContextMessage>,
+        userPrompt: String
+    ): String = buildString {
+        appendLine("=== LLM запрос (без истории) ===")
+        if (!systemPrompt.isNullOrBlank()) {
+            appendLine("[SYSTEM]")
+            appendLine(systemPrompt.trimEnd())
+            appendLine()
+        }
+        memoryMessages.forEach { msg ->
+            appendLine("[MEMORY:${msg.role.name}]")
+            appendLine(msg.content.trimEnd())
+            appendLine()
+        }
+        appendLine("[USER]")
+        append(userPrompt.trimEnd())
     }
 
     /** Returns formatted info about current context strategy/params state. */

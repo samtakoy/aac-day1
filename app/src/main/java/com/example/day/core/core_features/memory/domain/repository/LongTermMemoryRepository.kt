@@ -45,11 +45,19 @@ interface LongTermMemoryRepository {
     suspend fun getFactByKey(ltmGroupId: Long, memoryKey: String): LongTermMemoryFact?
 
     /**
-     * Delete a fact by its key within an LTM group.
+     * Delete all facts with the given key within an LTM group (across all categories).
      *
      * @param ltmGroupId LTM Group ID for memory isolation
      */
     suspend fun deleteFact(ltmGroupId: Long, memoryKey: String)
+
+    /**
+     * Delete a specific fact by key + category within an LTM group.
+     *
+     * @param ltmGroupId LTM Group ID for memory isolation
+     * @param categoryId Category ID of the fact to delete
+     */
+    suspend fun deleteFact(ltmGroupId: Long, memoryKey: String, categoryId: Long)
 
     /**
      * Clear all facts for a specific LTM group.

@@ -27,6 +27,9 @@ internal interface UserProfileDao {
     @Query("UPDATE user_profiles SET text_avatar = :avatar WHERE id = :id")
     suspend fun updateTextAvatar(id: Long, avatar: String?)
 
+    @Query("SELECT * FROM user_profiles ORDER BY title ASC")
+    suspend fun getAllProfiles(): List<UserProfileEntity>
+
     // ─── UserToProfile binding ───────────────────────────────────────────────────
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

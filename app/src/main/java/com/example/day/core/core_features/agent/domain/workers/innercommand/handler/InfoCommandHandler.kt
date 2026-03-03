@@ -18,7 +18,10 @@ class InfoCommandHandler @Inject constructor(
         chat: Chat
     ): CommandResult {
         val agent = aiAgentFactory.getOrCreate(
-            AGENT_NAME, false, chat
+            AGENT_NAME,
+            chatId = chat.id,
+            systemPromt = chat.settings.systemPromt,
+            model = chat.settings.model
         )
         return CommandResult.Success(agent.getInfo())
     }

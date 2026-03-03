@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -25,13 +26,18 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -76,13 +82,16 @@ private fun ChatsScreenInternal(
     val agentsChatEntry = appComponent.getAgentsConsoleFeatureEntry()
     val historyChatEntry = appComponent.getConsoleFeatureEntry()
     val plannerChatEntry = appComponent.getPlannerConsoleFeatureEntry()
+    val userSettingsEntry = appComponent.getUserSettingsFeatureEntry()
 
     // Create pager state at the top level to share between chips and pager
     val pagerState = rememberPagerState(initialPage = 0) { state.chips.size }
     val scope = rememberCoroutineScope()
+    var showUserSettings by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     Column(modifier = modifier) {
-        // TopAppBar with back button
+        // TopAppBar with back button and profile icon
         TopAppBar(
             title = { Text("Чаты") },
             navigationIcon = {
@@ -94,8 +103,17 @@ private fun ChatsScreenInternal(
                         )
                     }
                 }
+            },
+            actions = {
+                IconButton(onClick = { showUserSettings = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Профиль пользователя"
+                    )
+                }
             }
         )
+
         // Chips row with add button - always visible at top
         ChipsRow(
             chips = state.chips,
@@ -143,6 +161,18 @@ private fun ChatsScreenInternal(
                 val chatId = state.chips.getOrNull(pageIndex)?.id
                 chatId?.let { onEvent(ChatsViewModel.Event.SwipeTo(it)) }
             }
+        }
+    }
+
+    if (showUserSettings) {
+        ModalBottomSheet(
+            onDismissRequest = { showUserSettings = false },
+            sheetState = sheetState
+        ) {
+            userSettingsEntry.EntryPoint(
+                modifier = Modifier.fillMaxWidth(),
+                onDismiss = { showUserSettings = false }
+            )
         }
     }
 }

@@ -2,9 +2,13 @@ package com.example.day.core.core_features.agent.domain.workers.innercommand.han
 
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
+import com.example.day.core.core_features.llm.domain.model.getContent
 import com.example.day.core.core_features.memory.domain.model.LongTermMemoryFact
+import com.example.day.core.core_features.memory.domain.repository.UserProfileRepository
 import com.example.day.core.core_features.memory.domain.usecase.BindUserProfileUseCase
 import com.example.day.core.core_features.memory.domain.usecase.CreateUserProfileUseCase
+import com.example.day.core.core_features.memory.domain.usecase.GenerateProfileAvatarUseCase
 import com.example.day.core.core_features.memory.domain.usecase.GetCurrentUserProfileUseCase
 import com.example.day.core.core_features.memory.domain.usecase.GetFactsByUserProfileUseCase
 import com.example.day.core.core_features.memory.domain.usecase.RemoveUserProfileUseCase
@@ -12,6 +16,7 @@ import com.example.day.core.core_features.memory.domain.usecase.UnbindUserProfil
 import com.example.day.core.core_features.memory.domain.usecase.UpdateProfileAvatarUseCase
 import com.example.day.core.core_features.memory.domain.usecase.UpsertFactForProfileUseCase
 import javax.inject.Inject
+import kotlin.compareTo
 
 /**
  * Handles all @@talk(profile ...) commands.
@@ -21,10 +26,11 @@ import javax.inject.Inject
  *   --remove NAME         delete a profile by name
  *   --bind NAME           bind profile to current user
  *   --unbind              unbind current profile from user
+ *   --list                list all profiles (marks current with ✓)
  *   --show_facts          show all facts of the bound profile
  *   --add_fact key:cat:text  add a fact to the bound profile
  *   --avatar reset        clear the text avatar
- *   --avatar generate     generate avatar via LLM (30x30 ASCII art)
+ *   --avatar generate     generate avatar via LLM (20x20 emoji art)
  *   --avatar show         display current avatar
  */
 class ProfileCommandHandler @Inject constructor(
@@ -34,9 +40,10 @@ class ProfileCommandHandler @Inject constructor(
     private val unbindProfile: UnbindUserProfileUseCase,
     private val getCurrentProfile: GetCurrentUserProfileUseCase,
     private val getFactsByProfile: GetFactsByUserProfileUseCase,
+    private val generateAvatar: GenerateProfileAvatarUseCase,
     private val upsertFact: UpsertFactForProfileUseCase,
     private val updateAvatar: UpdateProfileAvatarUseCase,
-    private val aiAgentFactory: AIAgentFactory
+    private val profileRepository: UserProfileRepository
 ) : CommandHandler {
 
     override val commandName = "profile"
@@ -48,13 +55,14 @@ class ProfileCommandHandler @Inject constructor(
             "remove" in paramsMap -> handleRemove(paramsMap["remove"])
             "bind" in paramsMap   -> handleBind(paramsMap["bind"])
             "unbind" in paramsMap -> handleUnbind()
+            "list" in paramsMap   -> handleList()
             "show_facts" in paramsMap -> handleShowFacts()
             "add_fact" in paramsMap   -> handleAddFact(paramsMap["add_fact"])
             "avatar" in paramsMap     -> handleAvatar(paramsMap["avatar"], chat)
             else -> CommandResult.Error(
                 "Неизвестная команда profile.\n" +
-                "Доступные: --create NAME | --remove NAME | --bind NAME | --unbind | " +
-                "--show_facts | --add_fact key:category:текст | --avatar [reset|generate|show]"
+                "Доступные: --create NAME | --remove NAME | --bind NAME | --unbind | --list | " +
+                "--show_facts | --add_fact category:текст | --avatar [reset|generate|show]"
             )
         }
     }
@@ -90,6 +98,22 @@ class ProfileCommandHandler @Inject constructor(
         )
     }
 
+    private suspend fun handleList(): CommandResult {
+        val all = profileRepository.getAllProfiles()
+        if (all.isEmpty()) {
+            return CommandResult.Success("Профилей нет. Создайте: @@talk(profile --create NAME)")
+        }
+        val current = getCurrentProfile()
+        val text = buildString {
+            appendLine("Профили (${all.size}):")
+            all.forEach { profile ->
+                val marker = if (profile.id == current?.id) " ✓" else ""
+                appendLine("  • ${profile.title}$marker")
+            }
+        }.trim()
+        return CommandResult.Success(text)
+    }
+
     private suspend fun handleShowFacts(): CommandResult {
         val profile = getCurrentProfile()
             ?: return CommandResult.Success("Профиль не привязан. Используйте @@talk(profile --bind NAME)")
@@ -102,12 +126,30 @@ class ProfileCommandHandler @Inject constructor(
 
     private suspend fun handleAddFact(rawFact: String?): CommandResult {
         if (rawFact.isNullOrBlank()) {
-            return CommandResult.Error("Укажите факт: @@talk(profile --add_fact key:category:текст)")
+            return CommandResult.Error("Укажите факт: @@talk(profile --add_fact category:текст)")
         }
-        return upsertFact(rawFact).fold(
-            onSuccess = { CommandResult.Success("Факт сохранён: $rawFact") },
-            onFailure = { CommandResult.Error(it.message ?: "Ошибка сохранения факта") }
-        )
+        val parts = rawFact.split(":", limit = 3).mapNotNull { it.trim().takeIf { it.isNotEmpty() } }
+        if (parts.size != 2 && parts.size != 3) {
+            return CommandResult.Error("Укажите факт: @@talk(profile --add_fact category:текст)")
+        }
+
+        return when (parts.size) {
+            2 -> {
+                upsertFact("", parts[0], parts[1]).fold(
+                    onSuccess = { CommandResult.Success("Факт сохранён: $rawFact") },
+                    onFailure = { CommandResult.Error(it.message ?: "Ошибка сохранения факта") }
+                )
+            }
+            3 -> {
+                upsertFact(parts[0], parts[1], parts[2]).fold(
+                    onSuccess = { CommandResult.Success("Факт сохранён: $rawFact") },
+                    onFailure = { CommandResult.Error(it.message ?: "Ошибка сохранения факта") }
+                )
+            }
+            else -> {
+                CommandResult.Error("Неверный формат. Ожидается: category:текст_факта или сущность:category:текст_факта")
+            }
+        }
     }
 
     private suspend fun handleAvatar(subCommand: String?, chat: Chat): CommandResult {
@@ -127,18 +169,10 @@ class ProfileCommandHandler @Inject constructor(
     }
 
     private suspend fun handleAvatarGenerate(chat: Chat): CommandResult {
-        val facts = getFactsByProfile()
-        val prompt = buildAvatarPrompt(facts)
-
-        val agent = aiAgentFactory.getOrCreate(AGENT_NAME, false, chat)
-        val result = agent.process(chat.settings, prompt, null)
-            .getOrElse { return CommandResult.Error("Ошибка генерации аватара: ${it.message}") }
-
-        val avatarText = result.responseText
-        updateAvatar.update(avatarText).onFailure {
-            return CommandResult.Error("Аватар сгенерирован, но не сохранён: ${it.message}")
+        val (avatarText, prompt) = generateAvatar(chat.settings.model).getOrElse {
+            return CommandResult.Error("Ошибка генерации аватара: ${it.message}")
         }
-        return CommandResult.Success("Аватар сгенерирован и сохранён:\n\n$avatarText")
+        return CommandResult.Success("Аватар сгенерирован и сохранён:\n\n$avatarText\n\n---\nИспользован промпт:\n$prompt")
     }
 
     private suspend fun handleAvatarShow(): CommandResult {
@@ -153,48 +187,17 @@ class ProfileCommandHandler @Inject constructor(
         return buildString {
             appendLine("Профиль: $profileTitle")
             appendLine("Факты (${facts.size}):")
-            facts.groupBy { it.category }.forEach { (category, categoryFacts) ->
-                appendLine("\n[$category]")
-                categoryFacts.forEach { fact ->
-                    appendLine("  ${fact.memoryKey}: ${fact.fact}")
+            // 1. Группируем по сущности (User, Dog, и т.д.)
+            facts.groupBy { it.memoryKey }.forEach { (entity, entityFacts) ->
+                appendLine("\n[$entity]")
+
+                // 2. Внутри сущности группируем по категориям
+                entityFacts.groupBy { it.category }.forEach { (category, categoryFacts) ->
+                    val allFactsInCategory = categoryFacts.joinToString(", ") { it.fact }
+                    appendLine("  $category: $allFactsInCategory")
                 }
             }
         }.trim()
-    }
-
-    private fun buildAvatarPrompt(facts: List<LongTermMemoryFact>): String {
-        val factsSection = if (facts.isEmpty()) {
-            "Факты о пользователе отсутствуют."
-        } else {
-            facts.joinToString("\n") { "- [${it.category}/${it.memoryKey}] ${it.fact}" }
-        }
-        val count = 10
-        return """
-            Действуй как пиксель-арт художник. Создай квадратный портрет-аватар размером ${count}x${count} символов, используя только эмодзи-квадраты.
-            Палитра:
-            Фон: ⬜ (белый квадрат)
-            🟩 (Зеленый) — используй для фона или позитивных элементов.
-            🟥 (Красный) — используй для акцентов или ярких эмоций.
-            ⬛ (Черный) — для контуров и рта.
-            🟨 (Желтый) — используй для лица.
-            🟦 (Синий) — для глаз.
-            Персонаж:
-            Смайлик, выражающий эмоцию на основе фактов о персонаже:
-            $factsSection
-            
-            Технические правила:
-            Нарисуй лицо.
-            Ровно ${count} строк по ${count} символов в каждой.
-            Используй только эмодзи-квадраты, чтобы ширина была идеально ровной.
-            
-            Визуальный ориентир:
-            Используй всё пространство ${count}x${count}, не оставляй пустых белых углов, если это не обосновано фоном.
-            Рисуй крупным планом: глаза должны занимать 2-3 строки, рот — широкую линию.
-            Используй 🟩 и 🟥 для передачи атмосферы (например, красный фон для ярости или зеленый для спокойствия), а не просто как отдельные точки.
-            
-            Перед выводом пересчитай, чтобы в каждой строке было ровно ${count} квадратов.
-            Возвращай ТОЛЬКО текст аватара (${count} строк × ${count} символов), без пояснений и оформления.
-        """.trimIndent()
     }
 
     companion object {

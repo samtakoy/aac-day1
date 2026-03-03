@@ -13,6 +13,7 @@ internal object LongTermMemoryEntityMapper {
         return LongTermMemoryFact(
             memoryKey = entity.memory.memoryKey,
             ltmGroupId = entity.memory.ltmGroupId,
+            categoryId = entity.memory.categoryId,
             category = entity.category.title,
             fact = entity.memory.fact,
             updatedAt = entity.memory.updatedAt

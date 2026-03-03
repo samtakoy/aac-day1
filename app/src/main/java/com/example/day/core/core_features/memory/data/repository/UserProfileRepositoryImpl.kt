@@ -31,6 +31,7 @@ internal class UserProfileRepositoryImpl @Inject constructor(
         return userProfileDao.getById(id)?.toDomain()
     }
 
+    // TODO Transaction
     override suspend fun deleteByName(name: String) {
         val entity = userProfileDao.getByTitle(name) ?: return
         // Delete LTM group first (CASCADE will clean up LTM facts)
@@ -53,6 +54,10 @@ internal class UserProfileRepositoryImpl @Inject constructor(
 
     override suspend fun updateTextAvatar(profileId: Long, avatar: String?) {
         userProfileDao.updateTextAvatar(profileId, avatar)
+    }
+
+    override suspend fun getAllProfiles(): List<UserProfile> {
+        return userProfileDao.getAllProfiles().map { it.toDomain() }
     }
 
     private fun UserProfileEntity.toDomain() = UserProfile(

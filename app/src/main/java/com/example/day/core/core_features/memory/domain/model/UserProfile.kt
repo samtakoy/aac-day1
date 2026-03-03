@@ -12,6 +12,7 @@ package com.example.day.core.core_features.memory.domain.model
 data class UserProfile(
     val id: Long,
     val title: String,
+    // TODO используй
     val ltmGroupId: Long,
     val textAvatar: String?
 )

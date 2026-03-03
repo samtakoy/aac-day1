@@ -29,6 +29,9 @@ internal interface LongTermMemoryDao {
     @Query("DELETE FROM long_term_memory WHERE memory_key = :key AND ltm_group_id = :ltmGroupId")
     suspend fun deleteByKeyAndGroup(key: String, ltmGroupId: Long)
 
+    @Query("DELETE FROM long_term_memory WHERE memory_key = :key AND category_id = :categoryId AND ltm_group_id = :ltmGroupId")
+    suspend fun deleteByKeyAndCategoryAndGroup(key: String, categoryId: Long, ltmGroupId: Long)
+
     @Query("DELETE FROM long_term_memory WHERE ltm_group_id = :ltmGroupId")
     suspend fun clearByGroup(ltmGroupId: Long)
 

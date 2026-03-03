@@ -19,6 +19,7 @@ import com.example.day.core.core_features.chat.domain.ChatRepository
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.data.local.mapper.ModelSettingsMapper
+import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryType
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.Flow
@@ -46,11 +47,12 @@ internal class AgentRepositoryImpl @Inject constructor(
         title: String,
         chatUserId: Long,
         isCommon: Boolean,
-        chatSettings: ChatSettings
+        systemPromt: String,
+        model: ModelSettings
     ): Long {
         // Convert ChatSettings to entity values
-        val modelSettingsJson = modelSettingsMapper.toJson(chatSettings.model)
-        val systemPrompt = chatSettings.systemPromt
+        val modelSettingsJson = modelSettingsMapper.toJson(model)
+        val systemPrompt = systemPromt
         
         val entity = AgentEntity(
             systemName = systemName,
@@ -184,15 +186,16 @@ internal class AgentRepositoryImpl @Inject constructor(
     
     override suspend fun getOrCreateAgent(
         systemName: String,
-        isCommon: Boolean,
-        chatSettings: ChatSettings
+        chatId: Long,
+        systemPromt: String,
+        model: ModelSettings
     ): AgentConfig {
-        return if (isCommon) {
-            // ЛОГИКА 1: Общие агенты (isCommon = true)
+        return if (chatId == 0L) {
+            // ЛОГИКА 1: Общие агенты
             getOrCreateCommonAgent(systemName)
         } else {
-            // ЛОГИКА 2: Чат-специфичные агенты (isCommon = false)
-            getOrCreateChatSpecificAgent(systemName, chatSettings.chatId, chatSettings)
+            // ЛОГИКА 2: Чат-специфичные агенты
+            getOrCreateChatSpecificAgent(systemName, chatId, systemPromt, model)
         }
     }
     
@@ -219,7 +222,8 @@ internal class AgentRepositoryImpl @Inject constructor(
     private suspend fun getOrCreateChatSpecificAgent(
         systemName: String, 
         chatId: Long,
-        chatSettings: ChatSettings?
+        systemPromt: String,
+        model: ModelSettings
     ): AgentConfig {
         // 1. Искать агента по systemName + chatId
         val existingAgent = agentToChatDao.getAgentBySystemNameAndChatId(systemName, chatId)
@@ -230,28 +234,15 @@ internal class AgentRepositoryImpl @Inject constructor(
         // 2. Создать нового чат-специфичного агента
         val botUser = chatRepository.getOrCreateDefaultUsers().second
         
-        val newAgentId = if (chatSettings != null) {
-            // Используем ChatSettings если передан
-            createAgent(
-                systemName = systemName,
-                title = systemName,
-                chatUserId = botUser.id,
-                isCommon = false,
-                chatSettings = chatSettings
-            )
-        } else {
-            // TODO такого выбора не будет (и common агент - сейчас буддет работать некорректно)
-            // Получаем ChatSettings из чата
-            val settings = chatRepository.getChatSettings(chatId)
-            createAgent(
-                systemName = systemName,
-                title = systemName,
-                chatUserId = botUser.id,
-                isCommon = false,
-                chatSettings = settings ?: throw IllegalStateException("Chat settings not found for chat $chatId")
-            )
-        }
-        
+        val newAgentId = createAgent(
+            systemName = systemName,
+            title = systemName,
+            chatUserId = botUser.id,
+            isCommon = false,
+            systemPromt = systemPromt,
+            model = model
+        )
+
         // 3. Обязательно привязать к чату
         bindAgentToChat(newAgentId, chatId)
         

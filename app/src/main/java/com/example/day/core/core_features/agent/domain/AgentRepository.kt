@@ -3,6 +3,7 @@ package com.example.day.core.core_features.agent.domain
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryType
 import kotlinx.coroutines.flow.Flow
 
@@ -23,7 +24,8 @@ interface AgentRepository {
         title: String,
         chatUserId: Long,
         isCommon: Boolean,
-        chatSettings: ChatSettings
+        systemPromt: String,
+        model: ModelSettings
     ): Long
     
     /**
@@ -120,14 +122,16 @@ interface AgentRepository {
      * 
      * @param systemName system name of the agent
      * @param isCommon if true, agent can be used in any chat without binding
-     * @param chatId chat id to bind agent to (if isCommon = false)
-     * @param chatSettings settings from the chat (modelSettings, systemPrompt)
+     * @param chatId chat id to bind agent to (0 для агента не привязанного к чату)
+     * @param systemPromt agent system prompt
+     * @param model настройки llm бота
      * @return existing or newly created Agent
      */
     suspend fun getOrCreateAgent(
         systemName: String,
-        isCommon: Boolean,
-        chatSettings: ChatSettings
+        chatId: Long,
+        systemPromt: String,
+        model: ModelSettings
     ): AgentConfig
 
     // === Agent Memory Types ===

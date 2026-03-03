@@ -3,6 +3,7 @@ package com.example.day.core.core_features.agent.domain.usecase
 import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import javax.inject.Inject
 
 /**
@@ -31,13 +32,15 @@ class GetOrCreateAgentUseCase @Inject constructor(
      */
     suspend operator fun invoke(
         systemName: String,
-        isCommon: Boolean,
-        chatSettings: ChatSettings
+        chatId: Long,
+        systemPromt: String,
+        model: ModelSettings
     ): AgentConfig {
         return repository.getOrCreateAgent(
             systemName = systemName,
-            isCommon = isCommon,
-            chatSettings = chatSettings
+            chatId = chatId,
+            systemPromt = systemPromt,
+            model = model
         )
     }
 }

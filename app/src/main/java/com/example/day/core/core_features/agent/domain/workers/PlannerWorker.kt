@@ -81,9 +81,7 @@ class PlannerWorker @Inject constructor(
 
         // Get agent and process message
         val agent = aiAgentFactory.getOrCreate(
-            systemName = AGENT_NAME,
-            isCommonAgent = false,
-            chat = chat
+            AGENT_NAME, chat.id, chat.settings.systemPromt, chat.settings.model
         )
 
         // Process the message
