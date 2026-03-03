@@ -35,5 +35,5 @@ internal data class UserProfileEntity(
     val memoryGroupId: Long,
 
     @ColumnInfo(name = "text_avatar")
-    val textAvatar: Long,
+    val textAvatar: String? = null,
 )

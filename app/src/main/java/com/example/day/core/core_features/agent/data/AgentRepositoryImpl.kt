@@ -281,4 +281,11 @@ internal class AgentRepositoryImpl @Inject constructor(
             addMemoryType(agentId, type)
         }
     }
+
+    override suspend fun getMemoryTypes(agentId: Long): List<MemoryType> {
+        val dbNames = agentMemoryDao.getMemoryTypesForAgent(agentId)
+        return dbNames.mapNotNull { dbName ->
+            MemoryType.entries.find { it.dbName == dbName }
+        }
+    }
 }

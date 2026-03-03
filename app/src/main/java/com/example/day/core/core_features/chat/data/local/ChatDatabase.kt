@@ -11,6 +11,7 @@ import com.example.day.core.core_features.agent.data.local.model.AgentToChatEnti
 import com.example.day.core.core_features.agent.data.local.model.AgentContextMemoryEntity
 import com.example.day.core.core_features.agent.data.local.model.AgentToMemoryTypeEntity
 import com.example.day.core.core_features.memory.data.local.dao.ArtifactDao
+import com.example.day.core.core_features.memory.data.local.dao.UserProfileDao
 import com.example.day.core.core_features.memory.data.local.dao.LTMCategoryDao
 import com.example.day.core.core_features.memory.data.local.dao.LTMGroupDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatDao
@@ -58,7 +59,7 @@ import com.example.day.core.core_features.memory.data.local.model.user.UserProfi
         LTMGroupToUserProfileEntity::class,
         UserToProfileEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 internal abstract class ChatDatabase : RoomDatabase() {
@@ -77,4 +78,5 @@ internal abstract class ChatDatabase : RoomDatabase() {
     abstract fun ltmCategoryDao(): LTMCategoryDao
     abstract fun longTermMemoryDao(): LongTermMemoryDao
     abstract fun artifactDao(): ArtifactDao
+    abstract fun userProfileDao(): UserProfileDao
 }

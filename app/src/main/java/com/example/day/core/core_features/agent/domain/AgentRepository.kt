@@ -138,4 +138,7 @@ interface AgentRepository {
 
     // Атомарное обновление всех типов (например, из экрана настроек)
     suspend fun updateAgentMemories(agentId: Long, types: List<MemoryType>)
+
+    /** Returns list of memory types currently assigned to agent. */
+    suspend fun getMemoryTypes(agentId: Long): List<MemoryType>
 }

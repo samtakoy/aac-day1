@@ -5,7 +5,9 @@ import com.example.day.core.core_features.memory.domain.provider.EmptyMemoryProv
 import com.example.day.core.core_features.memory.domain.provider.UserProfileMemoryProvider
 import javax.inject.Inject
 
-class MemoryProviderFactory @Inject constructor() {
+class MemoryProviderFactory @Inject constructor(
+    private val userProfileMemoryProvider: UserProfileMemoryProvider
+) {
     fun create(
         memoryTypes: List<MemoryType>,
         chatId: Long,
@@ -21,7 +23,7 @@ class MemoryProviderFactory @Inject constructor() {
 
     private fun createProviderByType(type: MemoryType): MemoryProvider? {
         return when (type) {
-            MemoryType.UserProfile -> UserProfileMemoryProvider()
+            MemoryType.UserProfile -> userProfileMemoryProvider
             MemoryType.Chat -> null
             MemoryType.ChatGroup -> null
         }

@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.example.day.core.core_features.chat.data.ChatRepositoryImpl
 import com.example.day.core.core_features.chat.data.local.ChatDatabase
 import com.example.day.core.core_features.memory.data.local.dao.ArtifactDao
+import com.example.day.core.core_features.memory.data.local.dao.UserProfileDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatGroupDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatSettingsDao
@@ -38,6 +39,7 @@ internal interface ChatCoreFeatureModule {
                 ChatDatabase::class.java,
                 "chat_database.db"
             )
+                .fallbackToDestructiveMigration()
                 .build()
         }
 
@@ -58,6 +60,9 @@ internal interface ChatCoreFeatureModule {
 
         @Provides
         internal fun provideChatSettingsDao(db: ChatDatabase): ChatSettingsDao = db.chatSettingsDao()
+
+        @Provides
+        internal fun provideUserProfileDao(db: ChatDatabase): UserProfileDao = db.userProfileDao()
 
     }
 }

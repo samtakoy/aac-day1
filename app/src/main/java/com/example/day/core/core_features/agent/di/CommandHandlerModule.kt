@@ -4,9 +4,11 @@ import com.example.day.core.core_features.agent.domain.workers.branch.DeleteBran
 import com.example.day.core.core_features.agent.domain.workers.branch.ListBranchesCommandHandler
 import com.example.day.core.core_features.agent.domain.workers.branch.NewBranchCommandHandler
 import com.example.day.core.core_features.agent.domain.workers.branch.SwitchBranchCommandHandler
+import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.AgentMemoryCommandHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.CommandHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.ContextCommandHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.InfoCommandHandler
+import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.ProfileCommandHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.setup.SetupBranchingHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.setup.SetupSlidingWindowHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.setup.SetupStickyFactsHandler
@@ -57,4 +59,12 @@ abstract class CommandHandlerModule {
     @Binds
     @IntoSet
     abstract fun bindDeleteBranchHandler(handler: DeleteBranchCommandHandler): CommandHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindProfileHandler(handler: ProfileCommandHandler): CommandHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindAgentMemoryHandler(handler: AgentMemoryCommandHandler): CommandHandler
 }
