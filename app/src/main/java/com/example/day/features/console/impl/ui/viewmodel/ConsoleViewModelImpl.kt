@@ -7,13 +7,13 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
-import com.example.day.core.core_features.chat.domain.model.LongTermMemory
+import com.example.day.core.core_features.memory.domain.model.LongTermMemoryFact
 import com.example.day.core.core_features.chat.domain.usecase.ClearChatNotViewedMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerStageChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatByIdAsFlowUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsFlowUseCase
-import com.example.day.core.core_features.chat.domain.repository.ArtifactRepository
-import com.example.day.core.core_features.chat.domain.usecase.GetLongTermMemoryByGroupUseCase
+import com.example.day.core.core_features.memory.domain.repository.ArtifactRepository
+import com.example.day.core.core_features.memory.domain.usecase.GetLongTermMemoryByGroupUseCase
 import com.example.day.core.core_features.chat.domain.usecase.UpdateChatSettingsUseCase
 import com.example.day.core.core_features.chat.domain.usecase.UpdateChatTitleUseCase
 import com.example.day.core.ui.uikit.chat.bar.model.ChatBarUiModel
@@ -74,7 +74,7 @@ internal class ConsoleViewModelImpl(
 
     private var chat: Chat? = null
     private var chatSettings: ChatSettings? = null
-    private var currentLtmFacts: List<LongTermMemory> = emptyList()
+    private var currentLtmFacts: List<LongTermMemoryFact> = emptyList()
 
     private val _expandedStates = MutableStateFlow(persistentMapOf<Long, Boolean>())
 

@@ -1,22 +1,25 @@
 package com.example.day.core.core_features.agent.data
 
+import androidx.room.Transaction
 import com.example.day.core.core_features.agent.data.local.dao.AgentDao
+import com.example.day.core.core_features.agent.data.local.dao.AgentMemoryDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentToChatDao
-import com.example.day.core.core_features.agent.data.local.mapper.AgentContextMapper
 import com.example.day.core.core_features.agent.data.local.mapper.AgentMapper
 import com.example.day.core.core_features.agent.data.local.model.AgentEntity
 import com.example.day.core.core_features.agent.data.local.model.AgentToChatEntity
+import com.example.day.core.core_features.agent.data.local.model.AgentToMemoryTypeEntity
 import com.example.day.core.core_features.agent.data.local.model.StrategyTypeEntity
-import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
-import com.example.day.core.core_features.agent.domain.model.AgentConfig
+import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.model.AContext
 import com.example.day.core.core_features.agent.domain.model.AContextParams
 import com.example.day.core.core_features.agent.domain.model.AContextState
+import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.chat.domain.ChatRepository
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.data.local.mapper.ModelSettingsMapper
+import com.example.day.core.core_features.memory.domain.provider.base.MemoryType
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -28,6 +31,7 @@ import javax.inject.Inject
 internal class AgentRepositoryImpl @Inject constructor(
     private val agentDao: AgentDao,
     private val agentToChatDao: AgentToChatDao,
+    private val agentMemoryDao: AgentMemoryDao,
     private val agentContextRepository: AgentContextRepository,
     // TODO use chat dao
     private val chatRepository: ChatRepository,
@@ -104,7 +108,7 @@ internal class AgentRepositoryImpl @Inject constructor(
     }
     
     override suspend fun getAgentById(agentId: Long): AgentConfig? {
-        return agentDao.getById(agentId)?.let(agentMapper::toDomain)
+        return agentDao.getByIdWithMemories(agentId)?.let(agentMapper::toDomain)
     }
     
     override fun getAgentByIdAsFlow(agentId: Long): Flow<AgentConfig?> {
@@ -155,7 +159,7 @@ internal class AgentRepositoryImpl @Inject constructor(
     override fun getAgentsForChat(chatId: Long): Flow<List<AgentConfig>> {
         return agentToChatDao.getAgentsForChat(chatId).map { agentIds ->
             agentIds.mapNotNull { agentId ->
-                agentDao.getById(agentId)?.let(agentMapper::toDomain)
+                agentDao.getByIdWithMemories(agentId)?.let(agentMapper::toDomain)
             }
         }
     }
@@ -181,7 +185,6 @@ internal class AgentRepositoryImpl @Inject constructor(
     override suspend fun getOrCreateAgent(
         systemName: String,
         isCommon: Boolean,
-        chatId: Long,
         chatSettings: ChatSettings
     ): AgentConfig {
         return if (isCommon) {
@@ -189,7 +192,7 @@ internal class AgentRepositoryImpl @Inject constructor(
             getOrCreateCommonAgent(systemName)
         } else {
             // ЛОГИКА 2: Чат-специфичные агенты (isCommon = false)
-            getOrCreateChatSpecificAgent(systemName, chatId, chatSettings)
+            getOrCreateChatSpecificAgent(systemName, chatSettings.chatId, chatSettings)
         }
     }
     
@@ -254,5 +257,28 @@ internal class AgentRepositoryImpl @Inject constructor(
         
         return getAgentById(newAgentId) 
             ?: throw IllegalStateException("Failed to create chat-specific agent")
+    }
+
+    // ===== Agent Memory =====
+
+    override suspend fun addMemoryType(agentId: Long, type: MemoryType) {
+        val entity = AgentToMemoryTypeEntity(
+            agentId = agentId,
+            memoryType = type.dbName
+        )
+        agentMemoryDao.addMemoryTypeToAgent(entity)
+    }
+
+    override suspend fun removeMemoryType(agentId: Long, type: MemoryType) {
+        agentMemoryDao.removeMemoryTypeFromAgent(agentId, type.dbName)
+    }
+
+    // Атомарное обновление всех типов (например, из экрана настроек)
+    @Transaction
+    override suspend fun updateAgentMemories(agentId: Long, types: List<MemoryType>) {
+        agentMemoryDao.clearAgentMemories(agentId)
+        types.forEach { type ->
+            addMemoryType(agentId, type)
+        }
     }
 }

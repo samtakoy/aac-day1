@@ -1,4 +1,4 @@
-package com.example.day.core.core_features.chat.domain.model
+package com.example.day.core.core_features.memory.domain.model
 
 /**
  * Domain model representing a completed stage artifact.

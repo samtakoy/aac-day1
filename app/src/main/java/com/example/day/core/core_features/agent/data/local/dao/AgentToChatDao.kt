@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.example.day.core.core_features.agent.data.local.model.AgentEntity
 import com.example.day.core.core_features.agent.data.local.model.AgentToChatEntity
+import com.example.day.core.core_features.agent.data.local.model.relation.AgentWithMemoriesRelation
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -62,5 +63,5 @@ internal interface AgentToChatDao {
         AND atc.chat_id = :chatId
         LIMIT 1
     """)
-    suspend fun getAgentBySystemNameAndChatId(systemName: String, chatId: Long): AgentEntity?
+    suspend fun getAgentBySystemNameAndChatId(systemName: String, chatId: Long): AgentWithMemoriesRelation?
 }

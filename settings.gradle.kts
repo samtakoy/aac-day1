@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "day1_kimi"
+rootProject.name = "day1_current"
 include(":app")
  

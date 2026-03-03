@@ -2,6 +2,7 @@ package com.example.day.core.core_features.agent.domain.model
 
 import com.example.day.core.core_features.agent.domain.strategy.CtxStrategyType
 import com.example.day.core.core_features.llm.domain.model.ModelSettings
+import com.example.day.core.core_features.memory.domain.provider.base.MemoryType
 
 /**
  * Domain model representing an Agent settings in the system.
@@ -11,6 +12,7 @@ import com.example.day.core.core_features.llm.domain.model.ModelSettings
  * @property title Display title of the agent
  * @property chatUserId Reference to UserEntity that represents this agent in chats (avatar)
  * @property isCommon If true (1), agent can be used in any chat without explicit binding
+ * @property memoryTypes какие типы памяти использует агент
  */
 data class AgentConfig(
     val id: Long = 0,
@@ -24,4 +26,5 @@ data class AgentConfig(
     val systemPrompt: String,
     /** тип стратегии по работе с контекстом - enum class Full, Summarization, SlidingWindow */
     val contextStrategyType: CtxStrategyType,
+    val memoryTypes: List<MemoryType>
 )

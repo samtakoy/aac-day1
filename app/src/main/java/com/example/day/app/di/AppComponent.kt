@@ -6,6 +6,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.example.day.core.core_features.agent.di.AgentCoreFeatureModule
 import com.example.day.core.core_features.chat.di.ChatCoreFeatureModule
 import com.example.day.core.core_features.llm.di.LlmCoreFeatureModule
+import com.example.day.core.core_features.memory.di.MemoryCoreFeatureModule
 import com.example.day.core.di.NetworkModule
 import com.example.day.core.feature_entries.FeatureEntryProvider
 import com.example.day.features.chats.impl.di.ChatsFeatureDeps
@@ -23,6 +24,7 @@ import javax.inject.Singleton
     modules = [
         NetworkModule::class,
         ChatCoreFeatureModule::class,
+        MemoryCoreFeatureModule::class,
         AgentCoreFeatureModule::class,
         ConsoleFeatureApiModule::class,
         ChatsFeatureApiModule::class,

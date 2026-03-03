@@ -1,9 +1,9 @@
-package com.example.day.core.core_features.chat.data.repository
+package com.example.day.core.core_features.memory.data.repository
 
-import com.example.day.core.core_features.chat.data.local.dao.ArtifactDao
-import com.example.day.core.core_features.chat.data.local.model.ProjectArtifactEntity
-import com.example.day.core.core_features.chat.domain.model.Artifact
-import com.example.day.core.core_features.chat.domain.repository.ArtifactRepository
+import com.example.day.core.core_features.memory.data.local.dao.ArtifactDao
+import com.example.day.core.core_features.memory.data.local.model.ProjectArtifactEntity
+import com.example.day.core.core_features.memory.domain.model.Artifact
+import com.example.day.core.core_features.memory.domain.repository.ArtifactRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject

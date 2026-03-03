@@ -4,26 +4,36 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.example.day.core.core_features.agent.data.local.dao.AgentDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentContextMemoryDao
+import com.example.day.core.core_features.agent.data.local.dao.AgentMemoryDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentToChatDao
 import com.example.day.core.core_features.agent.data.local.model.AgentEntity
 import com.example.day.core.core_features.agent.data.local.model.AgentToChatEntity
 import com.example.day.core.core_features.agent.data.local.model.AgentContextMemoryEntity
-import com.example.day.core.core_features.chat.data.local.dao.ArtifactDao
+import com.example.day.core.core_features.agent.data.local.model.AgentToMemoryTypeEntity
+import com.example.day.core.core_features.memory.data.local.dao.ArtifactDao
+import com.example.day.core.core_features.memory.data.local.dao.LTMCategoryDao
+import com.example.day.core.core_features.memory.data.local.dao.LTMGroupDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatGroupDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatSettingsDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatTypeDao
-import com.example.day.core.core_features.chat.data.local.dao.LongTermMemoryDao
+import com.example.day.core.core_features.memory.data.local.dao.LongTermMemoryDao
 import com.example.day.core.core_features.chat.data.local.dao.MessageDao
 import com.example.day.core.core_features.chat.data.local.dao.UserDao
 import com.example.day.core.core_features.chat.data.local.model.ChatEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatGroupEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatSettingsEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatTypeEntity
-import com.example.day.core.core_features.chat.data.local.model.LongTermMemoryEntity
+import com.example.day.core.core_features.memory.data.local.model.LTMCategoryEntity
+import com.example.day.core.core_features.memory.data.local.model.LTMGroupEntity
+import com.example.day.core.core_features.memory.data.local.model.LongTermMemoryEntity
 import com.example.day.core.core_features.chat.data.local.model.MessageEntity
-import com.example.day.core.core_features.chat.data.local.model.ProjectArtifactEntity
+import com.example.day.core.core_features.memory.data.local.model.ProjectArtifactEntity
 import com.example.day.core.core_features.chat.data.local.model.UserEntity
+import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupToChatGroupEntity
+import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupToUserProfileEntity
+import com.example.day.core.core_features.memory.data.local.model.link.UserToProfileEntity
+import com.example.day.core.core_features.memory.data.local.model.user.UserProfileEntity
 
 @Database(
     entities = [
@@ -36,10 +46,19 @@ import com.example.day.core.core_features.chat.data.local.model.UserEntity
         AgentEntity::class,
         AgentToChatEntity::class,
         AgentContextMemoryEntity::class,
+        AgentToMemoryTypeEntity::class,
+        // Memory entities
+        LTMGroupEntity::class,
+        LTMCategoryEntity::class,
         LongTermMemoryEntity::class,
-        ProjectArtifactEntity::class
+        ProjectArtifactEntity::class,
+        UserProfileEntity::class,
+        // Link entities
+        LTMGroupToChatGroupEntity::class,
+        LTMGroupToUserProfileEntity::class,
+        UserToProfileEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 internal abstract class ChatDatabase : RoomDatabase() {
@@ -50,8 +69,12 @@ internal abstract class ChatDatabase : RoomDatabase() {
     abstract fun chatGroupDao(): ChatGroupDao
     abstract fun chatSettingsDao(): ChatSettingsDao
     abstract fun agentDao(): AgentDao
+    abstract fun agentMemoryDao(): AgentMemoryDao
     abstract fun agentToChatDao(): AgentToChatDao
     abstract fun agentContextMemoryDao(): AgentContextMemoryDao
+    // Memory DAOs
+    abstract fun ltmGroupDao(): LTMGroupDao
+    abstract fun ltmCategoryDao(): LTMCategoryDao
     abstract fun longTermMemoryDao(): LongTermMemoryDao
     abstract fun artifactDao(): ArtifactDao
 }

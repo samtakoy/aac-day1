@@ -1,8 +1,10 @@
 package com.example.day.core.core_features.agent.data.local.mapper
 
 import com.example.day.core.core_features.agent.data.local.model.AgentEntity
+import com.example.day.core.core_features.agent.data.local.model.relation.AgentWithMemoriesRelation
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.llm.data.local.mapper.ModelSettingsMapper
+import com.example.day.core.core_features.memory.domain.provider.base.MemoryType
 import javax.inject.Inject
 
 /**
@@ -18,16 +20,17 @@ internal class AgentMapper @Inject constructor(
         const val IS_COMMON_FALSE = 0
     }
     
-    fun toDomain(entity: AgentEntity): AgentConfig {
+    fun toDomain(entity: AgentWithMemoriesRelation): AgentConfig {
         return AgentConfig(
-            id = entity.id,
-            systemName = entity.systemName,
-            title = entity.title,
-            chatUserId = entity.chatUserId,
-            isCommon = entity.isCommon == IS_COMMON_TRUE,
-            modelSettings = modelSettingsMapper.fromJson(entity.modelSettings),
-            systemPrompt = entity.systemPrompt,
-            contextStrategyType = strategyTypeMapper.toDomain(entity.contextStrategyType)
+            id = entity.agent.id,
+            systemName = entity.agent.systemName,
+            title = entity.agent.title,
+            chatUserId = entity.agent.chatUserId,
+            isCommon = entity.agent.isCommon == IS_COMMON_TRUE,
+            modelSettings = modelSettingsMapper.fromJson(entity.agent.modelSettings),
+            systemPrompt = entity.agent.systemPrompt,
+            contextStrategyType = strategyTypeMapper.toDomain(entity.agent.contextStrategyType),
+            memoryTypes = memoryTypesToDomain(entity.memoryTypeNames)
         )
     }
     
@@ -42,5 +45,15 @@ internal class AgentMapper @Inject constructor(
             systemPrompt = agentConfig.systemPrompt,
             contextStrategyType = strategyTypeMapper.toEntity(agentConfig.contextStrategyType)
         )
+    }
+
+    private fun memoryTypesToDomain(types: List<String>): List<MemoryType> {
+        return types.mapNotNull { dbName ->
+            try {
+                MemoryType.entries.find { it.dbName == dbName }
+            } catch (_: Exception) {
+                null
+            }
+        }
     }
 }

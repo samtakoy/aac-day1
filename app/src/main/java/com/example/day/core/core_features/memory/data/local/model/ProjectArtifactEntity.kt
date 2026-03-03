@@ -1,10 +1,11 @@
-package com.example.day.core.core_features.chat.data.local.model
+package com.example.day.core.core_features.memory.data.local.model
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.day.core.core_features.chat.data.local.model.ChatEntity
 
 /**
  * Stores final results/outcomes from completed stage chats.

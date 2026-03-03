@@ -47,7 +47,6 @@ class SetupSummarizationHandler @Inject constructor(
         agentRepository.getOrCreateAgent(
             systemName = AGENT_NAME,
             isCommon = false,
-            chatId = chat.id,
             chatSettings = chat.settings
         )
 

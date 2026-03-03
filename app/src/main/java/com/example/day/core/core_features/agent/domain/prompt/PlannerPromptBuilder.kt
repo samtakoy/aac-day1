@@ -1,6 +1,6 @@
 package com.example.day.core.core_features.agent.domain.prompt
 
-import com.example.day.core.core_features.chat.domain.model.LongTermMemory
+import com.example.day.core.core_features.memory.domain.model.LongTermMemoryFact
 
 /**
  * Builds system prompts for Planner mode with memory injection.
@@ -13,7 +13,7 @@ object PlannerPromptBuilder {
      * This is where the project is defined and stages are planned.
      */
     fun buildMainPlannerPrompt(
-        ltmFacts: List<LongTermMemory>,
+        ltmFacts: List<LongTermMemoryFact>,
         projectContext: String? = null
     ): String {
         val ltmSection = buildLTMSection(ltmFacts)
@@ -86,7 +86,7 @@ You can use special markers to perform actions:
     fun buildStagePrompt(
         stageTitle: String,
         parentSummary: String?,
-        ltmFacts: List<LongTermMemory>
+        ltmFacts: List<LongTermMemoryFact>
     ): String {
         val ltmSection = buildLTMSection(ltmFacts)
 
@@ -139,7 +139,7 @@ You can use special markers:
     /**
      * Build the LTM section of the prompt.
      */
-    private fun buildLTMSection(facts: List<LongTermMemory>): String {
+    private fun buildLTMSection(facts: List<LongTermMemoryFact>): String {
         if (facts.isEmpty()) {
             return "(No long-term memory yet. You can add facts using SAVE_FACT[key:category:fact])"
         }
@@ -153,7 +153,7 @@ You can use special markers:
      * Inject LTM into an existing system prompt.
      * Replaces {{LTM_CONTEXT}} placeholder or appends to the end.
      */
-    fun injectLTMIntoPrompt(basePrompt: String, facts: List<LongTermMemory>): String {
+    fun injectLTMIntoPrompt(basePrompt: String, facts: List<LongTermMemoryFact>): String {
         val ltmSection = buildLTMSection(facts)
 
         return if (basePrompt.contains("{{LTM_CONTEXT}}")) {

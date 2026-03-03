@@ -32,13 +32,11 @@ class GetOrCreateAgentUseCase @Inject constructor(
     suspend operator fun invoke(
         systemName: String,
         isCommon: Boolean,
-        chatId: Long,
         chatSettings: ChatSettings
     ): AgentConfig {
         return repository.getOrCreateAgent(
             systemName = systemName,
             isCommon = isCommon,
-            chatId = chatId,
             chatSettings = chatSettings
         )
     }

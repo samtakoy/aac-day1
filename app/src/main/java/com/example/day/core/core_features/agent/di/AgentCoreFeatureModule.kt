@@ -4,9 +4,8 @@ import com.example.day.core.core_features.agent.data.AgentContextRepositoryImpl
 import com.example.day.core.core_features.agent.data.AgentRepositoryImpl
 import com.example.day.core.core_features.agent.data.local.dao.AgentDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentContextMemoryDao
+import com.example.day.core.core_features.agent.data.local.dao.AgentMemoryDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentToChatDao
-import com.example.day.core.core_features.agent.data.local.mapper.AgentMapper
-import com.example.day.core.core_features.agent.data.local.mapper.CtxStrategyTypeMapper
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.AgentRepository
@@ -15,11 +14,12 @@ import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentToolsImpl
 import com.example.day.core.core_features.chat.data.local.ChatDatabase
 import com.example.day.core.core_features.chat.domain.ChatRepository
-import com.example.day.core.core_features.chat.domain.repository.ArtifactRepository
-import com.example.day.core.core_features.chat.domain.repository.LongTermMemoryRepository
+import com.example.day.core.core_features.memory.domain.repository.ArtifactRepository
+import com.example.day.core.core_features.memory.domain.repository.LongTermMemoryRepository
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.tools.ChatToolsImpl
-import com.example.day.core.core_features.llm.data.local.mapper.ModelSettingsMapper
+import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerGroupWithMainChatUseCase
+import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerStageChatUseCase
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -28,12 +28,6 @@ import javax.inject.Singleton
 /**
  * Dagger module for Agent feature dependency injection.
  *
- * Содержит привязки для:
- * - AgentTools / AgentToolsImpl
- * - ChatTools / ChatToolsImpl
- * - ContextFormatter / ContextFormatterImpl
- * - Все Workers (SimpleWorker, StepWorker, etc.)
- * - CompressionStrategy / SummarizationStrategy
  */
 @Module(
     includes = [
@@ -63,28 +57,14 @@ internal interface AgentCoreFeatureModule {
 
         @Provides
         @Singleton
+        internal fun provideAgentMemoryDao(db: ChatDatabase): AgentMemoryDao = db.agentMemoryDao()
+
+        @Provides
+        @Singleton
         internal fun provideAgentToChatDao(db: ChatDatabase): AgentToChatDao = db.agentToChatDao()
 
         @Provides
         @Singleton
         internal fun provideAgentContextMemoryDao(db: ChatDatabase): AgentContextMemoryDao = db.agentContextMemoryDao()
-
-        @Provides
-        @Singleton
-        internal fun providePlannerWorker(
-            aiAgentFactory: AIAgentFactory,
-            longTermMemoryRepository: LongTermMemoryRepository,
-            chatRepository: ChatRepository,
-            artifactRepository: ArtifactRepository,
-            chatTools: ChatTools
-        ): PlannerWorker {
-            return PlannerWorker(
-                aiAgentFactory = aiAgentFactory,
-                longTermMemoryRepository = longTermMemoryRepository,
-                chatRepository = chatRepository,
-                artifactRepository = artifactRepository,
-                chatTools = chatTools
-            )
-        }
     }
 }

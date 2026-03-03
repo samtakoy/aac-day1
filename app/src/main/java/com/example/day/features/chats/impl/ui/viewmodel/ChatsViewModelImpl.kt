@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
-import com.example.day.core.core_features.chat.domain.repository.ArtifactRepository
+import com.example.day.core.core_features.memory.domain.repository.ArtifactRepository
 import com.example.day.core.core_features.chat.domain.usecase.CreateChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatsByGroupUseCase
 import com.example.day.features.chats.impl.ui.viewmodel.ChatsViewModel.State

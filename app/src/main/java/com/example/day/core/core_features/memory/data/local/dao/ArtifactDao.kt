@@ -1,9 +1,9 @@
-package com.example.day.core.core_features.chat.data.local.dao
+package com.example.day.core.core_features.memory.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
-import com.example.day.core.core_features.chat.data.local.model.ProjectArtifactEntity
+import com.example.day.core.core_features.memory.data.local.model.ProjectArtifactEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

@@ -1,7 +1,7 @@
 package com.example.day.features.console.impl.di
 
 import com.example.day.core.core_features.agent.domain.usecase.GetAgentContextUseCase
-import com.example.day.core.core_features.chat.domain.repository.LongTermMemoryRepository
+import com.example.day.core.core_features.memory.domain.repository.LongTermMemoryRepository
 import com.example.day.core.core_features.agent.domain.utils.ConsumptionCalculator
 import com.example.day.core.core_features.agent.domain.workers.CompareWorker
 import com.example.day.core.core_features.agent.domain.workers.PlannerWorker
@@ -11,8 +11,7 @@ import com.example.day.core.core_features.agent.domain.workers.SimpleWorker
 import com.example.day.core.core_features.agent.domain.workers.StepWorker
 import com.example.day.core.core_features.agent.domain.workers.TalkWorker
 import com.example.day.core.core_features.agent.domain.workers.TeamWorker
-import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
-import com.example.day.core.core_features.chat.domain.repository.ArtifactRepository
+import com.example.day.core.core_features.memory.domain.repository.ArtifactRepository
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ChangeMessageStatusUseCase

@@ -1,6 +1,6 @@
-package com.example.day.core.core_features.chat.domain.repository
+package com.example.day.core.core_features.memory.domain.repository
 
-import com.example.day.core.core_features.chat.domain.model.Artifact
+import com.example.day.core.core_features.memory.domain.model.Artifact
 import kotlinx.coroutines.flow.Flow
 
 /**

@@ -9,6 +9,7 @@ import com.example.day.core.core_features.agent.domain.workers.base.askLlm
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.getContent
+import com.example.day.core.core_features.memory.domain.provider.base.MemoryProvider
 
 /**
  * Main AI Agent orchestrator.
@@ -21,7 +22,8 @@ class AIAgent(
     val config: AgentConfig,
     private val contextRepository: AgentContextRepository,
     private val llmProvider: LlmRequestUseCase,
-    private val strategy: ContextStrategy
+    private val strategy: ContextStrategy,
+    private val memoryProvider: MemoryProvider    // Долговременная + Рабочая
 ) {
 
     /**
@@ -37,8 +39,12 @@ class AIAgent(
         userPrompt: String,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ): Result<AIAgentResult> {
+        // 1. Получаем "знания" (LTM + Working Memory) в виде промптов
+        val memoryMessages = memoryProvider.getMemoryContext()
         val snapshot = strategy.process(chat, config, userPrompt, contextRepository)
-        val history = snapshot.messages.toModelRequestMessages()
+        // 3. Собираем итоговый пирог для LLM
+        // Порядок: System Prompt -> Memory (LTM/Working) -> History -> User Prompt
+        val history = (memoryMessages + snapshot.messages).toModelRequestMessages()
 
         return llmProvider.askLlm(
             chatSettings = chat,

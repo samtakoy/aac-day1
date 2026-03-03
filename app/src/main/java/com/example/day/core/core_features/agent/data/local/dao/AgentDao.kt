@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.example.day.core.core_features.agent.data.local.model.AgentEntity
+import com.example.day.core.core_features.agent.data.local.model.relation.AgentWithMemoriesRelation
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -29,25 +30,28 @@ internal interface AgentDao {
     
     @Query("SELECT * FROM agents WHERE id = :agentId LIMIT 1")
     suspend fun getById(agentId: Long): AgentEntity?
+
+    @Query("SELECT * FROM agents WHERE id = :agentId LIMIT 1")
+    suspend fun getByIdWithMemories(agentId: Long): AgentWithMemoriesRelation?
     
     @Query("SELECT * FROM agents WHERE id = :agentId LIMIT 1")
-    fun getByIdAsFlow(agentId: Long): Flow<AgentEntity?>
+    fun getByIdAsFlow(agentId: Long): Flow<AgentWithMemoriesRelation?>
     
     @Query("SELECT * FROM agents ORDER BY id ASC")
-    fun getAll(): Flow<List<AgentEntity>>
+    fun getAll(): Flow<List<AgentWithMemoriesRelation>>
     
     @Query("SELECT * FROM agents WHERE is_common = 1 ORDER BY id ASC")
-    fun getCommonAgents(): Flow<List<AgentEntity>>
+    fun getCommonAgents(): Flow<List<AgentWithMemoriesRelation>>
     
     @Query("SELECT * FROM agents WHERE chat_user_id = :chatUserId LIMIT 1")
-    suspend fun getByChatUserId(chatUserId: Long): AgentEntity?
+    suspend fun getByChatUserId(chatUserId: Long): AgentWithMemoriesRelation?
     
     /**
      * Get common agent by system name only.
      * Used when isCommon = true
      */
     @Query("SELECT * FROM agents WHERE system_name = :systemName AND is_common = 1 LIMIT 1")
-    suspend fun getCommonAgentBySystemName(systemName: String): AgentEntity?
+    suspend fun getCommonAgentBySystemName(systemName: String): AgentWithMemoriesRelation?
     
     /**
      * Get agent by system name and isCommon flag.

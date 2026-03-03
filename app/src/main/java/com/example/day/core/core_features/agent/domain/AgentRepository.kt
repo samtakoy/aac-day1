@@ -1,9 +1,9 @@
 package com.example.day.core.core_features.agent.domain
 
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
-import com.example.day.core.core_features.agent.domain.model.AContext
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
+import com.example.day.core.core_features.memory.domain.provider.base.MemoryType
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -127,7 +127,15 @@ interface AgentRepository {
     suspend fun getOrCreateAgent(
         systemName: String,
         isCommon: Boolean,
-        chatId: Long,
         chatSettings: ChatSettings
     ): AgentConfig
+
+    // === Agent Memory Types ===
+
+    suspend fun addMemoryType(agentId: Long, type: MemoryType)
+
+    suspend fun removeMemoryType(agentId: Long, type: MemoryType)
+
+    // Атомарное обновление всех типов (например, из экрана настроек)
+    suspend fun updateAgentMemories(agentId: Long, types: List<MemoryType>)
 }

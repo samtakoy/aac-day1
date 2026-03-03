@@ -2,8 +2,10 @@ package com.example.day.core.core_features.agent.domain
 
 import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
 import com.example.day.core.core_features.agent.domain.usecase.GetOrCreateAgentUseCase
+import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
+import com.example.day.core.core_features.memory.domain.provider.base.MemoryProviderFactory
 import javax.inject.Inject
 
 /**
@@ -13,22 +15,32 @@ import javax.inject.Inject
 class AIAgentFactory @Inject constructor(
     private val getOrCreateAgentUseCase: GetOrCreateAgentUseCase,
     private val strategyFactory: StrategyFactory,
+    private val memoryProviderFactory: MemoryProviderFactory,
     private val contextRepository: AgentContextRepository,
     private val llmRequestUseCase: LlmRequestUseCase
 ) {
     suspend fun getOrCreate(
         systemName: String,
-        chatId: Long,
         isCommonAgent: Boolean,
-        chatSettings: ChatSettings
+        chat: Chat
     ): AIAgent {
         val config = getOrCreateAgentUseCase(
             systemName = systemName,
             isCommon = isCommonAgent,
-            chatId = chatId,
-            chatSettings = chatSettings
+            chatSettings = chat.settings
         )
         val strategy = strategyFactory.create(config.contextStrategyType)
-        return AIAgent(config, contextRepository, llmRequestUseCase, strategy)
+        val memoryProvider = memoryProviderFactory.create(
+            memoryTypes = config.memoryTypes,
+            chatId = chat.id,
+            chatGroupId = chat.chatGroup.id
+        )
+        return AIAgent(
+            config,
+            contextRepository,
+            llmRequestUseCase,
+            strategy,
+            memoryProvider
+        )
     }
 }

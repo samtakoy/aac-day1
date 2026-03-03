@@ -7,8 +7,9 @@ import com.example.day.core.core_features.agent.domain.prompt.PlannerPromptBuild
 import com.example.day.core.core_features.agent.domain.tools.ToolResponseParser
 import com.example.day.core.core_features.chat.domain.ChatRepository
 import com.example.day.core.core_features.chat.domain.model.Chat
-import com.example.day.core.core_features.chat.domain.repository.ArtifactRepository
-import com.example.day.core.core_features.chat.domain.repository.LongTermMemoryRepository
+import com.example.day.core.core_features.memory.domain.repository.ArtifactRepository
+import com.example.day.core.core_features.memory.domain.usecase.GetFactsByChatGroupUseCase
+import com.example.day.core.core_features.memory.domain.usecase.UpsertFactWithCategoryUseCase
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import javax.inject.Inject
 
@@ -29,7 +30,8 @@ import javax.inject.Inject
  */
 class PlannerWorker @Inject constructor(
     private val aiAgentFactory: AIAgentFactory,
-    private val longTermMemoryRepository: LongTermMemoryRepository,
+    private val getFactsByChatGroupUseCase: GetFactsByChatGroupUseCase,
+    private val upsertFactWithCategoryUseCase: UpsertFactWithCategoryUseCase,
     private val chatRepository: ChatRepository,
     private val artifactRepository: ArtifactRepository,
     private val chatTools: ChatTools
@@ -47,14 +49,15 @@ class PlannerWorker @Inject constructor(
         val chatId: Long = chat.id
         val chatTitle: String = chat.title
         val groupId: Long = chat.chatGroup.id  // Get groupId for memory isolation
-        
+
         // Use domain model fields directly (no need to fetch entity)
         val parentId: Long? = chat.parentId
         val isStageChat: Boolean = chat.isStageChat
         val workingSummary: String? = chat.workingSummary
 
         // Retrieve Long-Term Memory for this group only
-        val ltmFacts = longTermMemoryRepository.getFactsByGroup(groupId)
+        // Uses GetFactsByChatGroupUseCase which coordinates LTMGroup lookup and fact retrieval
+        val ltmFacts = getFactsByChatGroupUseCase(groupId)
 
         // Build system prompt with memory injection
         val systemPrompt = if (isStageChat) {
@@ -79,25 +82,25 @@ class PlannerWorker @Inject constructor(
         // Get agent and process message
         val agent = aiAgentFactory.getOrCreate(
             systemName = AGENT_NAME,
-            chatId = chatId,
             isCommonAgent = false,
-            chatSettings = chat.settings
+            chat = chat
         )
 
         // Process the message
         agent.process(chat.settings, enrichedTask, onEvent)
             .onSuccess { result ->
                 val responseText = result.responseText
-                
+
                 // Parse response for tool patterns
                 val parsedResponse = ToolResponseParser.parse(responseText)
 
                 // Handle SAVE_FACT commands (auto-save)
+                // Uses UpsertFactWithCategoryUseCase which coordinates category resolution and fact storage
                 for (cmd in parsedResponse.saveFactCommands) {
-                    longTermMemoryRepository.upsertFact(
-                        groupId = groupId,
+                    upsertFactWithCategoryUseCase(
+                        chatGroupId = groupId,
                         memoryKey = cmd.memoryKey,
-                        category = cmd.category,
+                        categoryTitle = cmd.category,
                         fact = cmd.fact
                     )
                     onEvent?.invoke(WorkerEvent.FactSaved(cmd.memoryKey, cmd.category, cmd.fact))
