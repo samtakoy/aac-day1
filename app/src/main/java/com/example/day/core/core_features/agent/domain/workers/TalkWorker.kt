@@ -29,7 +29,6 @@ import javax.inject.Inject
  */
 class TalkWorker @Inject constructor(
     private val aiAgentFactory: AIAgentFactory,
-    private val agentRepository: AgentRepository,
     private val commandDispatcher: CommandDispatcher,
     private val chatTools: ChatTools
 ) : AWorker {

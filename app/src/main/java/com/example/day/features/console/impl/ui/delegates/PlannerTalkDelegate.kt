@@ -1,6 +1,7 @@
 package com.example.day.features.console.impl.ui.delegates
 
 import com.example.day.core.core_features.agent.domain.workers.PlannerWorker
+import com.example.day.core.core_features.agent.domain.workers.TaskWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
@@ -20,7 +21,8 @@ import javax.inject.Inject
  */
 internal class PlannerTalkDelegate @Inject constructor(
     private val addChatMessageUseCase: AddChatMessageUseCase,
-    private val plannerWorker: PlannerWorker,
+    // private val plannerWorker: PlannerWorker,
+    private val taskWorker: TaskWorker,
     private val chatTools: ChatTools
 ) : TalkDelegate {
 
@@ -44,8 +46,8 @@ internal class PlannerTalkDelegate @Inject constructor(
 
         onSuccess.invoke()
 
-        // Отправляем сообщение напрямую в PlannerWorker без проверки команд
-        plannerWorker.doWork(
+        // Отправляем сообщение напрямую в taskWorker без проверки команд
+        taskWorker.doWork(
             userPrompt = inputText,
             chat = chat,
             onEvent = { event ->

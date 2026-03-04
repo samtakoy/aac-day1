@@ -4,8 +4,8 @@ import com.example.day.core.core_features.agent.domain.usecase.GetAgentContextUs
 import com.example.day.core.core_features.memory.domain.repository.LongTermMemoryRepository
 import com.example.day.core.core_features.agent.domain.utils.ConsumptionCalculator
 import com.example.day.core.core_features.agent.domain.workers.CompareWorker
-import com.example.day.core.core_features.agent.domain.workers.PlannerWorker
 import com.example.day.core.core_features.agent.domain.workers.PromptWorker
+import com.example.day.core.core_features.agent.domain.workers.TaskWorker
 import com.example.day.core.core_features.agent.domain.workers.RejectWorker
 import com.example.day.core.core_features.agent.domain.workers.SimpleWorker
 import com.example.day.core.core_features.agent.domain.workers.StepWorker
@@ -48,8 +48,8 @@ interface ConsoleFeatureDeps {
     val worker6: TalkWorker
     val consuption: ConsumptionCalculator
     
-    // Planner feature dependencies
-    val plannerWorker: PlannerWorker
+    // Task state machine dependencies
+    val taskWorker: TaskWorker
     val longTermMemoryRepository: LongTermMemoryRepository
     val artifactRepository: ArtifactRepository
     val chatTools: ChatTools
