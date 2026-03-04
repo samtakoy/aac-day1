@@ -35,4 +35,16 @@ internal class LTMGroupRepositoryImpl @Inject constructor(
     override suspend fun deleteLinkByChatGroupId(chatGroupId: Long) {
         ltmGroupDao.deleteLinkByChatGroupId(chatGroupId)
     }
+
+    override suspend fun findOrCreateByAgent(agentId: Long): Long {
+        return ltmGroupDao.findOrCreateByAgent(agentId)
+    }
+
+    override suspend fun getLTMGroupIdByAgentId(agentId: Long): Long? {
+        return ltmGroupDao.getLTMGroupIdByAgentId(agentId)
+    }
+
+    override suspend fun deleteLinkByAgentId(agentId: Long) {
+        ltmGroupDao.deleteLinkByAgentId(agentId)
+    }
 }

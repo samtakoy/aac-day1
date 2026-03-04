@@ -31,6 +31,7 @@ import com.example.day.core.core_features.memory.data.local.model.LongTermMemory
 import com.example.day.core.core_features.chat.data.local.model.MessageEntity
 import com.example.day.core.core_features.memory.data.local.model.ProjectArtifactEntity
 import com.example.day.core.core_features.chat.data.local.model.UserEntity
+import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupToAgentEntity
 import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupToChatGroupEntity
 import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupToUserProfileEntity
 import com.example.day.core.core_features.memory.data.local.model.link.UserToProfileEntity
@@ -55,6 +56,7 @@ import com.example.day.core.core_features.memory.data.local.model.user.UserProfi
         ProjectArtifactEntity::class,
         UserProfileEntity::class,
         // Link entities
+        LTMGroupToAgentEntity::class,
         LTMGroupToChatGroupEntity::class,
         LTMGroupToUserProfileEntity::class,
         UserToProfileEntity::class

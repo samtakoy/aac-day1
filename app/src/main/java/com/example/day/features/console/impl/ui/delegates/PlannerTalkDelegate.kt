@@ -46,7 +46,7 @@ internal class PlannerTalkDelegate @Inject constructor(
 
         // Отправляем сообщение напрямую в PlannerWorker без проверки команд
         plannerWorker.doWork(
-            task = inputText,
+            userPrompt = inputText,
             chat = chat,
             onEvent = { event ->
                 handleWorkerEvent(event, chat.id)

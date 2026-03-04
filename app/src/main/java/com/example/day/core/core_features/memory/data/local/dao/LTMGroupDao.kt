@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import com.example.day.core.core_features.memory.data.local.model.LTMGroupEntity
+import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupToAgentEntity
 import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupToChatGroupEntity
 
 /**
@@ -57,6 +58,46 @@ internal interface LTMGroupDao {
             LTMGroupToChatGroupEntity(
                 ltmGroupId = newGroupId,
                 chatGroupId = chatGroupId
+            )
+        )
+
+        return newGroupId
+    }
+
+    // --- LTMGroup to Agent Link Operations ---
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAgentLink(link: LTMGroupToAgentEntity)
+
+    @Query("SELECT * FROM ltm_group_to_agent WHERE agent_id = :agentId")
+    suspend fun getLinkByAgentId(agentId: Long): LTMGroupToAgentEntity?
+
+    @Query("SELECT ltm_group_id FROM ltm_group_to_agent WHERE agent_id = :agentId")
+    suspend fun getLTMGroupIdByAgentId(agentId: Long): Long?
+
+    @Query("DELETE FROM ltm_group_to_agent WHERE agent_id = :agentId")
+    suspend fun deleteLinkByAgentId(agentId: Long)
+
+    /**
+     * Finds existing LTM group for an agent or creates new one with link.
+     * Must be called within a transaction.
+     */
+    @Transaction
+    suspend fun findOrCreateByAgent(agentId: Long): Long {
+        // Try to find existing link
+        val existingId = getLTMGroupIdByAgentId(agentId)
+        if (existingId != null) {
+            return existingId
+        }
+
+        // Create new LTM group
+        val newGroupId = insert(LTMGroupEntity())
+
+        // Create link
+        insertAgentLink(
+            LTMGroupToAgentEntity(
+                ltmGroupId = newGroupId,
+                agentId = agentId
             )
         )
 

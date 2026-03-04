@@ -1,16 +1,15 @@
 package com.example.day.core.core_features.agent.domain.workers
 
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
-import com.example.day.core.core_features.agent.domain.workers.base.AWorker
-import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.prompt.PlannerPromptBuilder
 import com.example.day.core.core_features.agent.domain.tools.ToolResponseParser
-import com.example.day.core.core_features.chat.domain.ChatRepository
+import com.example.day.core.core_features.agent.domain.usecase.CompleteStageUseCase
+import com.example.day.core.core_features.agent.domain.workers.base.AWorker
+import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.chat.domain.model.Chat
-import com.example.day.core.core_features.memory.domain.repository.ArtifactRepository
+import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.memory.domain.usecase.GetFactsByChatGroupUseCase
 import com.example.day.core.core_features.memory.domain.usecase.UpsertFactWithCategoryUseCase
-import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import javax.inject.Inject
 
 /**
@@ -32,8 +31,8 @@ class PlannerWorker @Inject constructor(
     private val aiAgentFactory: AIAgentFactory,
     private val getFactsByChatGroupUseCase: GetFactsByChatGroupUseCase,
     private val upsertFactWithCategoryUseCase: UpsertFactWithCategoryUseCase,
-    private val chatRepository: ChatRepository,
-    private val artifactRepository: ArtifactRepository,
+    // TODO то юзкейсы то репозитории - непонятно - все перемешано
+    private val completeStageUseCase: CompleteStageUseCase,
     private val chatTools: ChatTools
 ) : AWorker {
 
@@ -42,7 +41,7 @@ class PlannerWorker @Inject constructor(
     }
 
     override suspend fun doWork(
-        task: String,
+        userPrompt: String,
         chat: Chat,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
@@ -74,7 +73,7 @@ class PlannerWorker @Inject constructor(
         }
 
         // Enrich task with system context
-        val enrichedTask = "[System context: $systemPrompt]\n\n$task"
+        val enrichedTask = "[System context: $systemPrompt]\n\n$userPrompt"
 
         // Notify that request is starting
         onEvent?.invoke(WorkerEvent.RequestStart)
@@ -108,24 +107,17 @@ class PlannerWorker @Inject constructor(
                 // (LLM may echo the pattern multiple times; processing all would duplicate working memory)
                 val completeCmd = parsedResponse.completeStageCommands.firstOrNull()
                 if (isStageChat && parentId != null && completeCmd != null) {
-                    artifactRepository.saveArtifact(
-                        chatId = chatId,
+                    completeStageUseCase(
+                        stageChatId = chatId,
                         stageTitle = chatTitle,
-                        content = completeCmd.outcome
-                    )
-                    onEvent?.invoke(WorkerEvent.StageCompleted(chatId, completeCmd.outcome))
-
-                    try {
-                        val parentChat = chatRepository.getChatById(parentId)
-                        val parentSummary = parentChat?.workingSummary ?: ""
-                        val updatedSummary = buildString {
-                            append(parentSummary)
-                            if (isNotEmpty()) append("\n\n")
-                            append("### ").append(chatTitle).append("\n").append(completeCmd.outcome)
-                        }
-                        chatRepository.updateWorkingSummary(parentId, updatedSummary)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
+                        parentId = parentId,
+                        outcome = completeCmd.outcome
+                    ).onSuccess {
+                        onEvent?.invoke(WorkerEvent.StageCompleted(chatId, completeCmd.outcome))
+                    }.onFailure {
+                        it.printStackTrace()
+                        // TODO инао сообщение в чат
+                        chatTools.addBotMessage(chatId, it.message ?: "Что-то пошло не так")
                     }
                 }
 

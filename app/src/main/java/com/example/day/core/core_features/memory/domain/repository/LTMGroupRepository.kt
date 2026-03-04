@@ -42,4 +42,25 @@ interface LTMGroupRepository {
      * Note: This doesn't delete the LTM group itself, just the link.
      */
     suspend fun deleteLinkByChatGroupId(chatGroupId: Long)
+
+    /**
+     * Finds existing LTM group ID for an agent or creates new one with link.
+     * This is the main entry point for getting LTM group ID from agent ID.
+     *
+     * @param agentId Agent ID
+     * @return LTM group ID (existing or newly created)
+     */
+    suspend fun findOrCreateByAgent(agentId: Long): Long
+
+    /**
+     * Gets LTM group ID by agent ID.
+     * Returns null if no link exists.
+     */
+    suspend fun getLTMGroupIdByAgentId(agentId: Long): Long?
+
+    /**
+     * Deletes the link between LTM group and agent.
+     * Note: This doesn't delete the LTM group itself, just the link.
+     */
+    suspend fun deleteLinkByAgentId(agentId: Long)
 }
