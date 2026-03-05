@@ -25,6 +25,9 @@ import javax.inject.Inject
  * - @@talk(switch_branch --id X) - switch to branch
  * - @@talk(list_branches) - list all branches
  * - @@talk(delete_branch --id X) - delete branch
+ * - @@talk(agent --addrule "текст") - добавить новое правило диалога
+ * - @@talk(agent --listrules) - вывести список всех правил диалога
+ * - @@talk(agent --clearrules) - удалить все правила диалога
  * - @@talk <text> - send text to LLM
  */
 class TalkWorker @Inject constructor(

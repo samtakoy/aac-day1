@@ -35,6 +35,7 @@ class AIAgentFactory @Inject constructor(
         val strategy = strategyFactory.create(config.contextStrategyType)
         val memoryProvider = memoryProviderFactory.create(
             memoryTypes = config.memoryTypes,
+            agentId = config.id
         )
         return AIAgent(
             config,

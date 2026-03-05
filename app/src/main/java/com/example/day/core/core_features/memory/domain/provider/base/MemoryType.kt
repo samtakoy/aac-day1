@@ -11,4 +11,6 @@ enum class MemoryType(val dbName: String) {
     Chat("chat"),
     /** Память из текущей группы чатов */
     ChatGroup("chat_group"),
+    /** Строгие правила диалога агента */
+    AgentRules("agent_rules"),
 }
