@@ -167,7 +167,7 @@ class TaskWorker @Inject constructor(
             TaskState.DONE -> "Формирование итогового отчёта"
         }
 
-        chatTools.addBotMessage(chatId, "📍 Состояние: ${state.name} — $stateDescription")
+        chatTools.addInfoMessage(chatId, "📍 Было Состояние: ${state.name} — $stateDescription")
     }
 
     private suspend fun loadFacts(agentId: Long): Map<String, String> {
@@ -236,7 +236,7 @@ class TaskWorker @Inject constructor(
                 TaskState.DONE -> "DONE — Финализация задачи"
                 TaskState.INIT -> "INIT — Новая задача"
             }
-            chatTools.addBotMessage(context.chat.id, "🔄 Переход: $stateLabel")
+            chatTools.addInfoMessage(context.chat.id, "🔄 Переход: $stateLabel")
         }
 
         // Send reply to user

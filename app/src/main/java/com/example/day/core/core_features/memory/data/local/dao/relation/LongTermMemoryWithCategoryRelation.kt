@@ -13,5 +13,5 @@ internal data class LongTermMemoryWithCategoryRelation(
         parentColumn = "category_id", // Поле в LongTermMemoryEntity
         entityColumn = "id"           // Поле в LTMCategoryEntity
     )
-    val category: LTMCategoryEntity
+    val category: LTMCategoryEntity? // TODO проверить - зачем 0 так не надо
 )

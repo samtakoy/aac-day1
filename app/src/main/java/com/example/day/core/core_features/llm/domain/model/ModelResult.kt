@@ -17,7 +17,7 @@ sealed interface ModelResult {
 
         data class Message(
             val role: String,
-            val content: String,
+            val content: String?,
             val reasoning: String?
         )
 

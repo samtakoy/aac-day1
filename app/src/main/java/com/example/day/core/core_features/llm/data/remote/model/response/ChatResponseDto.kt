@@ -66,7 +66,7 @@ internal data class MessageDto(
     @SerialName("role")
     val role: String,
     @SerialName("content")
-    val content: String,
+    val content: String? = null,
     @SerialName("reasoning")
     val reasoning: String? = null
 )

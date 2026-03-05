@@ -14,7 +14,7 @@ internal object LongTermMemoryEntityMapper {
             memoryKey = entity.memory.memoryKey,
             ltmGroupId = entity.memory.ltmGroupId,
             categoryId = entity.memory.categoryId,
-            category = entity.category.title,
+            category = entity.category?.title ?: "general",
             fact = entity.memory.fact,
             updatedAt = entity.memory.updatedAt
         )
