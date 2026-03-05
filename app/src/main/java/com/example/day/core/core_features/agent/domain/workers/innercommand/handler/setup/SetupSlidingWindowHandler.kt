@@ -46,8 +46,8 @@ class SetupSlidingWindowHandler @Inject constructor(
         agentRepository.getOrCreateAgent(
             systemName = AGENT_NAME,
             chatId = chat.id,
-            systemPromt = chat.settings.systemPromt,
-            model = chat.settings.model
+            systemPrompt = chat.settings.systemPromt,
+            defaultModel = { chat.settings.model }
         )
 
     companion object {

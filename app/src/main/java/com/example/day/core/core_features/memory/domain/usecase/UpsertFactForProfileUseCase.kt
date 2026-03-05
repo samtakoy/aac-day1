@@ -36,7 +36,7 @@ class UpsertFactForProfileUseCase @Inject constructor(
         upsertFactWithCategory.invokeByLTMGroup(
             ltmGroupId = profile.ltmGroupId,
             memoryKey = memoryKey,
-            categoryTitle = category,
+            category = category,
             fact = fact
         )
         return Result.success(Unit)

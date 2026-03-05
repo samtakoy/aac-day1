@@ -5,16 +5,17 @@ package com.example.day.core.core_features.memory.domain.model
  * Used to personalize agent responses across chat sessions.
  * Memory is isolated per LTMGroup, which can be linked to ChatGroup, UserProfile, etc.
  *
- * @property memoryKey Unique identifier for the fact (e.g., "primary_language", "experience_level")
+ * @property id Unique identifier (auto-generated)
+ * @property memoryKey Unique identifier for the fact within a category (e.g., "primary_language", "experience_level")
  * @property ltmGroupId LTM Group ID for memory isolation
- * @property category Category
+ * @property category Category name (stored directly, no separate table)
  * @property fact The actual fact text (e.g., "Senior Kotlin Developer")
  * @property updatedAt Timestamp of last update
  */
 data class LongTermMemoryFact(
+    val id: Long,
     val memoryKey: String,
     val ltmGroupId: Long,
-    val categoryId: Long,
     val category: String,
     val fact: String,
     val updatedAt: Long = System.currentTimeMillis()

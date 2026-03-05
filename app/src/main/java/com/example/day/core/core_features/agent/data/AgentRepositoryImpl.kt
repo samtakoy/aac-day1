@@ -183,29 +183,30 @@ internal class AgentRepositoryImpl @Inject constructor(
     }
     
     // ==================== Agent Factory ====================
-    
+
     override suspend fun getOrCreateAgent(
         systemName: String,
         chatId: Long,
-        systemPromt: String,
-        model: ModelSettings
+        systemPrompt: String,
+        defaultModel: () -> ModelSettings
     ): AgentConfig {
         return if (chatId == 0L) {
             // ЛОГИКА 1: Общие агенты
+            // TODO ошибка что настройки им не передаются
             getOrCreateCommonAgent(systemName)
         } else {
             // ЛОГИКА 2: Чат-специфичные агенты
-            getOrCreateChatSpecificAgent(systemName, chatId, systemPromt, model)
+            getOrCreateChatSpecificAgent(systemName, chatId, systemPrompt, defaultModel)
         }
     }
-    
+
     private suspend fun getOrCreateCommonAgent(systemName: String): AgentConfig {
         // 1. Искать только по systemName (isCommon = 1)
         val existingAgent = agentDao.getCommonAgentBySystemName(systemName)
         if (existingAgent != null) {
             return agentMapper.toDomain(existingAgent)
         }
-        
+
         // 2. Создать нового общего агента (без ChatSettings)
         val botUser = chatRepository.getOrCreateDefaultUsers().second
         val newAgentId = createAgent(
@@ -214,39 +215,41 @@ internal class AgentRepositoryImpl @Inject constructor(
             chatUserId = botUser.id,
             isCommon = true
         )
-        
-        return getAgentById(newAgentId) 
+
+        return getAgentById(newAgentId)
             ?: throw IllegalStateException("Failed to create common agent")
     }
-    
+
     private suspend fun getOrCreateChatSpecificAgent(
-        systemName: String, 
+        systemName: String,
         chatId: Long,
-        systemPromt: String,
-        model: ModelSettings
+        systemPrompt: String,
+        defaultModel: () -> ModelSettings
     ): AgentConfig {
         // 1. Искать агента по systemName + chatId
         val existingAgent = agentToChatDao.getAgentBySystemNameAndChatId(systemName, chatId)
         if (existingAgent != null) {
             return agentMapper.toDomain(existingAgent)
         }
-        
+
         // 2. Создать нового чат-специфичного агента
+        // Вызываем фабричный метод только если агент не найден
+        val model = defaultModel()
         val botUser = chatRepository.getOrCreateDefaultUsers().second
-        
+
         val newAgentId = createAgent(
             systemName = systemName,
             title = systemName,
             chatUserId = botUser.id,
             isCommon = false,
-            systemPromt = systemPromt,
+            systemPromt = systemPrompt,
             model = model
         )
 
         // 3. Обязательно привязать к чату
         bindAgentToChat(newAgentId, chatId)
-        
-        return getAgentById(newAgentId) 
+
+        return getAgentById(newAgentId)
             ?: throw IllegalStateException("Failed to create chat-specific agent")
     }
 

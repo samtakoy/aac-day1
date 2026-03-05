@@ -4,8 +4,6 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Transaction
-import com.example.day.core.core_features.memory.data.local.dao.relation.LongTermMemoryWithCategoryRelation
 import com.example.day.core.core_features.memory.data.local.model.LongTermMemoryEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -17,25 +15,29 @@ internal interface LongTermMemoryDao {
 
     // Get all facts for a specific LTM group
     @Query("SELECT * FROM long_term_memory WHERE ltm_group_id = :ltmGroupId ORDER BY updated_at DESC")
-    fun getByGroup(ltmGroupId: Long): Flow<List<LongTermMemoryWithCategoryRelation>>
+    fun getByGroup(ltmGroupId: Long): Flow<List<LongTermMemoryEntity>>
 
-    @Transaction // Важно! Room выполнит два запроса, транзакция гарантирует целостность
     @Query("SELECT * FROM long_term_memory WHERE ltm_group_id = :ltmGroupId ORDER BY updated_at DESC")
-    suspend fun getByGroupOnce(ltmGroupId: Long): List<LongTermMemoryWithCategoryRelation>
+    suspend fun getByGroupOnce(ltmGroupId: Long): List<LongTermMemoryEntity>
 
     @Query("SELECT * FROM long_term_memory WHERE memory_key = :key AND ltm_group_id = :ltmGroupId")
-    suspend fun getByKeyAndGroup(key: String, ltmGroupId: Long): LongTermMemoryWithCategoryRelation?
+    suspend fun getByKeyAndGroup(key: String, ltmGroupId: Long): LongTermMemoryEntity?
 
-    @Query("DELETE FROM long_term_memory WHERE memory_key = :key AND ltm_group_id = :ltmGroupId")
-    suspend fun deleteByKeyAndGroup(key: String, ltmGroupId: Long)
+    @Query("SELECT * FROM long_term_memory WHERE id = :id")
+    suspend fun getById(id: Long): LongTermMemoryEntity?
 
-    @Query("DELETE FROM long_term_memory WHERE memory_key = :key AND category_id = :categoryId AND ltm_group_id = :ltmGroupId")
-    suspend fun deleteByKeyAndCategoryAndGroup(key: String, categoryId: Long, ltmGroupId: Long)
+    // Delete by id
+    @Query("DELETE FROM long_term_memory WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    // Delete by composite key (ltm_group_id + memory_key + category)
+    @Query("DELETE FROM long_term_memory WHERE ltm_group_id = :ltmGroupId AND memory_key = :memoryKey AND category = :category")
+    suspend fun deleteByCompositeKey(ltmGroupId: Long, memoryKey: String, category: String)
 
     @Query("DELETE FROM long_term_memory WHERE ltm_group_id = :ltmGroupId")
     suspend fun clearByGroup(ltmGroupId: Long)
 
     // Get facts by category
-    @Query("SELECT * FROM long_term_memory WHERE ltm_group_id = :ltmGroupId AND category_id = :categoryId ORDER BY updated_at DESC")
-    suspend fun getByGroupAndCategory(ltmGroupId: Long, categoryId: Long): List<LongTermMemoryEntity>
+    @Query("SELECT * FROM long_term_memory WHERE ltm_group_id = :ltmGroupId AND category = :category ORDER BY updated_at DESC")
+    suspend fun getByGroupAndCategory(ltmGroupId: Long, category: String): List<LongTermMemoryEntity>
 }

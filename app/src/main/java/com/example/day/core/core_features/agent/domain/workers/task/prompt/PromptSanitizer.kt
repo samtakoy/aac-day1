@@ -1,31 +1,27 @@
 package com.example.day.core.core_features.agent.domain.workers.task.prompt
 
+import kotlinx.serialization.json.Json
+
 /**
  * Sanitizes data before injecting into prompts.
  * Prevents prompt injection attacks and JSON corruption.
  */
 object PromptSanitizer {
 
+    private val json = Json { encodeDefaults = false }
+
     /**
      * Escape special characters to prevent breaking JSON structure
      * or injecting malicious instructions.
+     *
+     * Uses kotlinx.serialization.json.Json.encodeToString() for proper JSON escaping.
      *
      * @param value Raw value from LTM or user input
      * @return Sanitized value safe for prompt injection
      */
     fun sanitize(value: String): String {
-        return value
-            // Escape JSON special characters first
-            .replace("\\", "\\\\")  // Backslash must be first
-            .replace("\"", "\\\"")  // Double quotes
-            .replace("\n", "\\n")   // Newlines
-            .replace("\r", "\\r")   // Carriage return
-            .replace("\t", "\\t")   // Tabs
-            // Remove control characters
-            // .replace(Regex("[\x00-\x1F\x7F]"), "") TODO
-            // Escape JSON protocol delimiters that could confuse the parser
-            .replace("}", "\\}")
-            .replace("{", "\\{")
+        // Json.encodeToString() adds surrounding quotes, so we remove them
+        return json.encodeToString(value).drop(1).dropLast(1)
     }
 
     /**
@@ -37,9 +33,9 @@ object PromptSanitizer {
      */
     fun sanitizeForSystemPrompt(value: String): String {
         return sanitize(value)
-            // Additional escaping for system prompt context
-            .replace("===", "\u200B===\u200B")  // Break protocol markers
-            .replace("```", "\u200B```\u200B")  // Break code blocks
+            // Break protocol markers and code blocks with explicit placeholders
+            .replace("===", "[EQ][EQ][EQ]")
+            .replace("```", "[BT][BT][BT]")
     }
 
     /**

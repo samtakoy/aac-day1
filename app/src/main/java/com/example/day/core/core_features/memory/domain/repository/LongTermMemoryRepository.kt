@@ -12,14 +12,15 @@ interface LongTermMemoryRepository {
 
     /**
      * Save or update a fact in long-term memory.
-     * Uses memoryKey + ltmGroupId for UPSERT - if key exists, updates; otherwise inserts.
+     * Uniqueness is enforced by (ltmGroupId + memoryKey + category) composite unique index.
+     * If a fact with the same key exists, it will be updated; otherwise, a new one is inserted.
      *
      * @param ltmGroupId LTM Group ID for memory isolation
-     * @param memoryKey Unique identifier (e.g., "primary_language", "experience_level")
-     * @param categoryId Category ID from LTMCategory
+     * @param memoryKey Unique identifier within category (e.g., "primary_language", "experience_level")
+     * @param category Category name (stored directly, no separate table)
      * @param fact The fact text to store
      */
-    suspend fun upsertFact(ltmGroupId: Long, memoryKey: String, categoryId: Long, fact: String)
+    suspend fun upsertFact(ltmGroupId: Long, memoryKey: String, category: String, fact: String)
 
     /**
      * Get facts for a specific LTM group as a one-time operation.
@@ -45,19 +46,21 @@ interface LongTermMemoryRepository {
     suspend fun getFactByKey(ltmGroupId: Long, memoryKey: String): LongTermMemoryFact?
 
     /**
-     * Delete all facts with the given key within an LTM group (across all categories).
+     * Delete a fact by its unique id.
      *
-     * @param ltmGroupId LTM Group ID for memory isolation
+     * @param id Fact id
      */
-    suspend fun deleteFact(ltmGroupId: Long, memoryKey: String)
+    suspend fun deleteFact(id: Long)
 
     /**
-     * Delete a specific fact by key + category within an LTM group.
+     * Delete a fact by composite key (ltmGroupId + memoryKey + category).
+     * Uniqueness is defined by this combination.
      *
      * @param ltmGroupId LTM Group ID for memory isolation
-     * @param categoryId Category ID of the fact to delete
+     * @param memoryKey Unique identifier within category
+     * @param category Category name
      */
-    suspend fun deleteFact(ltmGroupId: Long, memoryKey: String, categoryId: Long)
+    suspend fun deleteFact(ltmGroupId: Long, memoryKey: String, category: String)
 
     /**
      * Clear all facts for a specific LTM group.

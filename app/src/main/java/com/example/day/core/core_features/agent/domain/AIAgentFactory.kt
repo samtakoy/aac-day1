@@ -23,14 +23,14 @@ class AIAgentFactory @Inject constructor(
     suspend fun getOrCreate(
         systemName: String,
         chatId: Long,
-        systemPromt: String,
-        model: ModelSettings
+        systemPrompt: String,
+        defaultModel: () -> ModelSettings
     ): AIAgent {
         val config = getOrCreateAgentUseCase(
             systemName = systemName,
             chatId = chatId,
-            systemPromt = systemPromt,
-            model = model
+            systemPrompt = systemPrompt,
+            defaultModel = defaultModel
         )
         val strategy = strategyFactory.create(config.contextStrategyType)
         val memoryProvider = memoryProviderFactory.create(

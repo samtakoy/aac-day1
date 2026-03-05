@@ -4,43 +4,44 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.PrimaryKey
 
 /**
  * Long-term memory storage for user facts and preferences.
- * Uses composite key (memoryKey + ltmGroupId) for proper UPSERT operations.
+ * Uses auto-generated id as primary key.
+ * Uniqueness is enforced by composite unique index (ltm_group_id + memory_key + category).
  * Memory is isolated per LTMGroup, which can be linked to ChatGroup, UserProfile, etc.
  */
 @Entity(
     tableName = "long_term_memory",
-    primaryKeys = ["memory_key", "category_id", "ltm_group_id"],
     foreignKeys = [
         ForeignKey(
             entity = LTMGroupEntity::class,
             parentColumns = ["id"],
             childColumns = ["ltm_group_id"],
             onDelete = ForeignKey.CASCADE
-        ),
-        ForeignKey(
-            entity = LTMCategoryEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["category_id"],
-            onDelete = ForeignKey.RESTRICT
         )
     ],
     indices = [
         Index(value = ["ltm_group_id"]),
-        Index(value = ["category_id"])
+        Index(value = ["memory_key"]),
+        Index(value = ["category"]),
+        Index(value = ["ltm_group_id", "memory_key", "category"], unique = true)
     ]
 )
 internal data class LongTermMemoryEntity(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Long = 0,
+
     @ColumnInfo(name = "memory_key")
     val memoryKey: String,
 
     @ColumnInfo(name = "ltm_group_id")
     val ltmGroupId: Long,
 
-    @ColumnInfo(name = "category_id")
-    val categoryId: Long,
+    @ColumnInfo(name = "category")
+    val category: String,
 
     @ColumnInfo(name = "fact")
     val fact: String = "",

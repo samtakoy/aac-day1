@@ -6,6 +6,15 @@ import javax.inject.Inject
 class DeleteProfileFactUseCase @Inject constructor(
     private val repository: LongTermMemoryRepository
 ) {
-    suspend operator fun invoke(ltmGroupId: Long, memoryKey: String, categoryId: Long) =
-        repository.deleteFact(ltmGroupId, memoryKey, categoryId)
+    /**
+     * Delete a fact by its unique id.
+     */
+    suspend operator fun invoke(id: Long) =
+        repository.deleteFact(id)
+
+    /**
+     * Delete a fact by composite key (ltmGroupId + memoryKey + category).
+     */
+    suspend operator fun invoke(ltmGroupId: Long, memoryKey: String, category: String) =
+        repository.deleteFact(ltmGroupId, memoryKey, category)
 }

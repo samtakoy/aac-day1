@@ -77,7 +77,12 @@ class TalkWorker @Inject constructor(
         chat: Chat,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
-        val agent = aiAgentFactory.getOrCreate(AGENT_NAME, chat.id, chat.settings.systemPromt, chat.settings.model)
+        val agent = aiAgentFactory.getOrCreate(
+            AGENT_NAME,
+            chat.id,
+            chat.settings.systemPromt,
+            defaultModel = { chat.settings.model }
+        )
         agent.process(chat.settings, task, onEvent)
             .onSuccess { result ->
                 result.requestDebugInfo?.let { chatTools.addInfoMessage(chat.id, it) }

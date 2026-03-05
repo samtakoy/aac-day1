@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "day1_current"
+rootProject.name = "day1_qwen"
 include(":app")
  

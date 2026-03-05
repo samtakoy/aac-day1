@@ -2,6 +2,7 @@ package com.example.day.core.core_features.agent.di
 
 import com.example.day.core.core_features.agent.data.AgentContextRepositoryImpl
 import com.example.day.core.core_features.agent.data.AgentRepositoryImpl
+import com.example.day.core.core_features.agent.data.repository.AgentMemoryRepositoryImpl
 import com.example.day.core.core_features.agent.data.local.dao.AgentDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentContextMemoryDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentMemoryDao
@@ -9,6 +10,7 @@ import com.example.day.core.core_features.agent.data.local.dao.AgentToChatDao
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.AgentRepository
+import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.agent.domain.workers.PlannerWorker
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentToolsImpl
@@ -42,6 +44,9 @@ internal interface AgentCoreFeatureModule {
 
     @Binds
     fun bindsAgentContextRepository(impl: AgentContextRepositoryImpl): AgentContextRepository
+
+    @Binds
+    fun bindsAgentMemoryRepository(impl: AgentMemoryRepositoryImpl): AgentMemoryRepository
 
     @Binds
     fun bindsAgentTools(impl: AgentToolsImpl): AgentTools

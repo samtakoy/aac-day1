@@ -54,11 +54,11 @@ class ClearTaskMemoryForAgentUseCase @Inject constructor(
             }
         }
 
-        // Delete each task-related fact
+        // Delete each task-related fact by id
         var deletedCount = 0
         taskFacts.forEach { fact ->
             try {
-                longTermMemoryRepository.deleteFact(ltmGroupId, fact.memoryKey)
+                longTermMemoryRepository.deleteFact(fact.id)
                 deletedCount++
             } catch (e: Exception) {
                 // Log error but continue with other keys

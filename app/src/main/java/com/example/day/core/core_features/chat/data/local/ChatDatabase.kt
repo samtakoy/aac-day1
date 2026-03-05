@@ -12,7 +12,6 @@ import com.example.day.core.core_features.agent.data.local.model.AgentContextMem
 import com.example.day.core.core_features.agent.data.local.model.AgentToMemoryTypeEntity
 import com.example.day.core.core_features.memory.data.local.dao.ArtifactDao
 import com.example.day.core.core_features.memory.data.local.dao.UserProfileDao
-import com.example.day.core.core_features.memory.data.local.dao.LTMCategoryDao
 import com.example.day.core.core_features.memory.data.local.dao.LTMGroupDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatDao
 import com.example.day.core.core_features.chat.data.local.dao.ChatGroupDao
@@ -25,7 +24,6 @@ import com.example.day.core.core_features.chat.data.local.model.ChatEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatGroupEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatSettingsEntity
 import com.example.day.core.core_features.chat.data.local.model.ChatTypeEntity
-import com.example.day.core.core_features.memory.data.local.model.LTMCategoryEntity
 import com.example.day.core.core_features.memory.data.local.model.LTMGroupEntity
 import com.example.day.core.core_features.memory.data.local.model.LongTermMemoryEntity
 import com.example.day.core.core_features.chat.data.local.model.MessageEntity
@@ -51,7 +49,6 @@ import com.example.day.core.core_features.memory.data.local.model.user.UserProfi
         AgentToMemoryTypeEntity::class,
         // Memory entities
         LTMGroupEntity::class,
-        LTMCategoryEntity::class,
         LongTermMemoryEntity::class,
         ProjectArtifactEntity::class,
         UserProfileEntity::class,
@@ -61,7 +58,7 @@ import com.example.day.core.core_features.memory.data.local.model.user.UserProfi
         LTMGroupToUserProfileEntity::class,
         UserToProfileEntity::class
     ],
-    version = 8,
+    version = 10,
     exportSchema = false
 )
 internal abstract class ChatDatabase : RoomDatabase() {
@@ -77,7 +74,6 @@ internal abstract class ChatDatabase : RoomDatabase() {
     abstract fun agentContextMemoryDao(): AgentContextMemoryDao
     // Memory DAOs
     abstract fun ltmGroupDao(): LTMGroupDao
-    abstract fun ltmCategoryDao(): LTMCategoryDao
     abstract fun longTermMemoryDao(): LongTermMemoryDao
     abstract fun artifactDao(): ArtifactDao
     abstract fun userProfileDao(): UserProfileDao

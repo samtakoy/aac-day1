@@ -4,12 +4,12 @@ import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.Role
 import com.example.day.core.core_features.agent.domain.model.TaskMemoryKeys
 import com.example.day.core.core_features.agent.domain.model.TaskState
+import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.agent.domain.workers.task.TaskContext
 import com.example.day.core.core_features.agent.domain.workers.task.TaskStateMachine
 import com.example.day.core.core_features.agent.domain.workers.task.prompt.PromptSanitizer
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProvider
-import com.example.day.core.core_features.memory.domain.usecase.GetFactsByAgentUseCase
 import javax.inject.Inject
 
 /**
@@ -19,28 +19,20 @@ import javax.inject.Inject
  * Use [withAgentId] to create a working MemoryProvider instance.
  */
 class TaskStateMemoryProvider @Inject constructor(
-    private val getFactsByAgentUseCase: GetFactsByAgentUseCase,
-    private val chat: Chat
-) {
+    private val agentMemoryRepository: AgentMemoryRepository,
+    private val chat: Chat,
+    private val agentId: Long
+) : MemoryProvider {
     companion object {
         const val SYSTEM_PROMPT_PREFIX = "Ответ давай на русском языке. " +
             "Твой ответ должен быть валидным JSON объектом без markdown разметки, " +
             "следуя схеме в инструкциях.\n\n"
     }
 
-    /**
-     * Creates a working MemoryProvider instance with the specified agentId.
-     *
-     * @param agentId The agent ID for loading facts from LTM
-     * @return MemoryProvider that provides dynamic system prompt based on current task state
-     */
-    fun withAgentId(agentId: Long): MemoryProvider {
-        return TaskStateMemoryProviderImpl(
-            getFactsByAgentUseCase = getFactsByAgentUseCase,
-            chat = chat,
-            agentId = agentId,
-            factory = this
-        )
+    override suspend fun getMemoryContext(): List<AContextMessage> {
+        val facts = agentMemoryRepository.getFacts(agentId)
+            .associate { it.memoryKey to it.fact }
+        return buildSystemPrompt(facts, agentId)
     }
 
     /**
@@ -87,25 +79,5 @@ class TaskStateMemoryProvider @Inject constructor(
             stateStr.equals("DONE", ignoreCase = true) -> TaskState.INIT
             else -> TaskState.fromString(stateStr) ?: TaskState.INIT
         }
-    }
-}
-
-/**
- * Implementation of MemoryProvider that loads facts using agentId and delegates
- * prompt building to the factory.
- */
-private class TaskStateMemoryProviderImpl(
-    private val getFactsByAgentUseCase: GetFactsByAgentUseCase,
-    private val chat: Chat,
-    private val agentId: Long,
-    private val factory: TaskStateMemoryProvider
-) : MemoryProvider {
-
-    override suspend fun getMemoryContext(): List<AContextMessage> {
-        val facts = getFactsByAgentUseCase(agentId)
-            .associate { it.memoryKey to it.fact }
-
-        // Delegate to factory method - NO code duplication
-        return factory.buildSystemPrompt(facts, agentId)
     }
 }

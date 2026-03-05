@@ -21,9 +21,8 @@ import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.memory.domain.provider.CompositeMemoryProvider
 import com.example.day.core.core_features.memory.domain.provider.TaskStateMemoryProvider
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProviderFactory
+import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.memory.domain.usecase.ClearTaskMemoryForAgentUseCase
-import com.example.day.core.core_features.memory.domain.usecase.GetFactsByAgentUseCase
-import com.example.day.core.core_features.memory.domain.usecase.UpsertFactWithCategoryForAgentUseCase
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -41,8 +40,7 @@ import javax.inject.Inject
  */
 class TaskWorker @Inject constructor(
     private val aiAgentFactory: AIAgentFactory,
-    private val getFactsByAgentUseCase: GetFactsByAgentUseCase,
-    private val upsertFactUseCase: UpsertFactWithCategoryForAgentUseCase,
+    private val agentMemoryRepository: AgentMemoryRepository,
     private val clearAgentContextUseCase: ClearAgentContextUseCase,
     private val clearTaskMemoryUseCase: ClearTaskMemoryForAgentUseCase,
     private val chatTools: ChatTools,
@@ -71,38 +69,10 @@ class TaskWorker @Inject constructor(
             AGENT_NAME,
             chat.id,
             "",
-            chat.settings.model
+            defaultModel = { chat.settings.model.copy(jsonFormat = true) }
         )
-
-        // Load current state from LTM
-        val facts = loadFacts(agent.config.id)
-        val currentState = determineCurrentState(facts)
-        val currentStep = facts[TaskMemoryKeys.CURRENT_STEP]?.toIntOrNull() ?: 1
-
-        // Build context
-        val context = TaskContext(
-            chat = chat,
-            agentId = agent.config.id,
-            facts = facts,
-            currentState = currentState,
-            currentStep = currentStep
-        )
-
-        // Create TaskStateMemoryProvider for dynamic system prompts
-        val taskStateProvider = TaskStateMemoryProvider(
-            getFactsByAgentUseCase = getFactsByAgentUseCase,
-            chat = chat
-        ).withAgentId(agent.config.id)
-
-        // Base memory from agent config (e.g. UserProfile if configured)
-        val baseMemoryProvider = memoryProviderFactory.create(agent.config.memoryTypes)
-
-        // Create composite provider: task state prompt + base memory
-        val compositeProvider = CompositeMemoryProvider(
-            listOf(taskStateProvider, baseMemoryProvider)
-        )
-
-        // Create strategy for the agent
+        val taskContext = buildTaskContext(chat, agent)
+        val compositeProvider = buildMemoryProvider(chat, agent)
         val strategy = strategyFactory.create(agent.config.contextStrategyType)
 
         // Create new agent instance with composite memory provider
@@ -114,11 +84,8 @@ class TaskWorker @Inject constructor(
             memoryProvider = compositeProvider
         )
 
-        // Notify request start
-        onEvent?.invoke(WorkerEvent.RequestStart)
-
         // Report current state to chat before LLM call
-        reportCurrentState(chat.id, currentState, currentStep, facts)
+        reportCurrentState(chat.id, taskContext)
 
         // Call agent.process() for automatic context management
         val result = agentWithTaskState.process(
@@ -131,27 +98,65 @@ class TaskWorker @Inject constructor(
             onSuccess = { agentResult ->
                 val llmResponse = TaskResponseParser.parse(agentResult.responseText)
                 if (llmResponse != null) {
-                    processSuccessResponse(context, userPrompt, llmResponse, agent.config.id, onEvent)
+                    processSuccessResponse(taskContext, userPrompt, llmResponse, agent.config.id)
                 } else {
-                    handleParseError(chat.id, agentResult.responseText, onEvent)
+                    handleParseError(chat.id, agentResult.responseText)
                 }
             },
             onFailure = { error ->
-                handleLlmError(chat.id, error, onEvent)
+                handleLlmError(chat.id, error)
             }
+        )
+    }
+
+    /** Все MemoryProvider для агента: стандартные + для выдачи промптов текущего стейта */
+    private fun buildMemoryProvider(
+        chat: Chat,
+        agent: AIAgent
+    ): CompositeMemoryProvider {
+        // Create TaskStateMemoryProvider for dynamic system prompts
+        val taskStateProvider = TaskStateMemoryProvider(
+            agentMemoryRepository = agentMemoryRepository,
+            chat = chat,
+            agentId = agent.config.id
+        )
+
+        // Base memory from agent config (e.g. UserProfile if configured)
+        val baseMemoryProvider = memoryProviderFactory.create(agent.config.memoryTypes)
+
+        // Create composite provider: task state prompt + base memory
+        val compositeProvider = CompositeMemoryProvider(
+            listOf(taskStateProvider, baseMemoryProvider)
+        )
+        return compositeProvider
+    }
+
+    private suspend fun buildTaskContext(
+        chat: Chat,
+        agent: AIAgent,
+    ): TaskContext {
+        // Load current state from LTM
+        val facts = loadFacts(agent.config.id)
+        val currentState = determineCurrentState(facts)
+        val currentStep = facts[TaskMemoryKeys.CURRENT_STEP]?.toIntOrNull() ?: 1
+        return TaskContext(
+            chat = chat,
+            agentId = agent.config.id,
+            facts = facts,
+            currentState = currentState,
+            currentStep = currentStep
         )
     }
 
     private suspend fun reportCurrentState(
         chatId: Long,
-        state: TaskState,
-        step: Int,
-        facts: Map<String, String>
+        taskContext: TaskContext
     ) {
-        val totalStages = facts[TaskMemoryKeys.PLAN_TOTAL_STAGES]?.toIntOrNull() ?: 0
-        val stageName = if (totalStages > 0) facts[TaskMemoryKeys.planStageName(step)] else null
+        val step = taskContext.currentStep
+        val totalStages = taskContext.facts[TaskMemoryKeys.PLAN_TOTAL_STAGES]?.toIntOrNull() ?: 0
+        val stageName = if (totalStages > 0) taskContext.facts[TaskMemoryKeys.planStageName(step)] else null
 
-        val stateDescription = when (state) {
+        val stateDescription = when (taskContext.currentState) {
             TaskState.INIT -> "Сбор требований и определение задачи"
             TaskState.PLANNING -> "Декомпозиция задачи на этапы"
             TaskState.EXECUTION -> buildString {
@@ -167,11 +172,11 @@ class TaskWorker @Inject constructor(
             TaskState.DONE -> "Формирование итогового отчёта"
         }
 
-        chatTools.addInfoMessage(chatId, "📍 Было Состояние: ${state.name} — $stateDescription")
+        chatTools.addInfoMessage(chatId, "📍 Было Состояние: ${taskContext.currentState.name} — $stateDescription")
     }
 
     private suspend fun loadFacts(agentId: Long): Map<String, String> {
-        return getFactsByAgentUseCase(agentId)
+        return agentMemoryRepository.getFacts(agentId)
             .associate { it.memoryKey to it.fact }
     }
 
@@ -188,8 +193,7 @@ class TaskWorker @Inject constructor(
         context: TaskContext,
         userInput: String,
         llmResponse: TaskLlmResponse,
-        agentId: Long,
-        onEvent: (suspend (WorkerEvent) -> Unit)?
+        agentId: Long
     ) {
         // Get handler for current state
         val handler = stateMachine.getHandler(context.currentState)
@@ -220,22 +224,7 @@ class TaskWorker @Inject constructor(
 
         // Notify about state transition
         if (result.nextState != null && result.nextState != context.currentState) {
-            val totalStages = context.getTotalStages()
-            val newStageName = context.facts[TaskMemoryKeys.planStageName(newStep)]
-            val stateLabel = when (result.nextState) {
-                TaskState.PLANNING -> "PLANNING — Планирование"
-                TaskState.EXECUTION -> buildString {
-                    append("EXECUTION — Этап $newStep")
-                    if (totalStages > 0) append(" из $totalStages")
-                    if (newStageName != null) append(": $newStageName")
-                }
-                TaskState.VERIFICATION -> buildString {
-                    append("VERIFICATION — Проверка этапа $newStep")
-                    if (newStageName != null) append(": $newStageName")
-                }
-                TaskState.DONE -> "DONE — Финализация задачи"
-                TaskState.INIT -> "INIT — Новая задача"
-            }
+            val stateLabel = buildStateTranditionInfoMessage(context, newStep, result.nextState)
             chatTools.addInfoMessage(context.chat.id, "🔄 Переход: $stateLabel")
         }
 
@@ -261,6 +250,30 @@ class TaskWorker @Inject constructor(
         }
     }
 
+    private fun buildStateTranditionInfoMessage(
+        context: TaskContext,
+        newStep: Int,
+        nextState: TaskState
+    ): String {
+        val totalStages = context.getTotalStages()
+        val newStageName = context.facts[TaskMemoryKeys.planStageName(newStep)]
+        val stateLabel = when (nextState) {
+            TaskState.PLANNING -> "PLANNING — Планирование"
+            TaskState.EXECUTION -> buildString {
+                append("EXECUTION — Этап $newStep")
+                if (totalStages > 0) append(" из $totalStages")
+                if (newStageName != null) append(": $newStageName")
+            }
+            TaskState.VERIFICATION -> buildString {
+                append("VERIFICATION — Проверка этапа $newStep")
+                if (newStageName != null) append(": $newStageName")
+            }
+            TaskState.DONE -> "DONE — Финализация задачи"
+            TaskState.INIT -> "INIT — Новая задача"
+        }
+        return stateLabel
+    }
+
     private suspend fun saveMemoryUpdates(agentId: Long, updates: Map<String, String>) {
         val validUpdates = memoryUpdateValidator.filterValid(updates)
 
@@ -278,21 +291,19 @@ class TaskWorker @Inject constructor(
                 key.startsWith("exec:") -> TaskMemoryKeys.CAT_EXEC
                 else -> "general"
             }
-            upsertFactUseCase(agentId, key, category, value)
+            agentMemoryRepository.upsertFact(agentId, key, category, value)
         }
     }
 
     private suspend fun saveCurrentState(agentId: Long, state: TaskState, step: Int) {
-        upsertFactUseCase(agentId, TaskMemoryKeys.CURRENT_STATE, TaskMemoryKeys.CAT_WORKFLOW, state.name)
-        upsertFactUseCase(agentId, TaskMemoryKeys.CURRENT_STEP, TaskMemoryKeys.CAT_WORKFLOW, step.toString())
+        agentMemoryRepository.upsertFact(agentId, TaskMemoryKeys.CURRENT_STATE, TaskMemoryKeys.CAT_WORKFLOW, state.name)
+        agentMemoryRepository.upsertFact(agentId, TaskMemoryKeys.CURRENT_STEP, TaskMemoryKeys.CAT_WORKFLOW, step.toString())
     }
 
     private suspend fun handleParseError(
         chatId: Long,
-        rawResponse: String,
-        onEvent: (suspend (WorkerEvent) -> Unit)?
+        rawResponse: String
     ) {
-        onEvent?.invoke(WorkerEvent.RequestError("Parse error"))
         chatTools.addBotMessage(
             chatId,
             "⚠️ Не удалось обработать ответ от LLM. Пожалуйста, попробуйте переформулировать запрос."
@@ -302,10 +313,8 @@ class TaskWorker @Inject constructor(
     private suspend fun handleLlmError(
         chatId: Long,
         error: Throwable,
-        onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         val errorMessage = "❌ Ошибка при обращении к LLM: ${error.message}"
-        onEvent?.invoke(WorkerEvent.RequestError(errorMessage))
         chatTools.addBotMessage(chatId, errorMessage)
     }
 }

@@ -124,7 +124,7 @@ internal class UserSettingsViewModelImpl(
 
             UserSettingsViewModel.Event.AddFactClick -> _state.update {
                 it.copy(
-                    editingFact = LongTermFactUiItem("", 0L, "", "", 0L),
+                    editingFact = LongTermFactUiItem(0L, "", "", "", 0L),
                     editFactKey = "",
                     editFactCategory = "",
                     editFactValue = "",
@@ -145,8 +145,7 @@ internal class UserSettingsViewModelImpl(
             }
 
             is UserSettingsViewModel.Event.DeleteFactClick -> viewModelScope.launch {
-                val ltmGroupId = _state.value.currentProfile?.ltmGroupId ?: return@launch
-                deleteFact(ltmGroupId, event.fact.memoryKey, event.fact.categoryId)
+                deleteFact(event.fact.id)
                 // Flow автоматически обновит profileFacts
             }
 
@@ -179,7 +178,7 @@ internal class UserSettingsViewModelImpl(
                 upsertFact.invokeByLTMGroup(
                     ltmGroupId = profile.ltmGroupId,
                     memoryKey = key,
-                    categoryTitle = category,
+                    category = category,
                     fact = value
                 )
                 _state.update { it.copy(editingFact = null, factEditError = null) }
@@ -193,7 +192,7 @@ internal class UserSettingsViewModelImpl(
     }
 
     private fun List<LongTermMemoryFact>.toUiItems(): List<LongTermFactUiItem> =
-        map { LongTermFactUiItem(it.memoryKey, it.categoryId, it.category, it.fact, it.updatedAt) }
+        map { LongTermFactUiItem(it.id, it.memoryKey, it.category, it.fact, it.updatedAt) }
 
     class Factory @Inject constructor(
         private val getCurrentProfile: GetCurrentUserProfileUseCase,

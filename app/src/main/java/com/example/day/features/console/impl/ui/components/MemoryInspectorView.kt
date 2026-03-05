@@ -71,7 +71,7 @@ fun MemoryInspectorView(
                 1 -> WorkingMemoryContent(uiModel.workingMemory)
                 2 -> LongTermFactsListView(
                     facts = uiModel.longTermFacts.map {
-                        LongTermFactUiItem(it.memoryKey, it.categoryId, it.category, it.fact, it.updatedAt)
+                        LongTermFactUiItem(it.id, it.memoryKey, it.category, it.fact, it.updatedAt)
                     }.toImmutableList(),
                     showPromptPreview = true
                 )

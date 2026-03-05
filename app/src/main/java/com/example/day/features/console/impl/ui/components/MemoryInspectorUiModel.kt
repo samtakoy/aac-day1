@@ -23,8 +23,8 @@ data class ShortTermMemoryItem(
 )
 
 data class LongTermFactItem(
+    val id: Long,
     val memoryKey: String,
-    val categoryId: Long,
     val category: String,
     val fact: String,
     val updatedAt: Long

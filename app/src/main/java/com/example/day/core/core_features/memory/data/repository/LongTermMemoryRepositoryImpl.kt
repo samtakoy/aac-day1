@@ -13,11 +13,11 @@ internal class LongTermMemoryRepositoryImpl @Inject constructor(
     private val memoryDao: LongTermMemoryDao
 ) : LongTermMemoryRepository {
 
-    override suspend fun upsertFact(ltmGroupId: Long, memoryKey: String, categoryId: Long, fact: String) {
+    override suspend fun upsertFact(ltmGroupId: Long, memoryKey: String, category: String, fact: String) {
         val entity = LongTermMemoryEntity(
             memoryKey = memoryKey,
             ltmGroupId = ltmGroupId,
-            categoryId = categoryId,
+            category = category,
             fact = fact
         )
         memoryDao.upsert(entity)
@@ -41,12 +41,12 @@ internal class LongTermMemoryRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun deleteFact(ltmGroupId: Long, memoryKey: String) {
-        memoryDao.deleteByKeyAndGroup(memoryKey, ltmGroupId)
+    override suspend fun deleteFact(id: Long) {
+        memoryDao.deleteById(id)
     }
 
-    override suspend fun deleteFact(ltmGroupId: Long, memoryKey: String, categoryId: Long) {
-        memoryDao.deleteByKeyAndCategoryAndGroup(memoryKey, categoryId, ltmGroupId)
+    override suspend fun deleteFact(ltmGroupId: Long, memoryKey: String, category: String) {
+        memoryDao.deleteByCompositeKey(ltmGroupId, memoryKey, category)
     }
 
     override suspend fun clearFactsByGroup(ltmGroupId: Long) {

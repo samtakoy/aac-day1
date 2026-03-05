@@ -14,12 +14,10 @@ object TaskMemoryKeys {
     const val INIT_DESCRIPTION = "init:description"
     const val INIT_GOAL = "init:goal"
     const val INIT_EXPERT = "init:expert"
-    const val INIT_EXPERT_ROLE = "init:expert_role"
 
     // Planning artifacts
     const val PLAN_TOTAL_STAGES = "plan:total_stages"
     const val PLAN_CURRENT_STAGE = "plan:current_stage"
-    const val PLAN_STAGES_JSON = "plan:stages_json"
 
     // Stage artifacts - format: plan:stageN, plan:stageN_desc, plan:stageN_expert, plan:stageN_status
     fun planStageName(n: Int) = "plan:stage$n"

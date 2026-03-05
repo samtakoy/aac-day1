@@ -111,27 +111,27 @@ interface AgentRepository {
     
     /**
      * Get or create agent by systemName and isCommon flag.
-     * 
+     *
      * If isCommon = true:
      *   1. Find agent by systemName only (common agents)
      *   2. If not found - create new common agent
-     * 
+     *
      * If isCommon = false:
      *   1. Find agent by systemName + chatId (chat-specific)
      *   2. If not found - create new agent and bind to chatId
-     * 
+     *
      * @param systemName system name of the agent
      * @param isCommon if true, agent can be used in any chat without binding
      * @param chatId chat id to bind agent to (0 для агента не привязанного к чату)
-     * @param systemPromt agent system prompt
-     * @param model настройки llm бота
+     * @param systemPrompt agent system prompt
+     * @param defaultModel factory method to create ModelSettings only if agent needs to be created
      * @return existing or newly created Agent
      */
     suspend fun getOrCreateAgent(
         systemName: String,
         chatId: Long,
-        systemPromt: String,
-        model: ModelSettings
+        systemPrompt: String,
+        defaultModel: () -> ModelSettings
     ): AgentConfig
 
     // === Agent Memory Types ===

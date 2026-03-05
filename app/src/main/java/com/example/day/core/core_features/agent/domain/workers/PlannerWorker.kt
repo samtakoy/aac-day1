@@ -80,7 +80,10 @@ class PlannerWorker @Inject constructor(
 
         // Get agent and process message
         val agent = aiAgentFactory.getOrCreate(
-            AGENT_NAME, chat.id, chat.settings.systemPromt, chat.settings.model
+            AGENT_NAME,
+            chat.id,
+            chat.settings.systemPromt,
+            defaultModel = { chat.settings.model }
         )
 
         // Process the message
@@ -97,7 +100,7 @@ class PlannerWorker @Inject constructor(
                     upsertFactWithCategoryUseCase(
                         chatGroupId = groupId,
                         memoryKey = cmd.memoryKey,
-                        categoryTitle = cmd.category,
+                        category = cmd.category,
                         fact = cmd.fact
                     )
                     onEvent?.invoke(WorkerEvent.FactSaved(cmd.memoryKey, cmd.category, cmd.fact))
