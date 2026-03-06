@@ -2,7 +2,9 @@ package com.example.day.core.core_features.agent.domain.workers.task.states
 
 import com.example.day.core.core_features.agent.domain.model.TaskLlmResponse
 import com.example.day.core.core_features.agent.domain.model.TaskState
+import com.example.day.core.core_features.agent.domain.workers.task.HandlerResult
 import com.example.day.core.core_features.agent.domain.workers.task.TaskContext
+import com.example.day.core.core_features.agent.domain.workers.task.states.toHandlerResult
 
 /**
  * Interface for task state handlers.
@@ -19,12 +21,25 @@ interface TaskStateHandler {
 
     /**
      * Process LLM response and determine next state.
+     * Legacy method for backward compatibility - returns StateResult.
+     */
+    suspend fun handleLegacy(
+        context: TaskContext,
+        userInput: String,
+        llmResponse: TaskLlmResponse
+    ): StateResult
+
+    /**
+     * Process LLM response and determine next state.
+     * Default implementation converts StateResult to HandlerResult.
      */
     suspend fun handle(
         context: TaskContext,
         userInput: String,
         llmResponse: TaskLlmResponse
-    ): StateResult
+    ): HandlerResult {
+        return handleLegacy(context, userInput, llmResponse).toHandlerResult(state)
+    }
 }
 
 /**

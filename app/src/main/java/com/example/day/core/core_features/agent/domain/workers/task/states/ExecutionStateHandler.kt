@@ -63,7 +63,7 @@ $feedback
 """.trimIndent()
     }
 
-    override suspend fun handle(
+    override suspend fun handleLegacy(
         context: TaskContext,
         userInput: String,
         llmResponse: TaskLlmResponse

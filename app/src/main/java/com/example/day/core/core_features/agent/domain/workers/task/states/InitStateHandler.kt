@@ -3,7 +3,9 @@ package com.example.day.core.core_features.agent.domain.workers.task.states
 import com.example.day.core.core_features.agent.domain.model.TaskLlmResponse
 import com.example.day.core.core_features.agent.domain.model.TaskMemoryKeys
 import com.example.day.core.core_features.agent.domain.model.TaskState
+import com.example.day.core.core_features.agent.domain.workers.task.HandlerResult
 import com.example.day.core.core_features.agent.domain.workers.task.TaskContext
+import com.example.day.core.core_features.agent.domain.workers.task.TaskStateUpdate
 
 /**
  * INIT state handler.
@@ -56,6 +58,33 @@ class InitStateHandler : TaskStateHandler {
         context: TaskContext,
         userInput: String,
         llmResponse: TaskLlmResponse
+    ): HandlerResult {
+        val nextState = llmResponse.workflowTransition?.let {
+            TaskState.fromString(it)
+        }
+
+        return if (nextState != null && nextState == TaskState.PLANNING) {
+            // User confirmed - transition to PLANNING
+            val userTask = buildUserTask(llmResponse.memoryUpdates)
+            HandlerResult.transition(
+                targetState = TaskState.PLANNING,
+                update = TaskStateUpdate.TransitionToPlanning(
+                    userTask = userTask,
+                    planningResult = null
+                )
+            )
+        } else {
+            // Stay in INIT, return response to user
+            HandlerResult.success(
+                message = llmResponse.replyToUser
+            )
+        }
+    }
+
+    override suspend fun handleLegacy(
+        context: TaskContext,
+        userInput: String,
+        llmResponse: TaskLlmResponse
     ): StateResult {
         val nextState = llmResponse.workflowTransition?.let {
             TaskState.fromString(it)
@@ -66,5 +95,17 @@ class InitStateHandler : TaskStateHandler {
             nextState = nextState,
             memoryUpdates = llmResponse.memoryUpdates
         )
+    }
+
+    private fun buildUserTask(memoryUpdates: Map<String, String>): String {
+        val title = memoryUpdates[TaskMemoryKeys.INIT_TITLE] ?: ""
+        val description = memoryUpdates[TaskMemoryKeys.INIT_DESCRIPTION] ?: ""
+        val goal = memoryUpdates[TaskMemoryKeys.INIT_GOAL] ?: ""
+
+        return buildString {
+            if (title.isNotBlank()) append("Task: $title\n")
+            if (description.isNotBlank()) append("Description: $description\n")
+            if (goal.isNotBlank()) append("Goal: $goal")
+        }.trim()
     }
 }

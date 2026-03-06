@@ -70,7 +70,7 @@ plan:stageN_status: 0 = не начат, 1 = выполнен (ждёт вери
 """.trimIndent()
     }
 
-    override suspend fun handle(
+    override suspend fun handleLegacy(
         context: TaskContext,
         userInput: String,
         llmResponse: TaskLlmResponse

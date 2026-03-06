@@ -10,6 +10,7 @@ import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
 import com.example.day.core.core_features.agent.domain.usecase.ClearAgentContextUseCase
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
+import com.example.day.core.core_features.agent.domain.workers.task.HandlerResult
 import com.example.day.core.core_features.agent.domain.workers.task.TaskContext
 import com.example.day.core.core_features.agent.domain.workers.task.TaskResponseParser
 import com.example.day.core.core_features.agent.domain.workers.task.TaskStateMachine
@@ -20,6 +21,7 @@ import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.memory.domain.provider.CompositeMemoryProvider
 import com.example.day.core.core_features.memory.domain.provider.TaskStateMemoryProvider
+import com.example.day.core.core_features.memory.domain.provider.TaskStateMemoryProviderFactory
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProviderFactory
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.memory.domain.usecase.ClearTaskMemoryForAgentUseCase
@@ -45,6 +47,7 @@ class TaskWorker @Inject constructor(
     private val clearTaskMemoryUseCase: ClearTaskMemoryForAgentUseCase,
     private val chatTools: ChatTools,
     private val memoryProviderFactory: MemoryProviderFactory,
+    private val taskStateMemoryProviderFactory: TaskStateMemoryProviderFactory,
     private val contextRepository: AgentContextRepository,
     private val llmRequestUseCase: LlmRequestUseCase,
     private val strategyFactory: StrategyFactory
@@ -114,9 +117,8 @@ class TaskWorker @Inject constructor(
         chat: Chat,
         agent: AIAgent
     ): CompositeMemoryProvider {
-        // Create TaskStateMemoryProvider for dynamic system prompts
-        val taskStateProvider = TaskStateMemoryProvider(
-            agentMemoryRepository = agentMemoryRepository,
+        // Create TaskStateMemoryProvider using factory (injects TaskStateStore + Json)
+        val taskStateProvider = taskStateMemoryProviderFactory.create(
             chat = chat,
             agentId = agent.config.id
         )
@@ -201,8 +203,31 @@ class TaskWorker @Inject constructor(
         // Handle state logic
         val result = handler.handle(context, userInput, llmResponse)
 
+        // Extract values from HandlerResult based on type
+        val nextState = when (result) {
+            is HandlerResult.Transition -> result.targetState
+            is HandlerResult.Failure -> result.state
+            else -> null
+        }
+        val message = when (result) {
+            is HandlerResult.Success -> result.message
+            is HandlerResult.Transition -> result.message
+            is HandlerResult.Failure -> result.error
+            is HandlerResult.Waiting -> result.message
+        }
+        val memoryUpdates = when (result) {
+            is HandlerResult.Success -> result.memoryUpdates
+            is HandlerResult.Transition -> result.memoryUpdates
+            is HandlerResult.Failure -> result.memoryUpdates
+            is HandlerResult.Waiting -> result.memoryUpdates
+        }
+        val newStep = when (result) {
+            is HandlerResult.Success -> result.newStep
+            is HandlerResult.Transition -> result.newStep
+            else -> null
+        }
+
         // Validate state transition before applying
-        val nextState = result.nextState
         if (nextState != null && nextState != context.currentState) {
             val validation = transitionValidator.validate(context.currentState, nextState)
             if (validation is TransitionValidator.ValidationResult.Invalid) {
@@ -215,21 +240,21 @@ class TaskWorker @Inject constructor(
         }
 
         // Save memory updates to LTM
-        saveMemoryUpdates(agentId, result.memoryUpdates)
+        saveMemoryUpdates(agentId, memoryUpdates)
 
         // Save current state
-        val newState = result.nextState ?: context.currentState
-        val newStep = result.newStep ?: context.currentStep
-        saveCurrentState(agentId, newState, newStep)
+        val finalState = nextState ?: context.currentState
+        val step = newStep ?: context.currentStep
+        saveCurrentState(agentId, finalState, step)
 
         // Notify about state transition
-        if (result.nextState != null && result.nextState != context.currentState) {
-            val stateLabel = buildStateTranditionInfoMessage(context, newStep, result.nextState)
+        if (nextState != null && nextState != context.currentState) {
+            val stateLabel = buildStateTranditionInfoMessage(context, step, nextState)
             chatTools.addInfoMessage(context.chat.id, "🔄 Переход: $stateLabel")
         }
 
         // Send reply to user
-        chatTools.addBotMessage(context.chat.id, result.replyToUser)
+        chatTools.addBotMessage(context.chat.id, message)
 
         // Handle state transition side-effects
         when {
@@ -238,12 +263,12 @@ class TaskWorker @Inject constructor(
                 clearAgentContextUseCase(agentId)
                 clearTaskMemoryUseCase(agentId)
             }
-            newState == TaskState.DONE -> {
+            finalState == TaskState.DONE -> {
                 // Transitioned TO DONE from VERIFICATION — clear only dialog history.
                 // Task memory is preserved so DoneStateHandler can read artifacts on next doWork() call.
                 clearAgentContextUseCase(agentId)
             }
-            result.nextState != null && result.nextState != context.currentState -> {
+            nextState != null && nextState != context.currentState -> {
                 // Transitioned to a new non-DONE state — clear history for fresh context
                 clearAgentContextUseCase(agentId)
             }

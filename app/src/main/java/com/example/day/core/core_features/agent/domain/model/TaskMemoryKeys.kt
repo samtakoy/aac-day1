@@ -33,6 +33,19 @@ object TaskMemoryKeys {
     fun verifStageFeedback(n: Int) = "verif:stage${n}_feedback"
     fun verifStageScore(n: Int) = "verif:stage${n}_score"
 
+    // Legacy simple keys (for backward compatibility with TaskStateMemoryProvider)
+    const val USER_TASK = "user_task"
+    const val PLANNING = "planning"
+    const val ERROR = "error"
+    const val PLAN = "plan"
+    const val TOTAL_STEPS = "total_steps"
+    const val EXECUTION = "execution"
+    const val EXECUTION_RESULTS = "execution_results"
+    const val VERIFICATION = "verification"
+    const val FEEDBACK = "feedback"
+    const val RESULT = "result"
+    const val VERIFICATION_PASSED = "verification_passed"
+
     // Categories for LTM
     const val CAT_WORKFLOW = "workflow"
     const val CAT_INIT = "init"

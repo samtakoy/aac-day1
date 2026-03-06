@@ -12,6 +12,8 @@ import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.agent.domain.workers.PlannerWorker
+import com.example.day.core.core_features.agent.domain.workers.task.TaskStateStore
+import com.example.day.core.core_features.agent.domain.workers.task.TaskStateStoreImpl
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentToolsImpl
 import com.example.day.core.core_features.chat.data.local.ChatDatabase
@@ -53,6 +55,10 @@ internal interface AgentCoreFeatureModule {
 
     @Binds
     fun bindsChatTools(impl: ChatToolsImpl): ChatTools
+
+    @Binds
+    @Singleton
+    fun bindsTaskStateStore(impl: TaskStateStoreImpl): TaskStateStore
 
     companion object {
 
