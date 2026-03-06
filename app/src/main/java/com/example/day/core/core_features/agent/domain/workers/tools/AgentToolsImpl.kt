@@ -25,7 +25,6 @@ import javax.inject.Inject
  * but are no longer used by TalkWorker — that logic has moved to ContextStrategy subclasses.
  */
 internal class AgentToolsImpl @Inject constructor(
-    private val getOrCreateAgentUseCase: GetOrCreateAgentUseCase,
     private val getAgentContextUseCase: GetAgentContextUseCase,
     private val saveAgentContextUseCase: SaveAgentContextUseCase,
     private val clearAgentContextUseCase: ClearAgentContextUseCase,

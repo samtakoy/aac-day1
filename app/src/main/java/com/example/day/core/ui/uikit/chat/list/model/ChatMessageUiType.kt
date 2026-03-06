@@ -6,5 +6,6 @@ package com.example.day.core.ui.uikit.chat.list.model
 enum class ChatMessageUiType {
     User,
     Bot,
-    Info
+    Info,
+    Buttons
 }

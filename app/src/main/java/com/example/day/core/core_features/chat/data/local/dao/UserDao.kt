@@ -12,6 +12,9 @@ internal interface UserDao {
     @Query("SELECT * FROM users WHERE type = :type LIMIT 1")
     suspend fun getUserByType(type: Int): UserEntity?
 
+    @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
+    suspend fun getUserById(id: Long): UserEntity?
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(user: UserEntity): Long
 

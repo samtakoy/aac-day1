@@ -21,8 +21,10 @@ import com.example.day.core.core_features.memory.domain.provider.base.MemoryProv
  */
 class AIAgent(
     val config: AgentConfig,
+    // TODO больше тут не актуально - нужно вынести в AgentContextMemoryProvider или AgentMessageHistoryProvider
     private val contextRepository: AgentContextRepository,
     private val llmProvider: LlmRequestUseCase,
+    // TODO больше тут не актуально - нужно вынести в AgentContextMemoryProvider или AgentMessageHistoryProvider
     private val strategy: ContextStrategy,
     private val memoryProvider: MemoryProvider    // Долговременная + Рабочая
 ) {
@@ -50,7 +52,8 @@ class AIAgent(
         val requestDebugInfo = buildRequestDebugInfo(config.systemPrompt, memoryMessages, userPrompt)
 
         return llmProvider.askLlm(
-            chatSettings = chat,
+            // Модель теперь берется из агента, а не из чата. В чате - это только прототип для копирования.
+            model = config.modelSettings,
             userPrompt = userPrompt,
             systemPrompt = config.systemPrompt,
             history = history,

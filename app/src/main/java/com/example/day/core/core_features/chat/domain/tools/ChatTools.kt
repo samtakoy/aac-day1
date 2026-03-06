@@ -1,6 +1,7 @@
 package com.example.day.core.core_features.chat.domain.tools
 
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.model.ChatMessage
 
 /**
  * Interface for chat operations that workers and other components use.
@@ -34,7 +35,7 @@ interface ChatTools {
      * @param chatId the chat identifier
      * @param message the message content
      */
-    suspend fun addBotMessage(chatId: Long, message: String)
+    suspend fun addBotMessage(chatId: Long, message: String, buttons: List<ChatMessage.Button> = emptyList())
     
     /**
      * Add an info message to the chat.
@@ -42,5 +43,5 @@ interface ChatTools {
      * @param chatId the chat identifier
      * @param message the message content
      */
-    suspend fun addInfoMessage(chatId: Long, message: String)
+    suspend fun addInfoMessage(chatId: Long, message: String, buttons: List<ChatMessage.Button> = emptyList())
 }

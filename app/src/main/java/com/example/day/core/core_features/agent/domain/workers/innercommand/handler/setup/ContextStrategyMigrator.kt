@@ -62,5 +62,6 @@ class ContextStrategyMigrator @Inject constructor(
             )
         }
         CtxStrategyType.FULL_CONTEXT -> AContextState.Full(messages = messages.toPersistentList())
+        CtxStrategyType.EMPTY -> AContextState.Empty
     }
 }

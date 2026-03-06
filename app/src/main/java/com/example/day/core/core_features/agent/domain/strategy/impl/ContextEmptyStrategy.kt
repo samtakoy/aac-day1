@@ -13,7 +13,7 @@ class ContextEmptyStrategy : ContextStrategy {
     override suspend fun process(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String,
+        userPrompt: String?,
         store: AgentContextRepository
     ): ContextSnapshot = ContextSnapshot(messages = emptyList())
 

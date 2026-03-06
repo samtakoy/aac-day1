@@ -12,7 +12,9 @@ import kotlinx.collections.immutable.toImmutableList
 /**
  * Добавить сообщение пользователя в контекст
  */
-fun PersistentList<AContextMessage>.addUserMessage(content: String): PersistentList<AContextMessage> {
+fun PersistentList<AContextMessage>.addUserMessage(content: String?): PersistentList<AContextMessage> {
+    // Пустое сообщение может быть когда надо просто подергать llm
+    if (content.isNullOrBlank()) return this
     val newMessage = AContextMessage(
         role = Role.USER,
         content = content

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -63,7 +64,8 @@ fun ChatMessageView(
     item: ChatMessageUiModel,
     modifier: Modifier = Modifier,
     colors: ChatUiColors = LocalChatColors.current,
-    onInfoMessageExpand: (id: Long, isExpanded: Boolean) -> Unit = { _, _ -> }
+    onInfoMessageExpand: (id: Long, isExpanded: Boolean) -> Unit = { _, _ -> },
+    onMessageButtonClick: (messageId: Long, actionId: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
 
@@ -145,6 +147,18 @@ fun ChatMessageView(
                 onExpandChange = { isExpanded ->
                     onInfoMessageExpand(item.id, isExpanded)
                 }
+            )
+        }
+
+        ChatMessageUiType.Buttons -> {
+            ButtonsMessageRow(
+                modifier = modifier,
+                text = item.text,
+                buttons = item.buttons,
+                onButtonClick = { actionId ->
+                    onMessageButtonClick(item.id, actionId)
+                },
+                onCopyClick = copyToClipboard
             )
         }
     }
@@ -566,7 +580,7 @@ fun ChatMessageViewPreview() {
                 isExpanded = false
             )
         )
-        
+
         // Info message - long (expanded)
         ChatMessageView(
             item = ChatMessageUiModel(
@@ -577,5 +591,127 @@ fun ChatMessageViewPreview() {
                 isExpanded = true
             )
         )
+
+        // Buttons message - only buttons
+        ChatMessageView(
+            item = ChatMessageUiModel(
+                id = 8,
+                text = "",
+                userType = ChatMessageUiType.Buttons,
+                status = UiMessageStatus.Viewed,
+                buttons = ChatMessageUiModel.Buttons(
+                    list = listOf(
+                        ChatMessageUiModel.Button("action1", "Да", "", false),
+                        ChatMessageUiModel.Button("action2", "Нет", "", false)
+                    ),
+                    isEnabled = true
+                )
+            )
+        )
+    }
+}
+
+/**
+ * Buttons message row: displays message text (if any) with buttons below.
+ * Buttons are arranged horizontally in a row with wrapping.
+ * If buttons are disabled, they are displayed with reduced alpha.
+ */
+@Composable
+private fun ButtonsMessageRow(
+    text: String,
+    buttons: ChatMessageUiModel.Buttons?,
+    onButtonClick: (String) -> Unit,
+    onCopyClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    colors: ChatUiColors = LocalChatColors.current
+) {
+    val contentColor = LocalContentColor.current
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+    ) {
+        // Text (if any)
+        if (text.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .background(
+                        color = colors.infoBubble,
+                        shape = RoundedCornerShape(
+                            topStart = 4.dp,
+                            topEnd = 16.dp,
+                            bottomEnd = 16.dp,
+                            bottomStart = 16.dp
+                        )
+                    )
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = text,
+                    color = colors.infoText,
+                    fontSize = 14.sp
+                )
+            }
+        }
+
+        // Buttons row
+        if (buttons != null && buttons.list.isNotEmpty()) {
+            val buttonAlpha = if (buttons.isEnabled) 1f else 0.5f
+
+            Row(
+                modifier = Modifier
+                    .padding(top = if (text.isNotEmpty()) 4.dp else 0.dp)
+                    .graphicsLayer { alpha = buttonAlpha }
+            ) {
+                buttons.list.forEach { button ->
+                    val buttonBackground = if (button.isPressed) {
+                        colors.userBubble.copy(alpha = 0.5f)
+                    } else {
+                        colors.userBubble
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .clickable(enabled = buttons.isEnabled && !button.isPressed) {
+                                onButtonClick(button.actionId)
+                            }
+                            .background(
+                                color = buttonBackground,
+                                shape = RoundedCornerShape(50)
+                            )
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        shape = RoundedCornerShape(50),
+                        color = Color.Transparent
+                    ) {
+                        Text(
+                            text = button.title,
+                            color = colors.userText,
+                            fontSize = 14.sp,
+                            fontWeight = if (button.isPressed) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal
+                        )
+                    }
+                }
+            }
+        }
+
+        // Copy icon (only if there's text)
+        if (text.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .padding(top = 4.dp)
+                    .clickable { onCopyClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = "Copy",
+                    modifier = Modifier.size(14.dp),
+                    tint = contentColor.copy(alpha = 0.6f)
+                )
+            }
+        }
     }
 }

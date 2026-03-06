@@ -50,7 +50,7 @@ internal interface ConsoleViewModel {
         class SettingsSubmitClick(val chatTitle: String, val settings: ChatSettings) : Event
         object SettingsCancelClick : Event
         class MessageExpandedChange(val messageId: Long, val isExpanded: Boolean) : Event
-        
+
         // Stage Creation events (PLANNER groups)
         object ConfirmStageCreation : Event
         object DeclineStageCreation : Event
@@ -58,5 +58,8 @@ internal interface ConsoleViewModel {
         // Memory Inspector
         object OpenMemoryInspector : Event
         object ToggleMemoryInspector : Event
+
+        // Button click in chat message
+        class ChatButtonClick(val messageId: Long, val action: String) : Event
     }
 }

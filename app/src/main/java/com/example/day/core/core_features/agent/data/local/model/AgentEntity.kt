@@ -47,7 +47,7 @@ internal data class AgentEntity(
 
     /** Настройки модели llm  (json строка из ModelSettingsEntity) */
     @ColumnInfo(name = "model_settings")
-    val modelSettings: String = "{}",
+    val modelSettings: String,
 
     /** Системный промпт агента (по умолчанию пустой) */
     @ColumnInfo(name = "system_prompt")

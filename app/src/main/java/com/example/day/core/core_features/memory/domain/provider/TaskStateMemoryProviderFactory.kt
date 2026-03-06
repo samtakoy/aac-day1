@@ -1,17 +1,14 @@
 package com.example.day.core.core_features.memory.domain.provider
 
-import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
-import com.example.day.core.core_features.agent.domain.workers.task.TaskStateStore
 import com.example.day.core.core_features.chat.domain.model.Chat
-import com.example.day.core.core_features.memory.domain.provider.base.MemoryProvider
-import kotlinx.serialization.json.Json
+import com.example.day.core.core_features.state_machine.domain.StateStore
 import javax.inject.Inject
 
 /**
  * Factory for creating TaskStateMemoryProvider instances with proper runtime dependencies.
  *
  * This factory solves the DI problem where TaskStateMemoryProvider needs both injectable
- * dependencies (AgentMemoryRepository, TaskStateStore, Json) and runtime values (Chat, agentId).
+ * dependencies (TaskStateStore) and runtime values (Chat, agentId).
  *
  * Usage:
  * ```
@@ -19,9 +16,7 @@ import javax.inject.Inject
  * ```
  */
 class TaskStateMemoryProviderFactory @Inject constructor(
-    private val agentMemoryRepository: AgentMemoryRepository,
-    private val taskStateStore: TaskStateStore,
-    private val json: Json
+    private val taskStateStore: StateStore
 ) {
     /**
      * Creates a TaskStateMemoryProvider with the given runtime values.
@@ -32,11 +27,9 @@ class TaskStateMemoryProviderFactory @Inject constructor(
      */
     fun create(chat: Chat, agentId: Long): TaskStateMemoryProvider {
         return TaskStateMemoryProvider(
-            agentMemoryRepository = agentMemoryRepository,
             chat = chat,
             agentId = agentId,
-            taskStateStore = taskStateStore,
-            json = json
+            taskStateStore = taskStateStore
         )
     }
 }

@@ -30,5 +30,6 @@ enum class StrategyTypeEntity {
     /**
      * Стратегия ветвления - позволяет создавать независимые ветки диалога.
      */
-    BRANCHING
+    BRANCHING,
+    EMPTY
 }

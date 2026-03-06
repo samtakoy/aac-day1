@@ -1,8 +1,8 @@
 package com.example.day.core.core_features.agent.domain
 
+import com.example.day.core.core_features.agent.domain.model.AContext
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.chat.domain.model.Chat
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryType
 import kotlinx.coroutines.flow.Flow
@@ -24,21 +24,11 @@ interface AgentRepository {
         title: String,
         chatUserId: Long,
         isCommon: Boolean,
-        systemPromt: String,
-        model: ModelSettings
+        systemPrompt: String,
+        model: ModelSettings,
+        strategyContext: AContext
     ): Long
-    
-    /**
-     * Create a new agent (legacy - without ChatSettings)
-     * @return id of created agent
-     */
-    suspend fun createAgent(
-        systemName: String,
-        title: String,
-        chatUserId: Long,
-        isCommon: Boolean
-    ): Long
-    
+
     /**
      * Update an existing agent
      */
@@ -131,7 +121,8 @@ interface AgentRepository {
         systemName: String,
         chatId: Long,
         systemPrompt: String,
-        defaultModel: () -> ModelSettings
+        defaultModel: () -> ModelSettings,
+        defaultContext: () -> AContext
     ): AgentConfig
 
     // === Agent Memory Types ===

@@ -66,7 +66,9 @@ internal class ChatRepositoryImpl @Inject constructor(
         timestamp: Long,
         userType: UserType,
         text: String,
-        status: ChatMessageStatus
+        status: ChatMessageStatus,
+        type: ChatMessage.Type,
+        buttons: ChatMessage.Buttons?
     ): Long {
         val users = getOrCreateDefaultUsers()
         val infoUser = getOrCreateInfoUser()
@@ -83,7 +85,9 @@ internal class ChatRepositoryImpl @Inject constructor(
                 timestamp = timestamp,
                 user = userEntity,
                 text = text,
-                status = status
+                status = status,
+                type = type,
+                buttons = buttons
             ),
             userEntity.id
         )
@@ -93,6 +97,25 @@ internal class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun removeMessage(messageId: Long) {
         messageDao.deleteById(messageId)
+    }
+
+    override suspend fun getMessageById(messageId: Long): ChatMessage? {
+        val entity = messageDao.getMessageById(messageId) ?: return null
+        val userEntity = userDao.getUserById(entity.userId) ?: return null
+        return messageMapper.toDomain(entity, userMapper.toDomain(userEntity))
+    }
+
+    override suspend fun getMessagesByType(chatId: Long, type: ChatMessage.Type): List<ChatMessage> {
+        val dbType = messageMapper.toDbType(type)
+        return messageDao.getMessagesByChatIdAndType(chatId, dbType).mapNotNull { entity ->
+            val userEntity = userDao.getUserById(entity.userId) ?: return@mapNotNull null
+            messageMapper.toDomain(entity, userMapper.toDomain(userEntity))
+        }
+    }
+
+    override suspend fun updateMessageButtons(messageId: Long, buttons: ChatMessage.Buttons?) {
+        val json = buttons?.let { messageMapper.buttonsToJson(it) }
+        messageDao.updateButtons(messageId, json)
     }
 
     override suspend fun changeMessageStatus(messageId: Long, status: ChatMessageStatus) {

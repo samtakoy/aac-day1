@@ -1,10 +1,12 @@
 package com.example.day.core.core_features.agent.domain.workers.task.validation
 
-import com.example.day.core.core_features.agent.domain.model.TaskState
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
+import com.example.day.core.core_features.state_machine.domain.model.StateId
 
 /**
  * Validates state transitions in TaskWorker state machine.
  * Prevents invalid transitions like INIT -> DONE directly.
+ * TODO пока не используется
  */
 class TransitionValidator {
 
@@ -14,11 +16,11 @@ class TransitionValidator {
      * Value: Set of allowed To states
      */
     private val validTransitions = mapOf(
-        TaskState.INIT to setOf(TaskState.PLANNING),
-        TaskState.PLANNING to setOf(TaskState.EXECUTION),
-        TaskState.EXECUTION to setOf(TaskState.VERIFICATION),
-        TaskState.VERIFICATION to setOf(TaskState.EXECUTION, TaskState.DONE),
-        TaskState.DONE to setOf(TaskState.INIT) // For starting new task
+        TaskStateConfig.INIT to setOf(TaskStateConfig.PLANNING),
+        TaskStateConfig.PLANNING to setOf(TaskStateConfig.EXECUTION),
+        TaskStateConfig.EXECUTION to setOf(TaskStateConfig.VERIFICATION),
+        TaskStateConfig.VERIFICATION to setOf(TaskStateConfig.EXECUTION, TaskStateConfig.DONE),
+        TaskStateConfig.DONE to setOf(TaskStateConfig.INIT) // For starting new task
     )
 
     /**
@@ -28,7 +30,7 @@ class TransitionValidator {
      * @param to Target state
      * @return true if transition is allowed
      */
-    fun isValid(from: TaskState, to: TaskState): Boolean {
+    fun isValid(from: StateId, to: StateId): Boolean {
         // Same state is always valid (no transition)
         if (from == to) return true
 
@@ -40,7 +42,7 @@ class TransitionValidator {
     /**
      * Validate transition and return result with error message if invalid.
      */
-    fun validate(from: TaskState, to: TaskState): ValidationResult {
+    fun validate(from: StateId, to: StateId): ValidationResult {
         return if (isValid(from, to)) {
             ValidationResult.Valid
         } else {
@@ -54,7 +56,7 @@ class TransitionValidator {
     /**
      * Get list of allowed transitions from a given state.
      */
-    fun getAllowedTransitions(from: TaskState): List<TaskState> {
+    fun getAllowedTransitions(from: StateId): List<StateId> {
         return validTransitions[from]?.toList() ?: emptyList()
     }
 

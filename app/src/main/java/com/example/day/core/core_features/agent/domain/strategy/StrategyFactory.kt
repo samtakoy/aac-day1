@@ -21,6 +21,7 @@ class StrategyFactory @Inject constructor(
         CtxStrategyType.SLIDING_WINDOW -> ContextSlidingWindowStrategy()
         CtxStrategyType.STICKY_FACTS -> ContextStickyFactsStrategy(llmRequestUseCase)
         CtxStrategyType.BRANCHING -> ContextBranchingStrategy()
+        CtxStrategyType.EMPTY -> ContextEmptyStrategy()
     }
 
     /** Create strategy by context params (kept for other callers). */

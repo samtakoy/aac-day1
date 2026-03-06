@@ -3,6 +3,7 @@ package com.example.day.features.console.impl.ui.delegates
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
+import com.example.day.core.core_features.chat.domain.model.ChatMessage.Type
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
 import com.example.day.core.core_features.chat.domain.usecase.ChangeMessageStatusUseCase
@@ -32,7 +33,8 @@ internal class LlmTalkDelegate @Inject constructor(
             System.currentTimeMillis(),
             UserType.User,
             inputText,
-            ChatMessageStatus.Sending
+            ChatMessageStatus.Sending,
+            Type.User
         )
         val history = getMessagesWithStatusUseCase(chat.id, ChatMessageStatus.Viewed)
         llmRequest(inputText, history, chat.settings)
@@ -43,7 +45,8 @@ internal class LlmTalkDelegate @Inject constructor(
                     System.currentTimeMillis(),
                     UserType.Bot,
                     llmResult.getContent(),
-                    ChatMessageStatus.Viewed
+                    ChatMessageStatus.Viewed,
+                    Type.Bot
                 )
                 onSuccess()
             }
@@ -76,4 +79,12 @@ internal class LlmTalkDelegate @Inject constructor(
         } else {
             ModelRequest.Role.Assistant
         }
+
+    override suspend fun tryHandleAction(
+        chat: Chat,
+        messageId: Long,
+        action: String
+    ) {
+        // Not supported for LLM direct chat
+    }
 }

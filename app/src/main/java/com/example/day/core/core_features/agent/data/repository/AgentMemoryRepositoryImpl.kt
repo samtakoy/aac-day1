@@ -33,9 +33,9 @@ internal class AgentMemoryRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getFactByKey(agentId: Long, memoryKey: String): LongTermMemoryFact? {
+    override suspend fun getFact(agentId: Long, memoryKey: String, category: String): LongTermMemoryFact? {
         val ltmGroupId = ltmGroupRepository.getLTMGroupIdByAgentId(agentId) ?: return null
-        return memoryRepository.getFactByKey(ltmGroupId, memoryKey)
+        return memoryRepository.getFactByKey(ltmGroupId, memoryKey, category = category)
     }
 
     override suspend fun upsertFact(agentId: Long, memoryKey: String, category: String, fact: String) {
@@ -50,6 +50,11 @@ internal class AgentMemoryRepositoryImpl @Inject constructor(
     override suspend fun deleteFact(agentId: Long, memoryKey: String, category: String) {
         val ltmGroupId = ltmGroupRepository.getLTMGroupIdByAgentId(agentId) ?: return
         memoryRepository.deleteFact(ltmGroupId, memoryKey, category)
+    }
+
+    override suspend fun deleteFacts(agentId: Long, memoryKey: String) {
+        val ltmGroupId = ltmGroupRepository.getLTMGroupIdByAgentId(agentId) ?: return
+        memoryRepository.deleteFacts(ltmGroupId, memoryKey)
     }
 
     override suspend fun clearAllFacts(agentId: Long) {

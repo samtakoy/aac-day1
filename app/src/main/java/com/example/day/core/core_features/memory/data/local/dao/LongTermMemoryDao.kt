@@ -20,8 +20,8 @@ internal interface LongTermMemoryDao {
     @Query("SELECT * FROM long_term_memory WHERE ltm_group_id = :ltmGroupId ORDER BY updated_at DESC")
     suspend fun getByGroupOnce(ltmGroupId: Long): List<LongTermMemoryEntity>
 
-    @Query("SELECT * FROM long_term_memory WHERE memory_key = :key AND ltm_group_id = :ltmGroupId")
-    suspend fun getByKeyAndGroup(key: String, ltmGroupId: Long): LongTermMemoryEntity?
+    @Query("SELECT * FROM long_term_memory WHERE memory_key = :memoryKey AND ltm_group_id = :ltmGroupId AND category = :category")
+    suspend fun getByCompositeKey(ltmGroupId: Long, memoryKey: String, category: String): LongTermMemoryEntity?
 
     @Query("SELECT * FROM long_term_memory WHERE id = :id")
     suspend fun getById(id: Long): LongTermMemoryEntity?
@@ -33,6 +33,9 @@ internal interface LongTermMemoryDao {
     // Delete by composite key (ltm_group_id + memory_key + category)
     @Query("DELETE FROM long_term_memory WHERE ltm_group_id = :ltmGroupId AND memory_key = :memoryKey AND category = :category")
     suspend fun deleteByCompositeKey(ltmGroupId: Long, memoryKey: String, category: String)
+
+    @Query("DELETE FROM long_term_memory WHERE ltm_group_id = :ltmGroupId AND memory_key = :memoryKey")
+    suspend fun deleteByMemoryKey(ltmGroupId: Long, memoryKey: String)
 
     @Query("DELETE FROM long_term_memory WHERE ltm_group_id = :ltmGroupId")
     suspend fun clearByGroup(ltmGroupId: Long)

@@ -2,6 +2,7 @@ package com.example.day.core.core_features.agent.domain.workers.innercommand.han
 
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
+import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.memory.domain.provider.AgentRulesMemoryProvider
 import kotlinx.serialization.builtins.ListSerializer
@@ -46,7 +47,8 @@ class AgentCommandHandler @Inject constructor(
             AGENT_NAME,
             chat.id,
             chat.settings.systemPromt,
-            defaultModel = { chat.settings.model }
+            defaultModel = { chat.settings.model },
+            defaultContext = { AContextDefaultFactory.createFull() }
         )
 
         // Получаем текущие правила
@@ -72,7 +74,8 @@ class AgentCommandHandler @Inject constructor(
             AGENT_NAME,
             chat.id,
             chat.settings.systemPromt,
-            defaultModel = { chat.settings.model }
+            defaultModel = { chat.settings.model },
+            defaultContext = { AContextDefaultFactory.createFull() }
         )
 
         val rules = getCurrentRules(agent.config.id)
@@ -96,7 +99,8 @@ class AgentCommandHandler @Inject constructor(
             AGENT_NAME,
             chat.id,
             chat.settings.systemPromt,
-            defaultModel = { chat.settings.model }
+            defaultModel = { chat.settings.model },
+            defaultContext = { AContextDefaultFactory.createFull() }
         )
 
         agentMemoryRepository.deleteFact(
@@ -109,7 +113,7 @@ class AgentCommandHandler @Inject constructor(
     }
 
     private suspend fun getCurrentRules(agentId: Long): List<String> {
-        val fact = agentMemoryRepository.getFactByKey(agentId, AgentRulesMemoryProvider.MEMORY_KEY)
+        val fact = agentMemoryRepository.getFact(agentId, AgentRulesMemoryProvider.MEMORY_KEY, AgentRulesMemoryProvider.CATEGORY)
             ?: return emptyList()
 
         if (fact.category != AgentRulesMemoryProvider.CATEGORY) {

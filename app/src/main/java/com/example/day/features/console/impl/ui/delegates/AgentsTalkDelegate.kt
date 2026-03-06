@@ -1,6 +1,7 @@
 package com.example.day.features.console.impl.ui.delegates
 
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
@@ -25,7 +26,8 @@ internal class AgentsTalkDelegate @Inject constructor(
             timestamp = System.currentTimeMillis(),
             userType = UserType.User,
             text = inputText,
-            status = ChatMessageStatus.Viewed
+            status = ChatMessageStatus.Viewed,
+            type = ChatMessage.Type.User
         )
 
         // обработчик сообщения пользователя агентами
@@ -33,5 +35,13 @@ internal class AgentsTalkDelegate @Inject constructor(
             userMessage = inputText,
             chat = chat
         )
+    }
+
+    override suspend fun tryHandleAction(
+        chat: Chat,
+        messageId: Long,
+        action: String
+    ) {
+        // Not supported for agents
     }
 }

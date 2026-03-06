@@ -12,6 +12,7 @@ import com.example.day.core.core_features.chat.domain.usecase.ClearChatNotViewed
 import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerStageChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatByIdAsFlowUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsFlowUseCase
+import com.example.day.core.core_features.chat.domain.usecase.HandleMessageButtonClickUseCase
 import com.example.day.core.core_features.memory.domain.repository.ArtifactRepository
 import com.example.day.core.core_features.memory.domain.usecase.GetLongTermMemoryByGroupUseCase
 import com.example.day.core.core_features.chat.domain.usecase.UpdateChatSettingsUseCase
@@ -56,6 +57,7 @@ internal class ConsoleViewModelImpl(
     private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
     private val updateChatTitleUseCase: UpdateChatTitleUseCase,
     private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
+    private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
     private val getLtmByGroupUseCase: GetLongTermMemoryByGroupUseCase?,
     private val artifactRepository: ArtifactRepository?,
     private val chatId: Long
@@ -121,10 +123,11 @@ internal class ConsoleViewModelImpl(
                                 ChatMessageUiModel(
                                     id = msg.id,
                                     text = msg.text,
-                                    userType = when (msg.user.type) {
-                                        com.example.day.core.core_features.chat.domain.model.UserType.User -> ChatMessageUiType.User
-                                        com.example.day.core.core_features.chat.domain.model.UserType.Bot -> ChatMessageUiType.Bot
-                                        com.example.day.core.core_features.chat.domain.model.UserType.Info -> ChatMessageUiType.Info
+                                    userType = when (msg.type) {
+                                        com.example.day.core.core_features.chat.domain.model.ChatMessage.Type.User -> ChatMessageUiType.User
+                                        com.example.day.core.core_features.chat.domain.model.ChatMessage.Type.Bot -> ChatMessageUiType.Bot
+                                        com.example.day.core.core_features.chat.domain.model.ChatMessage.Type.Info -> ChatMessageUiType.Info
+                                        com.example.day.core.core_features.chat.domain.model.ChatMessage.Type.Buttons -> ChatMessageUiType.Buttons
                                     },
                                     status = when (msg.status) {
                                         ChatMessageStatus.Sending -> UiMessageStatus.Sending
@@ -132,7 +135,13 @@ internal class ConsoleViewModelImpl(
                                         ChatMessageStatus.Viewed -> UiMessageStatus.Viewed
                                     },
                                     avatarUrl = msg.user.avatar,
-                                    isExpanded = expandedStates[msg.id] ?: false
+                                    isExpanded = expandedStates[msg.id] ?: false,
+                                    buttons = msg.buttons?.let { b ->
+                                        ChatMessageUiModel.Buttons(
+                                            list = b.list.map { ChatMessageUiModel.Button(it.actionId, it.title, it.description, it.isPressed) },
+                                            isEnabled = b.isEnabled
+                                        )
+                                    }
                                 )
                             }.toPersistentList()
                         )
@@ -288,6 +297,14 @@ internal class ConsoleViewModelImpl(
             }
 
             ConsoleViewModel.Event.ToggleMemoryInspector -> { /* tab-based UI — no-op */ }
+
+            is ConsoleViewModel.Event.ChatButtonClick -> {
+                val currentChat = chat ?: return
+                viewModelScope.launch {
+                    handleMessageButtonClickUseCase(event.messageId, event.action)
+                    talkDelegate.tryHandleAction(currentChat, event.messageId, event.action)
+                }
+            }
         }
     }
 
@@ -349,6 +366,7 @@ internal class ConsoleViewModelImpl(
         private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
         private val updateChatTitleUseCase: UpdateChatTitleUseCase,
         private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
+        private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
             val id = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
@@ -360,6 +378,7 @@ internal class ConsoleViewModelImpl(
                 updateChatSettingsUseCase,
                 updateChatTitleUseCase,
                 createPlannerStageChatUseCase,
+                handleMessageButtonClickUseCase,
                 getLtmByGroupUseCase = null,
                 artifactRepository = null,
                 id
@@ -375,6 +394,7 @@ internal class ConsoleViewModelImpl(
         private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
         private val updateChatTitleUseCase: UpdateChatTitleUseCase,
         private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
+        private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
             val chatId = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
@@ -386,6 +406,7 @@ internal class ConsoleViewModelImpl(
                 updateChatSettingsUseCase,
                 updateChatTitleUseCase,
                 createPlannerStageChatUseCase,
+                handleMessageButtonClickUseCase,
                 getLtmByGroupUseCase = null,
                 artifactRepository = null,
                 chatId = chatId
@@ -403,6 +424,7 @@ internal class ConsoleViewModelImpl(
         private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
         private val getLtmByGroupUseCase: GetLongTermMemoryByGroupUseCase,
         private val artifactRepository: ArtifactRepository,
+        private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
             val chatId = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
@@ -414,6 +436,7 @@ internal class ConsoleViewModelImpl(
                 updateChatSettingsUseCase,
                 updateChatTitleUseCase,
                 createPlannerStageChatUseCase,
+                handleMessageButtonClickUseCase,
                 getLtmByGroupUseCase = getLtmByGroupUseCase,
                 artifactRepository = artifactRepository,
                 chatId = chatId

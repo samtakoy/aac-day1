@@ -15,6 +15,15 @@ interface TalkDelegate {
     )
 
     /**
+     * Handle button click action from chat message.
+     */
+    suspend fun tryHandleAction(
+        chat: Chat,
+        messageId: Long,
+        action: String
+    )
+
+    /**
      * Optional events stream for PLANNER-type delegates.
      * Returns null for non-PLANNER delegates.
      */

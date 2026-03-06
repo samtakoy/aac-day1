@@ -1,13 +1,13 @@
 package com.example.day.features.console.impl.domain.agents
 
 import com.example.day.core.core_features.agent.domain.utils.ConsumptionCalculator
-import com.example.day.core.core_features.agent.domain.workers.CompareWorker
-import com.example.day.core.core_features.agent.domain.workers.PromptWorker
-import com.example.day.core.core_features.agent.domain.workers.RejectWorker
-import com.example.day.core.core_features.agent.domain.workers.SimpleWorker
-import com.example.day.core.core_features.agent.domain.workers.StepWorker
-import com.example.day.core.core_features.agent.domain.workers.TeamWorker
-import com.example.day.core.core_features.agent.domain.workers.TalkWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.CompareWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.PromptWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.RejectWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.SimpleWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.StepWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.TeamWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.TalkWorker
 import com.example.day.core.core_features.agent.domain.utils.trimCmd
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
@@ -56,7 +56,7 @@ internal class AgMessageHandler @Inject constructor(
             if (trimmedMessage.startsWith(command.title, ignoreCase = true)) {
                 val postProcessingEvents = mutableListOf<WorkerEvent>()
                 worker.doWork(
-                    task = trimmedMessage.substring(command.title.length).trimCmd(),
+                    userPrompt = trimmedMessage.substring(command.title.length).trimCmd(),
                     chat = chat,
                     // Технические события (RequestStart, RequestSuccess, RequestError) можно обрабатывать при необходимости
                     onEvent = { workerEvent ->
@@ -70,7 +70,7 @@ internal class AgMessageHandler @Inject constructor(
         }
 
         rejectWorker.doWork(
-            task = trimmedMessage,
+            userPrompt = trimmedMessage,
             chat = chat,
             onEvent = null
         )

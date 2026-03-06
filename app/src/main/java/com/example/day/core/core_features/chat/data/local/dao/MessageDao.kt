@@ -31,4 +31,10 @@ internal interface MessageDao {
 
     @Query("DELETE FROM messages WHERE chat_id = :chatId AND status != :viewedStatus")
     suspend fun deleteByChatIdAndStatusNotViewed(chatId: Long, viewedStatus: Int)
+
+    @Query("SELECT * FROM messages WHERE chat_id = :chatId AND type = :type ORDER BY timestamp ASC")
+    suspend fun getMessagesByChatIdAndType(chatId: Long, type: Int): List<MessageEntity>
+
+    @Query("UPDATE messages SET buttons = :buttons WHERE id = :messageId")
+    suspend fun updateButtons(messageId: Long, buttons: String?)
 }

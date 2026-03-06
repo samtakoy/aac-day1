@@ -1,6 +1,7 @@
 package com.example.day.core.core_features.agent.domain.workers.innercommand.handler
 
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
+import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.chat.domain.model.Chat
 import javax.inject.Inject
 
@@ -21,7 +22,8 @@ class InfoCommandHandler @Inject constructor(
             AGENT_NAME,
             chatId = chat.id,
             systemPrompt = chat.settings.systemPromt,
-            defaultModel = { chat.settings.model }
+            defaultModel = { chat.settings.model },
+            defaultContext = { AContextDefaultFactory.createFull() }
         )
         return CommandResult.Success(agent.getInfo())
     }

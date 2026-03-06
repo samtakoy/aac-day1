@@ -130,6 +130,9 @@ private fun ConsoleScreenInternal(
                 onEvent = { listEvent ->
                     when (listEvent) {
                         is ChatListUiEvent.ItemLongClick -> {}
+                        is ChatListUiEvent.ChatButtonClick -> {
+                            onEvent(ConsoleViewModel.Event.ChatButtonClick(listEvent.messageId, listEvent.actionId))
+                        }
                     }
                 },
                 onInfoMessageExpand = { id, isExpanded ->

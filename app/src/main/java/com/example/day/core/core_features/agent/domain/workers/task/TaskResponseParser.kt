@@ -10,6 +10,7 @@ import kotlinx.serialization.json.Json
 object TaskResponseParser {
 
     private val json = Json {
+        coerceInputValues = true // Принудительно заменяет null на дефолтное значение из конструктора
         ignoreUnknownKeys = true
         isLenient = true
     }

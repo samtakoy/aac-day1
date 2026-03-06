@@ -33,7 +33,7 @@ interface AgentMemoryRepository {
      * @param memoryKey Unique identifier within category
      * @return Fact or null if not found
      */
-    suspend fun getFactByKey(agentId: Long, memoryKey: String): LongTermMemoryFact?
+    suspend fun getFact(agentId: Long, memoryKey: String, category: String): LongTermMemoryFact?
 
     /**
      * Save or update a fact for an agent.
@@ -61,6 +61,8 @@ interface AgentMemoryRepository {
      * @param category Category name
      */
     suspend fun deleteFact(agentId: Long, memoryKey: String, category: String)
+
+    suspend fun deleteFacts(agentId: Long, memoryKey: String)
 
     /**
      * Clear all facts for an agent.

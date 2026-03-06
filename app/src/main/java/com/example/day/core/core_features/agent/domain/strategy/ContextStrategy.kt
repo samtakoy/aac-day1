@@ -13,11 +13,12 @@ import com.example.day.core.core_features.chat.domain.model.ChatSettings
 interface ContextStrategy {
     /**
      * Process chat history and return optimized context.
+     * @param userPrompt не обязан присутствовать, можно дернуть llm и без него
      */
     suspend fun process(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String,
+        userPrompt: String?,
         store: AgentContextRepository
     ): ContextSnapshot
 

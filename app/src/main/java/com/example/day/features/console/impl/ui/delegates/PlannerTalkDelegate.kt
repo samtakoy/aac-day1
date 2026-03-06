@@ -1,9 +1,9 @@
 package com.example.day.features.console.impl.ui.delegates
 
-import com.example.day.core.core_features.agent.domain.workers.PlannerWorker
-import com.example.day.core.core_features.agent.domain.workers.TaskWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.TaskWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
@@ -41,19 +41,38 @@ internal class PlannerTalkDelegate @Inject constructor(
             timestamp = System.currentTimeMillis(),
             userType = UserType.User,
             text = inputText,
-            status = ChatMessageStatus.Viewed
+            status = ChatMessageStatus.Viewed,
+            type = ChatMessage.Type.User
         )
 
         onSuccess.invoke()
 
         // Отправляем сообщение напрямую в taskWorker без проверки команд
-        taskWorker.doWork(
-            userPrompt = inputText,
-            chat = chat,
-            onEvent = { event ->
+        try {
+            taskWorker.doWork(
+                userPrompt = inputText,
+                chat = chat,
+                onEvent = { event ->
+                    handleWorkerEvent(event, chat.id)
+                }
+            )
+        } catch (e: Throwable) {
+            chatTools.addInfoMessage(chat.id, e.stackTraceToString())
+        }
+    }
+
+    override suspend fun tryHandleAction(
+        chat: Chat,
+        messageId: Long,
+        action: String
+    ) {
+        try {
+            taskWorker.handleAction(chat, action) { event ->
                 handleWorkerEvent(event, chat.id)
             }
-        )
+        } catch (e: Throwable) {
+            chatTools.addInfoMessage(chat.id, "Action error: ${e.message}", emptyList())
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

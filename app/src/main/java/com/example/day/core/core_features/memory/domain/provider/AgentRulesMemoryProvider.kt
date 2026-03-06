@@ -40,7 +40,7 @@ class AgentRulesMemoryProvider @Inject constructor(
     override suspend fun getMemoryContext(): List<AContextMessage> {
         val agentId = agentId ?: return emptyList()
 
-        val fact = agentMemoryRepository.getFactByKey(agentId, MEMORY_KEY)
+        val fact = agentMemoryRepository.getFact(agentId, MEMORY_KEY, CATEGORY)
             ?: return emptyList()
 
         // Извлекаем правила только из категории "rules"

@@ -33,7 +33,7 @@ class ContextBranchingStrategy : ContextStrategy {
     override suspend fun process(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String,
+        userPrompt: String?,
         store: AgentContextRepository
     ): ContextSnapshot {
         val state = store.getContextState(agent.id) as? AContextState.Branching

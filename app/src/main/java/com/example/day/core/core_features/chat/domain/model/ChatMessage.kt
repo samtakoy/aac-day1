@@ -6,5 +6,28 @@ data class ChatMessage(
     val timestamp: Long,
     val user: User,
     val text: String,
-    val status: ChatMessageStatus
-)
+    val status: ChatMessageStatus,
+    val type: Type,
+    val buttons: Buttons? = null
+) {
+    data class Buttons(
+        val list: List<Button>,
+        val isEnabled: Boolean
+    )
+
+    data class Button(
+        val actionId: String,
+        val title: String,
+        val description: String,
+        val replyMessage: String,
+        val isEnabled: Boolean = true,
+        val isPressed: Boolean = false
+    )
+
+    enum class Type {
+        User,
+        Bot,
+        Info,
+        Buttons
+    }
+}

@@ -35,8 +35,8 @@ internal class LongTermMemoryRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getFactByKey(ltmGroupId: Long, memoryKey: String): LongTermMemoryFact? {
-        return memoryDao.getByKeyAndGroup(memoryKey, ltmGroupId)?.let {
+    override suspend fun getFactByKey(ltmGroupId: Long, memoryKey: String, category: String): LongTermMemoryFact? {
+        return memoryDao.getByCompositeKey(ltmGroupId, memoryKey, category)?.let {
             LongTermMemoryEntityMapper.toDomain(it)
         }
     }
@@ -47,6 +47,10 @@ internal class LongTermMemoryRepositoryImpl @Inject constructor(
 
     override suspend fun deleteFact(ltmGroupId: Long, memoryKey: String, category: String) {
         memoryDao.deleteByCompositeKey(ltmGroupId, memoryKey, category)
+    }
+
+    override suspend fun deleteFacts(ltmGroupId: Long, memoryKey: String) {
+        memoryDao.deleteByMemoryKey(ltmGroupId, memoryKey)
     }
 
     override suspend fun clearFactsByGroup(ltmGroupId: Long) {

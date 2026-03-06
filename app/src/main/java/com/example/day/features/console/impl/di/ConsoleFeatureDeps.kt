@@ -3,14 +3,14 @@ package com.example.day.features.console.impl.di
 import com.example.day.core.core_features.agent.domain.usecase.GetAgentContextUseCase
 import com.example.day.core.core_features.memory.domain.repository.LongTermMemoryRepository
 import com.example.day.core.core_features.agent.domain.utils.ConsumptionCalculator
-import com.example.day.core.core_features.agent.domain.workers.CompareWorker
-import com.example.day.core.core_features.agent.domain.workers.PromptWorker
-import com.example.day.core.core_features.agent.domain.workers.TaskWorker
-import com.example.day.core.core_features.agent.domain.workers.RejectWorker
-import com.example.day.core.core_features.agent.domain.workers.SimpleWorker
-import com.example.day.core.core_features.agent.domain.workers.StepWorker
-import com.example.day.core.core_features.agent.domain.workers.TalkWorker
-import com.example.day.core.core_features.agent.domain.workers.TeamWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.CompareWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.PromptWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.TaskWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.RejectWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.SimpleWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.StepWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.TalkWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.TeamWorker
 import com.example.day.core.core_features.memory.domain.repository.ArtifactRepository
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
@@ -21,6 +21,7 @@ import com.example.day.core.core_features.chat.domain.usecase.GetChatByIdAsFlowU
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesAsFlowUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesWithStatusUseCase
 import com.example.day.core.core_features.chat.domain.usecase.GetOrCreateChatUseCase
+import com.example.day.core.core_features.chat.domain.usecase.HandleMessageButtonClickUseCase
 import com.example.day.core.core_features.chat.domain.usecase.UpdateChatSettingsUseCase
 import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerStageChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.UpdateChatTitleUseCase
@@ -55,4 +56,5 @@ interface ConsoleFeatureDeps {
     val chatTools: ChatTools
     val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase
     val getAgentContextUseCase: GetAgentContextUseCase
+    val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase
 }

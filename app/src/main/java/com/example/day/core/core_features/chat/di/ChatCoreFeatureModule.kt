@@ -20,6 +20,7 @@ import com.example.day.core.core_features.memory.domain.repository.ArtifactRepos
 import com.example.day.core.core_features.memory.domain.repository.LongTermMemoryRepository
 import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerGroupWithMainChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerStageChatUseCase
+import com.example.day.core.core_features.chat.domain.usecase.HandleMessageButtonClickUseCase
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -63,6 +64,5 @@ internal interface ChatCoreFeatureModule {
 
         @Provides
         internal fun provideUserProfileDao(db: ChatDatabase): UserProfileDao = db.userProfileDao()
-
     }
 }

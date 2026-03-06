@@ -1,7 +1,5 @@
 package com.example.day.core.core_features.agent.domain.workers.task.validation
 
-import com.example.day.core.core_features.agent.domain.model.TaskMemoryKeys
-
 /**
  * Validates memory updates from LLM to prevent corruption of LTM data.
  * Only allows specific key patterns to be written.

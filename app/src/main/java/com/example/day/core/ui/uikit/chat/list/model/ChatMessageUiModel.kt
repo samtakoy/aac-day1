@@ -9,5 +9,18 @@ data class ChatMessageUiModel(
     val userType: ChatMessageUiType,
     val status: UiMessageStatus,
     val avatarUrl: String? = null,
-    val isExpanded: Boolean = false
-)
+    val isExpanded: Boolean = false,
+    val buttons: Buttons? = null
+) {
+    data class Buttons(
+        val list: List<Button>,
+        val isEnabled: Boolean
+    )
+
+    data class Button(
+        val actionId: String,
+        val title: String,
+        val description: String,
+        val isPressed: Boolean
+    )
+}

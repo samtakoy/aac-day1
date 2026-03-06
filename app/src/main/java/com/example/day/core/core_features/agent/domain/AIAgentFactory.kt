@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.agent.domain
 
+import com.example.day.core.core_features.agent.domain.model.AContext
 import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
 import com.example.day.core.core_features.agent.domain.usecase.GetOrCreateAgentUseCase
 import com.example.day.core.core_features.chat.domain.model.Chat
@@ -24,13 +25,15 @@ class AIAgentFactory @Inject constructor(
         systemName: String,
         chatId: Long,
         systemPrompt: String,
-        defaultModel: () -> ModelSettings
+        defaultModel: () -> ModelSettings,
+        defaultContext: () -> AContext
     ): AIAgent {
         val config = getOrCreateAgentUseCase(
             systemName = systemName,
             chatId = chatId,
             systemPrompt = systemPrompt,
-            defaultModel = defaultModel
+            defaultModel = defaultModel,
+            defaultContext = defaultContext
         )
         val strategy = strategyFactory.create(config.contextStrategyType)
         val memoryProvider = memoryProviderFactory.create(

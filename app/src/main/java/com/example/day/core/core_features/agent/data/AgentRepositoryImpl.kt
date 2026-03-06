@@ -5,10 +5,10 @@ import com.example.day.core.core_features.agent.data.local.dao.AgentDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentMemoryDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentToChatDao
 import com.example.day.core.core_features.agent.data.local.mapper.AgentMapper
+import com.example.day.core.core_features.agent.data.local.mapper.CtxStrategyTypeMapper
 import com.example.day.core.core_features.agent.data.local.model.AgentEntity
 import com.example.day.core.core_features.agent.data.local.model.AgentToChatEntity
 import com.example.day.core.core_features.agent.data.local.model.AgentToMemoryTypeEntity
-import com.example.day.core.core_features.agent.data.local.model.StrategyTypeEntity
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.model.AContext
@@ -17,7 +17,6 @@ import com.example.day.core.core_features.agent.domain.model.AContextState
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.chat.domain.ChatRepository
 import com.example.day.core.core_features.chat.domain.model.Chat
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.data.local.mapper.ModelSettingsMapper
 import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryType
@@ -38,6 +37,7 @@ internal class AgentRepositoryImpl @Inject constructor(
     private val chatRepository: ChatRepository,
     private val agentMapper: AgentMapper,
     private val modelSettingsMapper: ModelSettingsMapper,
+    private val contextTypeMapper: CtxStrategyTypeMapper
 ) : AgentRepository {
     
     // ==================== Agent CRUD ====================
@@ -47,52 +47,28 @@ internal class AgentRepositoryImpl @Inject constructor(
         title: String,
         chatUserId: Long,
         isCommon: Boolean,
-        systemPromt: String,
-        model: ModelSettings
+        systemPrompt: String,
+        model: ModelSettings,
+        strategyContext: AContext
     ): Long {
-        // Convert ChatSettings to entity values
-        val modelSettingsJson = modelSettingsMapper.toJson(model)
-        val systemPrompt = systemPromt
-        
         val entity = AgentEntity(
             systemName = systemName,
             title = title,
             chatUserId = chatUserId,
             isCommon = if (isCommon) AgentMapper.IS_COMMON_TRUE else AgentMapper.IS_COMMON_FALSE,
-            modelSettings = modelSettingsJson,
+            modelSettings = modelSettingsMapper.toJson(model),
             systemPrompt = systemPrompt,
-            contextStrategyType = StrategyTypeEntity.FULL_CONTEXT
+            contextStrategyType = contextTypeMapper.toEntity(strategyContext)
         )
         val agentId = agentDao.insert(entity)
         
         // Создаем пустую запись контекста для агента
-        createEmptyAgentContext(agentId)
+        createDefaultAgentContext(agentId, strategyContext)
         
         return agentId
     }
-    
-    override suspend fun createAgent(
-        systemName: String,
-        title: String,
-        chatUserId: Long,
-        isCommon: Boolean
-    ): Long {
-        // Legacy method - uses default values (empty modelSettings "{}")
-        val entity = AgentEntity(
-            systemName = systemName,
-            title = title,
-            chatUserId = chatUserId,
-            isCommon = if (isCommon) AgentMapper.IS_COMMON_TRUE else AgentMapper.IS_COMMON_FALSE
-        )
-        val agentId = agentDao.insert(entity)
-        
-        // Создаем пустую запись контекста для агента
-        createEmptyAgentContext(agentId)
-        
-        return agentId
-    }
-    
-    private suspend fun createEmptyAgentContext(agentId: Long) {
+
+    private suspend fun createDefaultAgentContext(agentId: Long, strategyContext: AContext) {
         // Create proper context for FULL_CONTEXT strategy
         val context = AContext(
             params = AContextParams.Full,
@@ -188,43 +164,8 @@ internal class AgentRepositoryImpl @Inject constructor(
         systemName: String,
         chatId: Long,
         systemPrompt: String,
-        defaultModel: () -> ModelSettings
-    ): AgentConfig {
-        return if (chatId == 0L) {
-            // ЛОГИКА 1: Общие агенты
-            // TODO ошибка что настройки им не передаются
-            getOrCreateCommonAgent(systemName)
-        } else {
-            // ЛОГИКА 2: Чат-специфичные агенты
-            getOrCreateChatSpecificAgent(systemName, chatId, systemPrompt, defaultModel)
-        }
-    }
-
-    private suspend fun getOrCreateCommonAgent(systemName: String): AgentConfig {
-        // 1. Искать только по systemName (isCommon = 1)
-        val existingAgent = agentDao.getCommonAgentBySystemName(systemName)
-        if (existingAgent != null) {
-            return agentMapper.toDomain(existingAgent)
-        }
-
-        // 2. Создать нового общего агента (без ChatSettings)
-        val botUser = chatRepository.getOrCreateDefaultUsers().second
-        val newAgentId = createAgent(
-            systemName = systemName,
-            title = systemName,
-            chatUserId = botUser.id,
-            isCommon = true
-        )
-
-        return getAgentById(newAgentId)
-            ?: throw IllegalStateException("Failed to create common agent")
-    }
-
-    private suspend fun getOrCreateChatSpecificAgent(
-        systemName: String,
-        chatId: Long,
-        systemPrompt: String,
-        defaultModel: () -> ModelSettings
+        defaultModel: () -> ModelSettings,
+        defaultContext: () -> AContext
     ): AgentConfig {
         // 1. Искать агента по systemName + chatId
         val existingAgent = agentToChatDao.getAgentBySystemNameAndChatId(systemName, chatId)
@@ -234,20 +175,21 @@ internal class AgentRepositoryImpl @Inject constructor(
 
         // 2. Создать нового чат-специфичного агента
         // Вызываем фабричный метод только если агент не найден
-        val model = defaultModel()
         val botUser = chatRepository.getOrCreateDefaultUsers().second
-
         val newAgentId = createAgent(
             systemName = systemName,
             title = systemName,
             chatUserId = botUser.id,
             isCommon = false,
-            systemPromt = systemPrompt,
-            model = model
+            systemPrompt = systemPrompt,
+            model = defaultModel(),
+            strategyContext = defaultContext()
         )
 
         // 3. Обязательно привязать к чату
-        bindAgentToChat(newAgentId, chatId)
+        if (chatId != 0L) {
+            bindAgentToChat(newAgentId, chatId)
+        }
 
         return getAgentById(newAgentId)
             ?: throw IllegalStateException("Failed to create chat-specific agent")

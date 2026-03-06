@@ -31,19 +31,25 @@ internal data class MessageEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
     val id: Long = 0,
-    
+
     @ColumnInfo(name = "chat_id")
     val chatId: Long,
-    
+
     @ColumnInfo(name = "user_id")
     val userId: Long,
-    
+
     @ColumnInfo(name = "timestamp")
     val timestamp: Long,
-    
+
     @ColumnInfo(name = "text")
     val text: String,
-    
+
     @ColumnInfo(name = "status")
-    val status: Int
+    val status: Int,
+
+    @ColumnInfo(name = "type", defaultValue = "0")
+    val type: Int = 0,
+
+    @ColumnInfo(name = "buttons")
+    val buttons: String? = null
 )

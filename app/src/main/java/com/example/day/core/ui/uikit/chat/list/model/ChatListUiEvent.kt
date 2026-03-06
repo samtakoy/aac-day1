@@ -8,4 +8,9 @@ sealed interface ChatListUiEvent {
      * User long-pressed on a message item
      */
     data class ItemLongClick(val message: ChatMessageUiModel) : ChatListUiEvent
+
+    /**
+     * User clicked on a button in a message
+     */
+    data class ChatButtonClick(val messageId: Long, val actionId: String) : ChatListUiEvent
 }

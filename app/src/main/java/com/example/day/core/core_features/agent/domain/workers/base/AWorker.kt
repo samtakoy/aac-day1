@@ -8,7 +8,7 @@ import com.example.day.core.core_features.chat.domain.model.Chat
  * */
 interface AWorker {
     suspend fun doWork(
-        task: String,
+        userPrompt: String,
         chat: Chat,
         onEvent: (suspend (WorkerEvent) -> Unit)? = null
     )

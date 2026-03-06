@@ -20,7 +20,9 @@ interface ChatRepository {
         timestamp: Long,
         userType: UserType,
         text: String,
-        status: ChatMessageStatus
+        status: ChatMessageStatus,
+        type: ChatMessage.Type,
+        buttons: ChatMessage.Buttons? = null
     ): Long
     suspend fun removeMessage(messageId: Long)
     suspend fun changeMessageStatus(messageId: Long, status: ChatMessageStatus)
@@ -30,6 +32,11 @@ interface ChatRepository {
     suspend fun clearChat(chatId: Long)
     suspend fun clearChatNotViewedMessages(chatId: Long)
     suspend fun dropChat(chatId: Long)
+
+    // New methods for buttons support
+    suspend fun getMessageById(messageId: Long): ChatMessage?
+    suspend fun getMessagesByType(chatId: Long, type: ChatMessage.Type): List<ChatMessage>
+    suspend fun updateMessageButtons(messageId: Long, buttons: ChatMessage.Buttons?)
     
     // New methods for groups
     fun getAllChatGroups(): Flow<List<ChatGroup>>

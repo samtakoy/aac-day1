@@ -2,6 +2,7 @@ package com.example.day.core.core_features.agent.domain.workers.branch
 
 import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
+import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.agent.domain.strategy.ContextStrategyConstants
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.CommandHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.CommandResult
@@ -42,7 +43,8 @@ class NewBranchCommandHandler @Inject constructor(
             systemName = AGENT_NAME,
             chatId = chat.id,
             systemPrompt = chat.settings.systemPromt,
-            defaultModel = { chat.settings.model }
+            defaultModel = { chat.settings.model },
+            defaultContext = { AContextDefaultFactory.createFull() }
         )
 
     companion object {

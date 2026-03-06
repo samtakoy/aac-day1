@@ -65,7 +65,10 @@ fun ChatListView(
                     ) {
                         ChatMessageView(
                             item = message,
-                            onInfoMessageExpand = onInfoMessageExpand
+                            onInfoMessageExpand = onInfoMessageExpand,
+                            onMessageButtonClick = { messageId, actionId ->
+                                onEvent(ChatListUiEvent.ChatButtonClick(messageId, actionId))
+                            }
                         )
                     }
                 }

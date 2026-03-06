@@ -2,34 +2,11 @@ package com.example.day.core.core_features.agent.domain.model
 
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentMap
-import kotlinx.collections.immutable.persistentMapOf
 
-// sealed interface AContext {
 data class AContext(
     val params: AContextParams,
     val data: AContextState,
 )
-/*
-    data class Summarization(
-        override val params: AContextParams.Summarization,
-        override val data: AContextState.Summarization
-    ) : AContext
-
-    data class SlidingWindow(
-        override val params: AContextParams.SlidingWindow,
-        override val data: AContextState.SlidingWindow
-    ) : AContext
-
-    data class Full(
-        override val params: AContextParams.Full,
-        override val data: AContextState.Full
-    ) : AContext
-
-    data class Empty(
-        override val params: AContextParams.Empty,
-        override val data: AContextState.Empty
-    ) : AContext
-}*/
 
 sealed interface AContextState {
     data class Summary(

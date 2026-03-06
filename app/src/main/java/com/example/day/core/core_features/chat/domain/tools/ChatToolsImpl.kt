@@ -1,6 +1,7 @@
 package com.example.day.core.core_features.chat.domain.tools
 
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
@@ -27,23 +28,33 @@ internal class ChatToolsImpl @Inject constructor(
         return getOrCreateChatUseCase.invoke(chatTitle, groupId)
     }
 
-    override suspend fun addBotMessage(chatId: Long, message: String) {
+    override suspend fun addBotMessage(chatId: Long, message: String, buttons: List<ChatMessage.Button>) {
+        val type = if (buttons.isNotEmpty()) ChatMessage.Type.Buttons else ChatMessage.Type.Bot
+        val buttonsModel = if (buttons.isNotEmpty()) ChatMessage.Buttons(buttons, true) else null
+
         addChatMessageUseCase.invoke(
             chatId,
             System.currentTimeMillis(),
             UserType.Bot,
             message,
-            ChatMessageStatus.Viewed
+            ChatMessageStatus.Viewed,
+            type,
+            buttonsModel
         )
     }
 
-    override suspend fun addInfoMessage(chatId: Long, message: String) {
+    override suspend fun addInfoMessage(chatId: Long, message: String, buttons: List<ChatMessage.Button>) {
+        val type = if (buttons.isNotEmpty()) ChatMessage.Type.Buttons else ChatMessage.Type.Info
+        val buttonsModel = if (buttons.isNotEmpty()) ChatMessage.Buttons(buttons, true) else null
+
         addChatMessageUseCase.invoke(
             chatId,
             System.currentTimeMillis(),
             UserType.Info,
             message,
-            ChatMessageStatus.Viewed
+            ChatMessageStatus.Viewed,
+            type,
+            buttonsModel
         )
     }
 }
