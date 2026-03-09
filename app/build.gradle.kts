@@ -89,6 +89,7 @@ dependencies {
     implementation(libs.ktor.client.logging)
     implementation(libs.kotlinx.collections.immutable)
     implementation(libs.coil.compose)
+    implementation(libs.androidx.datastore.preferences)
 
     /*
     testImplementation(libs.junit)

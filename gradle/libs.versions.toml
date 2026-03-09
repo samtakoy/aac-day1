@@ -19,6 +19,7 @@ dagger = "2.59.1"
 kotlinxCollectionsImmutable = "0.4.0"
 room = "2.8.4"
 foundation = "1.10.4"
+datastore = "1.1.1"
 
 
 [libraries]
@@ -56,6 +57,7 @@ room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version = "2.7.0" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -10,6 +10,7 @@ import io.ktor.client.plugins.logging.ANDROID
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.sse.SSE
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import javax.inject.Singleton
@@ -38,6 +39,7 @@ interface NetworkModule {
                     logger = Logger.ANDROID
                     level = LogLevel.ALL
                 }
+                install(SSE)
             }
         }
     }

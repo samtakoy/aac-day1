@@ -6,15 +6,18 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.example.day.core.core_features.agent.di.AgentCoreFeatureModule
 import com.example.day.core.core_features.chat.di.ChatCoreFeatureModule
 import com.example.day.core.core_features.llm.di.LlmCoreFeatureModule
+import com.example.day.core.core_features.mcp.di.McpCoreFeatureModule
 import com.example.day.core.core_features.memory.di.MemoryCoreFeatureModule
 import com.example.day.core.di.NetworkModule
 import com.example.day.core.feature_entries.FeatureEntryProvider
-import com.example.day.features.chats.impl.di.ChatsFeatureDeps
 import com.example.day.features.chats.impl.di.ChatsFeatureApiModule
-import com.example.day.features.console.impl.di.ConsoleFeatureDeps
+import com.example.day.features.chats.impl.di.ChatsFeatureDeps
 import com.example.day.features.console.impl.di.ConsoleFeatureApiModule
+import com.example.day.features.console.impl.di.ConsoleFeatureDeps
 import com.example.day.features.group_choice.impl.di.GroupChoiceFeatureApiModule
 import com.example.day.features.group_choice.impl.di.GroupChoiceFeatureDeps
+import com.example.day.features.mcp_settings.impl.di.McpSettingsFeatureApiModule
+import com.example.day.features.mcp_settings.impl.di.McpSettingsFeatureDeps
 import com.example.day.features.user_settings.impl.di.UserSettingsFeatureApiModule
 import com.example.day.features.user_settings.impl.di.UserSettingsFeatureDeps
 import dagger.BindsInstance
@@ -32,11 +35,14 @@ import javax.inject.Singleton
         ChatsFeatureApiModule::class,
         GroupChoiceFeatureApiModule::class,
         UserSettingsFeatureApiModule::class,
-        LlmCoreFeatureModule::class
+        LlmCoreFeatureModule::class,
+        McpCoreFeatureModule::class,
+        McpSettingsFeatureApiModule::class
     ]
 )
 @Immutable
-interface AppComponent : FeatureEntryProvider, ConsoleFeatureDeps, ChatsFeatureDeps, GroupChoiceFeatureDeps, UserSettingsFeatureDeps {
+interface AppComponent : FeatureEntryProvider, ConsoleFeatureDeps, ChatsFeatureDeps,
+    GroupChoiceFeatureDeps, UserSettingsFeatureDeps, McpSettingsFeatureDeps {
 
     @Component.Factory
     interface Factory {
@@ -47,4 +53,3 @@ interface AppComponent : FeatureEntryProvider, ConsoleFeatureDeps, ChatsFeatureD
 val LocalAppComponent = staticCompositionLocalOf<AppComponent> {
     error("No AppComponent provided")
 }
-

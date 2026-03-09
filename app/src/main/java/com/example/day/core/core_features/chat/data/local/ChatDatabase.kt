@@ -34,6 +34,8 @@ import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupT
 import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupToUserProfileEntity
 import com.example.day.core.core_features.memory.data.local.model.link.UserToProfileEntity
 import com.example.day.core.core_features.memory.data.local.model.user.UserProfileEntity
+import com.example.day.core.core_features.mcp.data.local.dao.McpServerDao
+import com.example.day.core.core_features.mcp.data.local.entity.McpServerEntity
 
 @Database(
     entities = [
@@ -56,9 +58,10 @@ import com.example.day.core.core_features.memory.data.local.model.user.UserProfi
         LTMGroupToAgentEntity::class,
         LTMGroupToChatGroupEntity::class,
         LTMGroupToUserProfileEntity::class,
-        UserToProfileEntity::class
+        UserToProfileEntity::class,
+        McpServerEntity::class
     ],
-    version = 11,
+    version = 14,
     exportSchema = false
 )
 internal abstract class ChatDatabase : RoomDatabase() {
@@ -77,4 +80,5 @@ internal abstract class ChatDatabase : RoomDatabase() {
     abstract fun longTermMemoryDao(): LongTermMemoryDao
     abstract fun artifactDao(): ArtifactDao
     abstract fun userProfileDao(): UserProfileDao
+    abstract fun mcpServerDao(): McpServerDao
 }
