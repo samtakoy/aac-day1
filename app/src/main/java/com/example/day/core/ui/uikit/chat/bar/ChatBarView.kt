@@ -33,8 +33,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import com.example.day.core.ui.uikit.chat.ChatUiColors
-import com.example.day.core.ui.uikit.chat.LocalChatColors
+import com.example.day.core.ui.uikit.chat.ChatColorScheme
+import com.example.day.core.ui.uikit.chat.LocalChatColorScheme
 import com.example.day.core.ui.uikit.chat.bar.model.ChatBarUiEvent
 import com.example.day.core.ui.uikit.chat.bar.model.ChatBarUiModel
 
@@ -46,7 +46,7 @@ fun ChatBarView(
     model: ChatBarUiModel,
     onEvent: (ChatBarUiEvent) -> Unit,
     modifier: Modifier = Modifier,
-    colors: ChatUiColors = LocalChatColors.current
+    colors: ChatColorScheme = LocalChatColorScheme.current
 ) {
     var text by remember { mutableStateOf(model.inputInitialValue) }
     val focusManager = LocalFocusManager.current

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.day.core.core_features.chat.domain.model.Chat
+import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.memory.domain.model.LongTermMemoryFact
@@ -124,10 +125,11 @@ internal class ConsoleViewModelImpl(
                                     id = msg.id,
                                     text = msg.text,
                                     userType = when (msg.type) {
-                                        com.example.day.core.core_features.chat.domain.model.ChatMessage.Type.User -> ChatMessageUiType.User
-                                        com.example.day.core.core_features.chat.domain.model.ChatMessage.Type.Bot -> ChatMessageUiType.Bot
-                                        com.example.day.core.core_features.chat.domain.model.ChatMessage.Type.Info -> ChatMessageUiType.Info
-                                        com.example.day.core.core_features.chat.domain.model.ChatMessage.Type.Buttons -> ChatMessageUiType.Buttons
+                                        ChatMessage.Type.User -> ChatMessageUiType.User
+                                        ChatMessage.Type.Bot -> ChatMessageUiType.Bot
+                                        ChatMessage.Type.Info -> ChatMessageUiType.Info
+                                        ChatMessage.Type.Buttons -> ChatMessageUiType.Buttons
+                                        ChatMessage.Type.Title -> ChatMessageUiType.Title
                                     },
                                     status = when (msg.status) {
                                         ChatMessageStatus.Sending -> UiMessageStatus.Sending
@@ -135,7 +137,7 @@ internal class ConsoleViewModelImpl(
                                         ChatMessageStatus.Viewed -> UiMessageStatus.Viewed
                                     },
                                     avatarUrl = msg.user.avatar,
-                                    isExpanded = expandedStates[msg.id] ?: false,
+                                    isExpanded = expandedStates[msg.id] ?: (msg.type == ChatMessage.Type.Buttons || msg.type == ChatMessage.Type.Title),
                                     buttons = msg.buttons?.let { b ->
                                         ChatMessageUiModel.Buttons(
                                             list = b.list.map { ChatMessageUiModel.Button(it.actionId, it.title, it.description, it.isPressed) },

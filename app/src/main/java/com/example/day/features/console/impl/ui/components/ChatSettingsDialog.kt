@@ -12,8 +12,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
-import com.example.day.core.ui.uikit.chat.ChatUiColors
-import com.example.day.core.ui.uikit.chat.LocalChatColors
+import com.example.day.core.ui.uikit.chat.ChatColorScheme
+import com.example.day.core.ui.uikit.chat.LocalChatColorScheme
 
 /**
  * A modal dialog wrapper for ChatSettingsView.
@@ -22,14 +22,14 @@ import com.example.day.core.ui.uikit.chat.LocalChatColors
  * @param state The UI model containing settings state
  * @param onDismiss Callback when dialog is dismissed
  * @param onSubmit Callback when settings are submitted
- * @param colors Chat UI colors
+ * @param colors Chat color scheme
  */
 @Composable
 fun ChatSettingsDialog(
     state: ChatSettingsUiModel,
     onDismiss: () -> Unit,
     onSubmit: (chatTitle: String, settings: ChatSettings) -> Unit,
-    colors: ChatUiColors = LocalChatColors.current
+    colors: ChatColorScheme = LocalChatColorScheme.current
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(

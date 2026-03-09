@@ -9,6 +9,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_confi
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withBot
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withButton
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withInfo
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.withTitle
 import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
 import com.example.day.core.core_features.state_machine.domain.HandlerResult
 import com.example.day.core.core_features.state_machine.domain.TaskStateHandler
@@ -26,7 +27,7 @@ class InitStateHandler : TaskStateHandler {
     override val stateName: StateId = TaskStateConfig.INIT
 
     override suspend fun buildSystemPrompt(context: TaskContext): String = """
-Ты — System Design Expert. Твоя задача — через опрос выявить потребность пользователя - с какой проблемой он пришел, чего хочет достичь, пожелания к решению.
+Ты — System Design Expert. Твоя задача — через опрос выявить потребность пользователя, собрать требования к решению и основные use cases (если есть), с какой проблемой он пришел, чего хочет достичь, пожелания к решению.
 
 === ПРОТОКОЛ ОТВЕТА ===
 Ты должен отвечать строго ТОЛЬКО в формате JSON:
@@ -102,6 +103,7 @@ class InitStateHandler : TaskStateHandler {
             HandlerResult.Message(llmResponse.replyToUser, false)
         )
 
+        // TODO это условие верификации - сделать единообразно во всех хендлерах
         return if (
             nextState == TaskStateConfig.PLANNING &&
             title.isNotBlank() &&
@@ -109,8 +111,6 @@ class InitStateHandler : TaskStateHandler {
             goal.isNotBlank() &&
             expert.isNotBlank()
         ) {
-            val userTask = buildUserTask(title, description, goal, expert)
-
             // Сохранить данные текущего состояния
             context.saveStateData(
                 data.copy(title = title, description = description, goal = goal, expert = expert)
@@ -124,7 +124,8 @@ class InitStateHandler : TaskStateHandler {
                     messages = chatMessages.withButton(
                         action = ACTION_PROCEED,
                         title = "К планированию",
-                    ).withInfo(userTask)
+                        messageText = buildUserTask(title, description, goal, expert),
+                    )
                 )
             }
         } else {
@@ -154,7 +155,7 @@ class InitStateHandler : TaskStateHandler {
             // сообщить о переходе и разбудить Llm
             HandlerResult(
                 messages = emptyList<HandlerResult.Message>()
-                    .withInfo(context.buildStateTransitionInfoMessage(nextStep, nextState)),
+                    .withTitle(context.buildStateTransitionInfoMessage(nextStep, nextState)),
                 // Будим Llm
                 llmRequest = HandlerResult.LlmRequest()
             )

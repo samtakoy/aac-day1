@@ -74,6 +74,7 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
 
     implementation(libs.dagger)
+    implementation(libs.androidx.compose.foundation)
     ksp(libs.dagger.compiler)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

@@ -33,7 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.day.core.ui.uikit.chat.LocalChatColors
+import com.example.day.core.ui.uikit.chat.LocalChatColorScheme
 import com.example.day.core.ui.uikit.chat.bar.ChatBarView
 import com.example.day.core.ui.uikit.chat.bar.model.ChatBarUiEvent
 import com.example.day.core.ui.uikit.chat.list.ChatListView
@@ -180,7 +180,7 @@ private fun ConsoleScreenInternal(
 
 @Composable
 private fun SettingsButtonView(modifier: Modifier) {
-    val buttonColor = LocalChatColors.current.sendButtonDisabled
+    val buttonColor = LocalChatColorScheme.current.sendButtonDisabled
 
     Box(
         modifier = modifier
@@ -200,7 +200,7 @@ private fun SettingsButtonView(modifier: Modifier) {
 
 @Composable
 private fun MemoryButtonView(modifier: Modifier) {
-    val buttonColor = LocalChatColors.current.sendButtonDisabled
+    val buttonColor = LocalChatColorScheme.current.sendButtonDisabled
 
     Box(
         modifier = modifier

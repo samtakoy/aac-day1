@@ -44,4 +44,5 @@ interface ChatTools {
      * @param message the message content
      */
     suspend fun addInfoMessage(chatId: Long, message: String, buttons: List<ChatMessage.Button> = emptyList())
+    suspend fun addTitleMessage(chatId: Long, message: String, buttons: List<ChatMessage.Button> = emptyList())
 }

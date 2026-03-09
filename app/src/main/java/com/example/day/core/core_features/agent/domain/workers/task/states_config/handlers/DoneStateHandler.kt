@@ -70,7 +70,6 @@ ${context.buildFinalResult(withFeedbacks = true)}
             HandlerResult.Message(llmResponse.replyToUser, false)
         )
 
-        val userTask = buildUserTask()
         // Сохранить данные текущего состояния
         context.saveStateData(data)
 
@@ -78,7 +77,8 @@ ${context.buildFinalResult(withFeedbacks = true)}
             messages = chatMessages.withButton(
                 action = ACTION_PROCEED,
                 title = "Завершить",
-            ).withInfo(userTask)
+                messageText = buildUserTask()
+            )
         )
     }
 

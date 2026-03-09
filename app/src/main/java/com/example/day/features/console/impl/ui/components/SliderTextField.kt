@@ -28,8 +28,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.day.core.ui.uikit.chat.ChatUiColors
-import com.example.day.core.ui.uikit.chat.LocalChatColors
+import com.example.day.core.ui.uikit.chat.ChatColorScheme
+import com.example.day.core.ui.uikit.chat.LocalChatColorScheme
 import com.example.day.core.ui.uikit.components.HelpIconButton
 
 /**
@@ -42,7 +42,7 @@ import com.example.day.core.ui.uikit.components.HelpIconButton
  * @param min Minimum value for slider
  * @param max Maximum value for slider
  * @param modifier Modifier for the composable
- * @param colors Chat UI colors
+ * @param colors Chat color scheme
  * @param decimalPlaces Number of decimal places for display (0 for integers)
  */
 @Composable
@@ -53,7 +53,7 @@ fun SliderTextField(
     min: Double,
     max: Double,
     modifier: Modifier = Modifier,
-    colors: ChatUiColors = LocalChatColors.current,
+    colors: ChatColorScheme = LocalChatColorScheme.current,
     decimalPlaces: Int = 2,
     helpDescription: String? = null
 ) {
@@ -158,7 +158,7 @@ fun SliderTextField(
     min: Int,
     max: Int,
     modifier: Modifier = Modifier,
-    colors: ChatUiColors = LocalChatColors.current,
+    colors: ChatColorScheme = LocalChatColorScheme.current,
     helpDescription: String? = null
 ) {
     var textValue by remember(value) {

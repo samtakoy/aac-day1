@@ -7,5 +7,6 @@ enum class ChatMessageUiType {
     User,
     Bot,
     Info,
-    Buttons
+    Buttons,
+    Title
 }

@@ -24,8 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
-import com.example.day.core.ui.uikit.chat.ChatUiColors
-import com.example.day.core.ui.uikit.chat.LocalChatColors
+import com.example.day.core.ui.uikit.chat.ChatColorScheme
+import com.example.day.core.ui.uikit.chat.LocalChatColorScheme
 import com.example.day.core.ui.uikit.components.SettingsTextField
 
 /**
@@ -39,7 +39,7 @@ fun ChatSettingsView(
     onSubmit: (chatTitle: String, ChatSettings) -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
-    colors: ChatUiColors = LocalChatColors.current
+    colors: ChatColorScheme = LocalChatColorScheme.current
 ) {
     val settings = state.settingsState
     var chatTitle by remember(state.chatTitle) { mutableStateOf(state.chatTitle) }

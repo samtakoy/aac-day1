@@ -20,11 +20,12 @@ fun List<TaskStateMessage>.continueHistory(
 fun List<HandlerResult.Message>.withButton(
     action: String,
     title: String,
+    messageText: String = "",
     description: String = "",
     replyMessage: String = ""
 ): List<HandlerResult.Message> {
     return this + HandlerResult.Message(
-        message = "",
+        message = messageText,
         isInfo = false,
         buttons = listOf(
             ChatMessage.Button(
@@ -40,10 +41,11 @@ fun List<HandlerResult.Message>.withButton(
 }
 
 fun List<HandlerResult.Message>.withButtons(
-    buttons: List<ChatMessage.Button>
+    buttons: List<ChatMessage.Button>,
+    messageText: String = ""
 ): List<HandlerResult.Message> {
     return this + HandlerResult.Message(
-        message = "",
+        message = messageText,
         isInfo = false,
         buttons = buttons
     )
@@ -53,6 +55,13 @@ fun List<HandlerResult.Message>.withInfo(title: String): List<HandlerResult.Mess
     return this + HandlerResult.Message(
         message = title,
         isInfo = true
+    )
+}
+
+fun List<HandlerResult.Message>.withTitle(title: String): List<HandlerResult.Message> {
+    return this + HandlerResult.Message(
+        message = title,
+        isTitle = true
     )
 }
 

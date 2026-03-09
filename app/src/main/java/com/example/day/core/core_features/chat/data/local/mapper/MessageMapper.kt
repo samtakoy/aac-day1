@@ -64,6 +64,7 @@ internal class MessageMapper @Inject constructor() {
         ChatMessage.Type.Bot -> 1
         ChatMessage.Type.Info -> 2
         ChatMessage.Type.Buttons -> 3
+        ChatMessage.Type.Title -> 4
     }
 
     fun fromDbType(type: Int): ChatMessage.Type = when (type) {
@@ -71,6 +72,7 @@ internal class MessageMapper @Inject constructor() {
         1 -> ChatMessage.Type.Bot
         2 -> ChatMessage.Type.Info
         3 -> ChatMessage.Type.Buttons
+        4 -> ChatMessage.Type.Title
         else -> ChatMessage.Type.User
     }
 }

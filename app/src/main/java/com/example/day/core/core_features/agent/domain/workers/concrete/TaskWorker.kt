@@ -122,7 +122,8 @@ class TaskWorker @Inject constructor(
 
         val result = handler?.handleUserAction(taskContext, action)
         result?.messages?.forEach { msg ->
-            if (msg.isInfo) chatTools.addInfoMessage(chat.id, msg.message, msg.buttons)
+            if (msg.isTitle) chatTools.addTitleMessage(chat.id, msg.message, msg.buttons)
+            else if (msg.isInfo) chatTools.addInfoMessage(chat.id, msg.message, msg.buttons)
             else chatTools.addBotMessage(chat.id, msg.message, msg.buttons)
         }
 
@@ -200,6 +201,7 @@ class TaskWorker @Inject constructor(
         // 1. Сообщения в чат
         result.messages.forEach { msg ->
             when {
+                msg.isTitle -> chatTools.addTitleMessage(context.   chat.id, msg.message, msg.buttons)
                 msg.isInfo -> chatTools.addInfoMessage(context.chat.id, msg.message, msg.buttons)
                 else -> chatTools.addBotMessage(context.chat.id, msg.message, msg.buttons)
             }

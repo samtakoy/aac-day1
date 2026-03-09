@@ -44,8 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.day.app.di.LocalAppComponent
 import com.example.day.core.core_features.chat.domain.model.ChatType
-import com.example.day.core.ui.uikit.chat.DarkChatUiColors
-import com.example.day.core.ui.uikit.chat.LocalChatColors
+import com.example.day.core.ui.uikit.chat.DarkChatColorScheme
+import com.example.day.core.ui.uikit.chat.LocalChatColorScheme
 import com.example.day.features.chats.impl.ui.viewmodel.ChatsViewModel
 import com.example.day.features.chats.impl.ui.viewmodel.ChatsViewModelImpl
 import kotlinx.coroutines.launch
@@ -59,7 +59,7 @@ internal fun ChatsScreen(
     val state by viewModel.getStateAsFlow().collectAsStateWithLifecycle()
 
     CompositionLocalProvider(
-        LocalChatColors provides DarkChatUiColors
+        LocalChatColorScheme provides DarkChatColorScheme
     ) {
         ChatsScreenInternal(
             state = state,

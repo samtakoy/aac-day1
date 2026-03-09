@@ -32,8 +32,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.example.day.core.ui.uikit.chat.ChatUiColors
-import com.example.day.core.ui.uikit.chat.LocalChatColors
+import com.example.day.core.ui.uikit.chat.ChatColorScheme
+import com.example.day.core.ui.uikit.chat.LocalChatColorScheme
 
 /**
  * Круглая кнопка с вопросительным знаком для отображения справки по параметрам
@@ -42,7 +42,7 @@ import com.example.day.core.ui.uikit.chat.LocalChatColors
 fun HelpIconButton(
     description: String,
     modifier: Modifier = Modifier,
-    colors: ChatUiColors = LocalChatColors.current
+    colors: ChatColorScheme = LocalChatColorScheme.current
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
@@ -116,7 +116,7 @@ fun SettingsTextField(
     maxLines: Int = 1,
     keyboardType: KeyboardType = KeyboardType.Text,
     helpDescription: String? = null,
-    colors: ChatUiColors = LocalChatColors.current
+    colors: ChatColorScheme = LocalChatColorScheme.current
 ) {
     Column(
         modifier = modifier,
@@ -194,7 +194,7 @@ fun NullableIntField(
     placeholder: String,
     modifier: Modifier = Modifier,
     helpDescription: String? = null,
-    colors: ChatUiColors = LocalChatColors.current
+    colors: ChatColorScheme = LocalChatColorScheme.current
 ) {
     var textValue by remember(value) { mutableStateOf(value?.toString() ?: "") }
 

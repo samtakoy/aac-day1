@@ -15,6 +15,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_confi
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withBot
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withButtons
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withInfo
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.withTitle
 import com.example.day.core.core_features.state_machine.domain.HandlerResult
 import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
@@ -125,12 +126,15 @@ class VerificationStateHandler : TaskStateHandler {
 
         // return if (data.stepResults.isNotEmpty()  && data.stepResults.size == context.getTotalSteps() && data.resume != null && data.score != null) {
         return if (data.stepResults.isNotEmpty() && data.resume != null && data.score != null) {
-            val userTask = buildUserTask(data)
             // Сохранить данные текущего состояния
             context.saveStateData(data)
 
             HandlerResult(
-                messages = chatMessages.addButtons(data).withInfo(userTask)
+                messages = chatMessages
+                    .addButtons(
+                        data = data,
+                        messageText = buildUserTask(data)
+                    )
             )
         } else {
             context.saveStateData(data)
@@ -152,7 +156,7 @@ class VerificationStateHandler : TaskStateHandler {
             // сообщить о переходе и разбудить Llm
             HandlerResult(
                 messages = emptyList<HandlerResult.Message>()
-                    .withInfo(context.buildStateTransitionInfoMessage(nextStep, nextState)),
+                    .withTitle(context.buildStateTransitionInfoMessage(nextStep, nextState)),
                 // Будим Llm
                 llmRequest = HandlerResult.LlmRequest()
             )
@@ -196,6 +200,8 @@ class VerificationStateHandler : TaskStateHandler {
             )
         )
         // prefill для стадии выполнения с фидбэком
+        // TODO префил добавлен только одному шагу Execution - нужно чтобы каждый Execution стейт сам добалял его при возврате на доработку фидбэка
+        //  для этого isCompleted надо поменять на стейты: не решено, взято в работу, решено, есть фидбэк
         val feedback = verifData.stepResults.find { it.stepNumber == executionStep }?.feedback ?: return
         val execData = context.getStateData(TaskStateConfig.VERIFICATION, executionStep) as? TaskStateData.Verification ?: return
         context.saveStateData(
@@ -252,7 +258,10 @@ class VerificationStateHandler : TaskStateHandler {
     }
 }
 
-private fun List<HandlerResult.Message>.addButtons(data: TaskStateData.Verification): List<HandlerResult.Message> {
+private fun List<HandlerResult.Message>.addButtons(
+    data: TaskStateData.Verification,
+    messageText: String = "",
+): List<HandlerResult.Message> {
     return this.withButtons(
         buttons = buildList {
             data.stepResults.forEach { step ->
@@ -275,6 +284,7 @@ private fun List<HandlerResult.Message>.addButtons(data: TaskStateData.Verificat
                     replyMessage = "К результатам"
                 )
             )
-        }
+        },
+        messageText = messageText
     )
 }

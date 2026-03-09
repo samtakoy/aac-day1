@@ -19,9 +19,11 @@ class HandlerResult(
         val userPrompt: String? = null
     )
 
+    // TODO refactor
     data class Message(
         val message: String,
-        val isInfo: Boolean,
+        val isInfo: Boolean = false,
+        val isTitle: Boolean = false,
         val buttons: List<ChatMessage.Button> = emptyList()
     )
 

@@ -13,13 +13,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.day.core.ui.uikit.chat.ChatUiColors
-import com.example.day.core.ui.uikit.chat.LocalChatColors
+import com.example.day.core.ui.uikit.chat.ChatColorScheme
+import com.example.day.core.ui.uikit.chat.LocalChatColorScheme
 import com.example.day.core.ui.uikit.chat.list.model.ChatListUiEvent
 import com.example.day.core.ui.uikit.chat.list.model.ChatListUiModel
 
 /**
- * Composable for displaying chat message list
+ * Composable для отображения списка сообщений чата
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -28,7 +28,7 @@ fun ChatListView(
     onEvent: (ChatListUiEvent) -> Unit,
     onInfoMessageExpand: (id: Long, isExpanded: Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
-    colors: ChatUiColors = LocalChatColors.current
+    colors: ChatColorScheme = LocalChatColorScheme.current
 ) {
     Column(
         modifier = modifier
@@ -42,7 +42,7 @@ fun ChatListView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(32.dp),
-                color = colors.inputPlaceholder
+                color = colors.contentColor.copy(alpha = 0.6f)
             )
         } else {
             LazyColumn(
@@ -54,7 +54,6 @@ fun ChatListView(
                     items = model.messages,
                     key = { it.id }
                 ) { message ->
-                    // TODO зачем Column?
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -65,6 +64,7 @@ fun ChatListView(
                     ) {
                         ChatMessageView(
                             item = message,
+                            colors = colors,
                             onInfoMessageExpand = onInfoMessageExpand,
                             onMessageButtonClick = { messageId, actionId ->
                                 onEvent(ChatListUiEvent.ChatButtonClick(messageId, actionId))

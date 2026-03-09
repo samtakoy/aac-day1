@@ -22,8 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.example.day.core.core_features.llm.domain.model.ModelSettings
-import com.example.day.core.ui.uikit.chat.ChatUiColors
-import com.example.day.core.ui.uikit.chat.LocalChatColors
+import com.example.day.core.ui.uikit.chat.ChatColorScheme
+import com.example.day.core.ui.uikit.chat.LocalChatColorScheme
 import com.example.day.core.ui.uikit.components.ModelParameterDescriptions
 import com.example.day.core.ui.uikit.components.NullableIntField
 import com.example.day.core.ui.uikit.components.SettingsTextField
@@ -36,14 +36,14 @@ import kotlinx.collections.immutable.toImmutableList
  * @param modelSettings The current model settings
  * @param onModelSettingsChange Callback when settings change
  * @param modifier Modifier for the composable
- * @param colors Chat UI colors
+ * @param colors Chat color scheme
  */
 @Composable
 fun ModelSettingsView(
     modelSettings: ModelSettings,
     onModelSettingsChange: (ModelSettings) -> Unit,
     modifier: Modifier = Modifier,
-    colors: ChatUiColors = LocalChatColors.current
+    colors: ChatColorScheme = LocalChatColorScheme.current
 ) {
     var modelName by remember(modelSettings.name) { mutableStateOf(modelSettings.name) }
     var stopWord by remember(modelSettings.stopSequence) { 

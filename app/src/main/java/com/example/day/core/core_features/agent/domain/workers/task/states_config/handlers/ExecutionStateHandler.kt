@@ -9,6 +9,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_confi
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withBot
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withButton
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withInfo
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.withTitle
 import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
 import com.example.day.core.core_features.state_machine.domain.HandlerResult
 import com.example.day.core.core_features.state_machine.domain.TaskStateHandler
@@ -129,8 +130,6 @@ $feedbackSection
         )
 
         return if (nextState == TaskStateConfig.EXECUTION && data.result?.isNotBlank() == true) {
-            val userTask = buildUserTask(data)
-
             // Сохранить данные текущего состояния
             context.saveStateData(data, curStep)
 
@@ -142,7 +141,8 @@ $feedbackSection
                     messages = chatMessages.withButton(
                         action = ACTION_PROCEED,
                         title = "К следующему этапу",
-                    ).withInfo(userTask)
+                        messageText = buildUserTask(data)
+                    )
                 )
             }
 
@@ -175,7 +175,7 @@ $feedbackSection
             // сообщить о переходе и разбудить Llm
             HandlerResult(
                 messages = emptyList<HandlerResult.Message>()
-                    .withInfo(context.buildStateTransitionInfoMessage(nextStepNum, nextState)),
+                    .withTitle(context.buildStateTransitionInfoMessage(nextStepNum, nextState)),
                 // Будим Llm
                 llmRequest = HandlerResult.LlmRequest()
             )

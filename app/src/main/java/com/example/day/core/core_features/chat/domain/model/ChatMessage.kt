@@ -28,6 +28,7 @@ data class ChatMessage(
         User,
         Bot,
         Info,
-        Buttons
+        Buttons,
+        Title
     }
 }

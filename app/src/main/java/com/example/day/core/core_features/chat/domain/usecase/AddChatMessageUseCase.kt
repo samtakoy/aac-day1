@@ -18,6 +18,7 @@ class AddChatMessageUseCase @Inject constructor(
         type: ChatMessage.Type,
         buttons: ChatMessage.Buttons? = null
     ): Long {
+        // TODO  не удалять а завести состояние и перечеркивать
         // Если сообщение от пользователя - удаляем активные сообщения с кнопками
         if (userType == UserType.User) {
             val buttonMessages = repository.getMessagesByType(chatId, ChatMessage.Type.Buttons)

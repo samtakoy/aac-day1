@@ -9,6 +9,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_confi
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withBot
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withButton
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withInfo
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.withTitle
 import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
 import com.example.day.core.core_features.state_machine.domain.HandlerResult
 import com.example.day.core.core_features.state_machine.domain.TaskStateHandler
@@ -54,7 +55,7 @@ class PlanningStateHandler : TaskStateHandler {
 
 === ПРАВИЛА ФОРМАТИРОВАНИЯ JSON ===
 • Весь ответ — это ОДИН валидный JSON-объект, без markdown, без пояснений до/после.
-• Пример корректного ответа:
+• Пример корректного ответа (количество этапов не регламентировано - тут 3 только для примера):
 {
     "${TaskMemKeys.REPLY_TO_USER}": "Отлично, я понял задачу.\nПлан включает 3 этапа:\n1. Анализ требований\n2. Проектирование\n3. Реализация",
     "${TaskMemKeys.MEM_UPDATES}": {
@@ -114,8 +115,6 @@ class PlanningStateHandler : TaskStateHandler {
 
         return if (nextState == TaskStateConfig.EXECUTION && data.steps.isNotEmpty() && data.steps.size == data.totalSteps) {
 
-            val userTask = buildUserTask(data)
-
             // Сохранить данные текущего состояния
             context.saveStateData(data)
             context.setTotalSteps(data.steps.size)
@@ -128,7 +127,8 @@ class PlanningStateHandler : TaskStateHandler {
                     messages = chatMessages.withButton(
                         action = ACTION_PROCEED,
                         title = "К этапу 1",
-                    ).withInfo(userTask)
+                        messageText = buildUserTask(data)
+                    )
                 )
             }
 
@@ -184,7 +184,7 @@ class PlanningStateHandler : TaskStateHandler {
             // сообщить о переходе и разбудить Llm
             HandlerResult(
                 messages = emptyList<HandlerResult.Message>()
-                    .withInfo(context.buildStateTransitionInfoMessage(nextStep, nextState)),
+                    .withTitle(context.buildStateTransitionInfoMessage(nextStep, nextState)),
                 // Будим Llm
                 llmRequest = HandlerResult.LlmRequest()
             )

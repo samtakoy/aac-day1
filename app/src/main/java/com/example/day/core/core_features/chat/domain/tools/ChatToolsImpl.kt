@@ -57,4 +57,22 @@ internal class ChatToolsImpl @Inject constructor(
             buttonsModel
         )
     }
+
+    override suspend fun addTitleMessage(
+        chatId: Long,
+        message: String,
+        buttons: List<ChatMessage.Button>
+    ) {
+        val buttonsModel = if (buttons.isNotEmpty()) ChatMessage.Buttons(buttons, true) else null
+
+        addChatMessageUseCase.invoke(
+            chatId,
+            System.currentTimeMillis(),
+            UserType.Info,
+            message,
+            ChatMessageStatus.Viewed,
+            ChatMessage.Type.Title,
+            buttonsModel
+        )
+    }
 }

@@ -21,23 +21,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.day.core.ui.uikit.chat.ChatUiColors
-import com.example.day.core.ui.uikit.chat.LocalChatColors
+import com.example.day.core.ui.uikit.chat.ChatColorScheme
+import com.example.day.core.ui.uikit.chat.LocalChatColorScheme
 import com.example.day.core.ui.uikit.chat.bar.model.ChatSendButtonType
 
 /**
- * Round send button with arrow icon
+ * Round button with arrow icon or loading indicator
  */
 @Composable
 fun ChatSendButton(
     type: ChatSendButtonType,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    colors: ChatUiColors = LocalChatColors.current
+    colors: ChatColorScheme = LocalChatColorScheme.current
 ) {
     val isEnabled = type == ChatSendButtonType.Arrow
     val isLoading = type == ChatSendButtonType.Loading
-    
+
     val buttonColor = if (isEnabled) colors.sendButtonEnabled else colors.sendButtonDisabled
     
     // Rotate animation for send arrow
