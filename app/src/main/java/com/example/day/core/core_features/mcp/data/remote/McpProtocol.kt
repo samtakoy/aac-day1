@@ -7,73 +7,74 @@ import kotlinx.serialization.json.JsonObject
 /** JSON-RPC 2.0 Request */
 @Serializable
 internal data class JsonRpcRequest(
-    val jsonrpc: String = "2.0",
-    val id: Int,
-    val method: String,
-    val params: JsonElement? = null
+    @kotlinx.serialization.SerialName("jsonrpc") val jsonrpc: String = "2.0",
+    @kotlinx.serialization.SerialName("id") val id: Int,
+    @kotlinx.serialization.SerialName("method") val method: String,
+    @kotlinx.serialization.SerialName("params") val params: JsonElement? = null
 )
 
 /** JSON-RPC 2.0 Response */
 @Serializable
 internal data class JsonRpcResponse(
-    val jsonrpc: String = "2.0",
-    val id: Int,
-    val result: JsonElement? = null,
-    val error: JsonRpcError? = null
+    @kotlinx.serialization.SerialName("jsonrpc") val jsonrpc: String = "2.0",
+    @kotlinx.serialization.SerialName("id") val id: Int? = null,
+    @kotlinx.serialization.SerialName("result") val result: JsonElement? = null,
+    @kotlinx.serialization.SerialName("error") val error: JsonRpcError? = null
 )
 
 /** JSON-RPC Error */
 @Serializable
 internal data class JsonRpcError(
-    val code: Int,
-    val message: String,
-    val data: JsonElement? = null
+    @kotlinx.serialization.SerialName("code") val code: Int,
+    @kotlinx.serialization.SerialName("message") val message: String,
+    @kotlinx.serialization.SerialName("data") val data: JsonElement? = null
 )
 
 /** MCP Initialize Request Params */
 @Serializable
 internal data class InitializeParams(
-    val protocolVersion: String = "2024-11-05",
+    @kotlinx.serialization.SerialName("protocolVersion") val protocolVersion: String = "2024-11-05",
     /** Empty capabilities — JsonObject is properly serializable */
-    val capabilities: JsonObject = JsonObject(emptyMap()),
-    val clientInfo: ClientInfo
+    @kotlinx.serialization.SerialName("capabilities") val capabilities: JsonObject = JsonObject(emptyMap()),
+    @kotlinx.serialization.SerialName("clientInfo") val clientInfo: ClientInfo
 )
 
 @Serializable
 internal data class ClientInfo(
-    val name: String,
-    val version: String
+    @kotlinx.serialization.SerialName("name") val name: String,
+    @kotlinx.serialization.SerialName("version") val version: String
 )
 
 /** MCP Initialize Result */
 @Serializable
 internal data class InitializeResult(
-    val protocolVersion: String,
-    val capabilities: JsonObject = JsonObject(emptyMap()),
-    val serverInfo: ServerInfo
+    @kotlinx.serialization.SerialName("protocolVersion") val protocolVersion: String,
+    @kotlinx.serialization.SerialName("capabilities") val capabilities: JsonObject = JsonObject(emptyMap()),
+    @kotlinx.serialization.SerialName("serverInfo") val serverInfo: ServerInfo
 )
 
 @Serializable
 internal data class ServerInfo(
-    val name: String,
-    val version: String
+    @kotlinx.serialization.SerialName("name") val name: String,
+    @kotlinx.serialization.SerialName("version") val version: String
 )
 
 /** MCP tools/list result */
 @Serializable
 internal data class ToolsListResult(
-    val tools: List<ToolDefinition>
+    @kotlinx.serialization.SerialName("tools") val tools: List<ToolDefinition>
 )
 
 /** Tool definition as returned by MCP server */
 @Serializable
 internal data class ToolDefinition(
-    val name: String,
-    val description: String? = null,
-    val inputSchema: JsonElement? = null
+    @kotlinx.serialization.SerialName("name") val name: String,
+    @kotlinx.serialization.SerialName("description") val description: String? = null,
+    @kotlinx.serialization.SerialName("inputSchema") val inputSchema: JsonElement? = null
 )
 
 internal object McpMethods {
     const val INITIALIZE = "initialize"
     const val TOOLS_LIST = "tools/list"
+    const val TOOLS_CALL = "tools/call"
 }

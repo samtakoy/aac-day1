@@ -58,4 +58,8 @@ enum class ChatCommand(val title: String) {
      * Сохраняет историю сообщений между запросами.
      * */
     Talk("@@talk"),
+    /**
+     * MCP command handler (manual tool call).
+     */
+    Mcp("@@mcp"),
 }

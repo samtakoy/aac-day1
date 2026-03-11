@@ -26,6 +26,9 @@ import com.example.day.core.core_features.chat.domain.usecase.UpdateChatSettings
 import com.example.day.core.core_features.chat.domain.usecase.CreatePlannerStageChatUseCase
 import com.example.day.core.core_features.chat.domain.usecase.UpdateChatTitleUseCase
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
+import com.example.day.core.core_features.mcp.domain.repository.McpRepository
+import com.example.day.core.core_features.mcp.domain.tools.McpTools
+import kotlinx.serialization.json.Json
 
 interface ConsoleFeatureDeps {
     val getMessagesUseCase: GetChatMessagesAsFlowUseCase
@@ -57,4 +60,7 @@ interface ConsoleFeatureDeps {
     val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase
     val getAgentContextUseCase: GetAgentContextUseCase
     val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase
+    val mcpRepository: McpRepository
+    val mcpTools: McpTools
+    val json: Json
 }

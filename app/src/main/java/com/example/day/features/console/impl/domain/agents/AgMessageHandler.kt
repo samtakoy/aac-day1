@@ -2,6 +2,7 @@ package com.example.day.features.console.impl.domain.agents
 
 import com.example.day.core.core_features.agent.domain.utils.ConsumptionCalculator
 import com.example.day.core.core_features.agent.domain.workers.concrete.CompareWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.McpWorker
 import com.example.day.core.core_features.agent.domain.workers.concrete.PromptWorker
 import com.example.day.core.core_features.agent.domain.workers.concrete.RejectWorker
 import com.example.day.core.core_features.agent.domain.workers.concrete.SimpleWorker
@@ -24,6 +25,7 @@ internal class AgMessageHandler @Inject constructor(
     promptWorker: PromptWorker,
     teamWorker: TeamWorker,
     talkWorker: TalkWorker,
+    mcpWorker: McpWorker,
     compareWorker: CompareWorker,
     private val rejectWorker: RejectWorker,
     private val consumptionCalculator: ConsumptionCalculator
@@ -35,6 +37,7 @@ internal class AgMessageHandler @Inject constructor(
         ChatCommand.PromptWork to promptWorker,
         ChatCommand.TeamWork to teamWorker,
         ChatCommand.Talk to talkWorker,
+        ChatCommand.Mcp to mcpWorker,
         ChatCommand.Compare to compareWorker,
     )
 

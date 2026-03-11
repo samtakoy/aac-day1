@@ -20,8 +20,12 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Low-level MCP transport supporting three modes:
@@ -38,11 +42,13 @@ import javax.inject.Inject
  *   `Accept: application/json, text/event-stream`.
  *   Сервер отвечает либо `application/json`, либо `text/event-stream` (SSE).
  */
+@Singleton
 internal class McpTransport @Inject constructor(
     private val httpClient: HttpClient,
     private val json: Json
 ) {
     private val requestId = AtomicInteger(0)
+    private val sessionIds = ConcurrentHashMap<String, String>()
 
     /** Dispatches to the correct transport based on [config.transportType]. */
     suspend fun connect(config: McpServerConfig): List<McpTool> = when (config.transportType) {
@@ -129,18 +135,36 @@ internal class McpTransport @Inject constructor(
      * Если вернул JSON — декодируем напрямую.
      */
     private suspend fun connectStreamableHttp(config: McpServerConfig): List<McpTool> {
-        postStreamable(config, initRequest())   // initialize
-        val toolsRpc = postStreamable(config, JsonRpcRequest(id = nextId(), method = McpMethods.TOOLS_LIST, params = null))
+        // Start a fresh session for each connect to avoid "already initialized"
+        sessionIds.remove(config.id)
+        postStreamable(config, initRequest(), includeSessionHeader = false)   // initialize
+        val toolsRpc = postStreamable(
+            config,
+            JsonRpcRequest(id = nextId(), method = McpMethods.TOOLS_LIST, params = null),
+            includeSessionHeader = true
+        )
         return parseTools(toolsRpc)
     }
 
-    private suspend fun postStreamable(config: McpServerConfig, request: JsonRpcRequest): JsonRpcResponse {
+    internal suspend fun postStreamable(
+        config: McpServerConfig,
+        request: JsonRpcRequest,
+        includeSessionHeader: Boolean = true
+    ): JsonRpcResponse {
         val url = buildUrl(config.url, config.urlPath)
         val response = httpClient.post(url) {
             contentType(ContentType.Application.Json)
             header(HttpHeaders.Accept, "application/json, text/event-stream")
+            if (includeSessionHeader) {
+                sessionIds[config.id]?.let { header("mcp-session-id", it) }
+            }
             config.authToken?.let { header(HttpHeaders.Authorization, "Bearer $it") }
             setBody(json.encodeToString(JsonRpcRequest.serializer(), request))
+        }
+        response.headers["mcp-session-id"]?.let { sessionId ->
+            if (sessionId.isNotBlank()) {
+                sessionIds[config.id] = sessionId
+            }
         }
         val body = response.bodyAsText()
         val ct = response.contentType()
@@ -226,9 +250,14 @@ internal class McpTransport @Inject constructor(
     private fun initRequest() = JsonRpcRequest(
         id = nextId(),
         method = McpMethods.INITIALIZE,
-        params = json.encodeToJsonElement(
-            InitializeParams(clientInfo = ClientInfo(name = "Day-App", version = "1.0"))
-        )
+        params = buildJsonObject {
+            put("protocolVersion", "2024-11-05")
+            put("capabilities", buildJsonObject {})
+            put(
+                "clientInfo",
+                json.encodeToJsonElement(ClientInfo(name = "Day-App", version = "1.0"))
+            )
+        }
     )
 
     private fun decodeOrThrow(raw: String): JsonRpcResponse {

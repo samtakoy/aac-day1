@@ -1,0 +1,13 @@
+.gradle/
+.idea/
+.kotlin/
+.kilocode/
+.rooignore
+.git/
+.gitignore
+app/
+plans/
+prompts/
+meta/
+**/build/
+**/target/

@@ -1,0 +1,241 @@
+package com.example.day.mcpserver.tools
+
+import com.example.day.mcpserver.github.GitHubApiClient
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
+
+object GitHubToolNames {
+    const val GET_ISSUE = "get_issue"
+    const val LIST_ISSUES = "list_issues"
+    const val GET_ISSUE_COMMENTS = "get_issue_comments"
+    const val GET_USER = "get_user"
+    const val CREATE_ISSUE = "create_issue"
+    const val CREATE_COMMENT = "create_comment"
+}
+
+object GitHubToolDefaults {
+    const val DEFAULT_STATE = "open"
+    const val DEFAULT_PER_PAGE = 20
+    const val DEFAULT_PAGE = 1
+}
+
+fun registerMcpTools(server: Server, api: GitHubApiClient) {
+    registerEcho(server)
+    registerGetIssue(server, api)
+    registerListIssues(server, api)
+    registerGetIssueComments(server, api)
+    registerGetUser(server, api)
+    registerCreateIssue(server, api)
+    registerCreateComment(server, api)
+}
+
+private fun registerEcho(server: Server) {
+    server.addTool(
+        name = "echo",
+        description = "Echo back the input text (test/debug tool)",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("text", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Text to echo back"))
+                })
+            },
+            required = listOf("text")
+        )
+    ) { request ->
+        val text = request.arguments?.get("text")?.jsonPrimitive?.content ?: "(empty)"
+        CallToolResult(content = listOf(TextContent(text = "Echo: $text")))
+    }
+}
+
+private fun registerGetIssue(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.GET_ISSUE,
+        description = "Get issue by number from a GitHub repository",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("issueNumber", buildJsonObject { put("type", JsonPrimitive("integer")) })
+            },
+            required = listOf("issueNumber")
+        )
+    ) { request ->
+        val issueNumber = request.arguments?.get("issueNumber")?.jsonPrimitive?.intOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "issueNumber is required")),
+                isError = true
+            )
+        val text = api.getIssue(
+            owner = request.arguments?.get("owner")?.jsonPrimitive?.contentOrNull,
+            repo = request.arguments?.get("repo")?.jsonPrimitive?.contentOrNull,
+            issueNumber = issueNumber
+        )
+        CallToolResult(content = listOf(TextContent(text = text)))
+    }
+}
+
+private fun registerListIssues(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.LIST_ISSUES,
+        description = "List issues for a repository (PRs excluded by default)",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("state", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("labels", buildJsonObject { put("type", JsonPrimitive("array")) })
+                put("per_page", buildJsonObject { put("type", JsonPrimitive("integer")) })
+                put("page", buildJsonObject { put("type", JsonPrimitive("integer")) })
+                put("include_prs", buildJsonObject { put("type", JsonPrimitive("boolean")) })
+            }
+        )
+    ) { request ->
+        val args = request.arguments
+        val perPage = args?.get("per_page")?.jsonPrimitive?.intOrNull ?: GitHubToolDefaults.DEFAULT_PER_PAGE
+        val page = args?.get("page")?.jsonPrimitive?.intOrNull ?: GitHubToolDefaults.DEFAULT_PAGE
+        val includePrs = args?.get("include_prs")?.jsonPrimitive?.booleanOrNull ?: false
+        val labels = when (val labelsElement = args?.get("labels")) {
+            is JsonArray -> labelsElement.mapNotNull { it.jsonPrimitive.contentOrNull }
+            is JsonPrimitive -> labelsElement.content.split(",").map { it.trim() }.filter { it.isNotBlank() }
+            else -> null
+        }
+        val text = api.listIssues(
+            owner = args?.get("owner")?.jsonPrimitive?.contentOrNull,
+            repo = args?.get("repo")?.jsonPrimitive?.contentOrNull,
+            state = args?.get("state")?.jsonPrimitive?.contentOrNull ?: GitHubToolDefaults.DEFAULT_STATE,
+            labels = labels,
+            perPage = perPage,
+            page = page,
+            includePrs = includePrs
+        )
+        CallToolResult(content = listOf(TextContent(text = text)))
+    }
+}
+
+private fun registerGetIssueComments(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.GET_ISSUE_COMMENTS,
+        description = "Get comments for an issue",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("issueNumber", buildJsonObject { put("type", JsonPrimitive("integer")) })
+            },
+            required = listOf("issueNumber")
+        )
+    ) { request ->
+        val issueNumber = request.arguments?.get("issueNumber")?.jsonPrimitive?.intOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "issueNumber is required")),
+                isError = true
+            )
+        val text = api.getIssueComments(
+            owner = request.arguments?.get("owner")?.jsonPrimitive?.contentOrNull,
+            repo = request.arguments?.get("repo")?.jsonPrimitive?.contentOrNull,
+            issueNumber = issueNumber
+        )
+        CallToolResult(content = listOf(TextContent(text = text)))
+    }
+}
+
+private fun registerGetUser(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.GET_USER,
+        description = "Get GitHub user information by username",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("username", buildJsonObject { put("type", JsonPrimitive("string")) })
+            },
+            required = listOf("username")
+        )
+    ) { request ->
+        val username = request.arguments?.get("username")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "username is required")),
+                isError = true
+            )
+        val text = api.getUser(username)
+        CallToolResult(content = listOf(TextContent(text = text)))
+    }
+}
+
+private fun registerCreateIssue(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.CREATE_ISSUE,
+        description = "Create a new issue in a repository",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("title", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("body", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("labels", buildJsonObject { put("type", JsonPrimitive("array")) })
+            },
+            required = listOf("title")
+        )
+    ) { request ->
+        val title = request.arguments?.get("title")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "title is required")),
+                isError = true
+            )
+        val labels = when (val labelsElement = request.arguments?.get("labels")) {
+            is JsonArray -> labelsElement.mapNotNull { it.jsonPrimitive.contentOrNull }
+            is JsonPrimitive -> labelsElement.content.split(",").map { it.trim() }.filter { it.isNotBlank() }
+            else -> null
+        }
+        val text = api.createIssue(
+            owner = request.arguments?.get("owner")?.jsonPrimitive?.contentOrNull,
+            repo = request.arguments?.get("repo")?.jsonPrimitive?.contentOrNull,
+            title = title,
+            body = request.arguments?.get("body")?.jsonPrimitive?.contentOrNull,
+            labels = labels
+        )
+        CallToolResult(content = listOf(TextContent(text = text)))
+    }
+}
+
+private fun registerCreateComment(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.CREATE_COMMENT,
+        description = "Create a comment for an issue",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
+                put("issueNumber", buildJsonObject { put("type", JsonPrimitive("integer")) })
+                put("body", buildJsonObject { put("type", JsonPrimitive("string")) })
+            },
+            required = listOf("issueNumber", "body")
+        )
+    ) { request ->
+        val issueNumber = request.arguments?.get("issueNumber")?.jsonPrimitive?.intOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "issueNumber is required")),
+                isError = true
+            )
+        val body = request.arguments?.get("body")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "body is required")),
+                isError = true
+            )
+        val text = api.createComment(
+            owner = request.arguments?.get("owner")?.jsonPrimitive?.contentOrNull,
+            repo = request.arguments?.get("repo")?.jsonPrimitive?.contentOrNull,
+            issueNumber = issueNumber,
+            body = body
+        )
+        CallToolResult(content = listOf(TextContent(text = text)))
+    }
+}
