@@ -20,5 +20,27 @@ class MessageDto(
     @SerialName("thinking")
     val thinking: String? = null,
     @SerialName("cache_prompt")
-    val cachePrompt: Boolean? = null
+    val cachePrompt: Boolean? = null,
+    @SerialName("tool_calls")
+    val toolCalls: List<ToolCallDto>? = null,
+    @SerialName("tool_call_id")
+    val toolCallId: String? = null
+)
+
+@Serializable
+class ToolCallDto(
+    @SerialName("id")
+    val id: String,
+    @SerialName("type")
+    val type: String,
+    @SerialName("function")
+    val function: FunctionCallDto
+)
+
+@Serializable
+class FunctionCallDto(
+    @SerialName("name")
+    val name: String,
+    @SerialName("arguments")
+    val arguments: String
 )

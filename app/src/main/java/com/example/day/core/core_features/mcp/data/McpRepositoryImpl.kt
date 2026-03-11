@@ -4,6 +4,7 @@ import com.example.day.core.core_features.mcp.data.local.SecretsVault
 import com.example.day.core.core_features.mcp.data.local.dao.McpServerDao
 import com.example.day.core.core_features.mcp.data.local.entity.McpServerEntity
 import com.example.day.core.core_features.mcp.data.remote.McpTransport
+import com.example.day.core.core_features.mcp.domain.McpLocalConstants
 import com.example.day.core.core_features.mcp.domain.model.McpConnectionState
 import com.example.day.core.core_features.mcp.domain.model.McpServerConfig
 import com.example.day.core.core_features.mcp.domain.model.TransportType
@@ -11,6 +12,7 @@ import com.example.day.core.core_features.mcp.domain.repository.McpRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,7 +27,9 @@ internal class McpRepositoryImpl @Inject constructor(
     private val connectionStates = MutableStateFlow<Map<String, McpConnectionState>>(emptyMap())
 
     override fun getServers(): Flow<List<McpServerConfig>> =
-        dao.getAllServers().map { entities -> entities.map { it.toConfig() } }
+        dao.getAllServers()
+            .onStart { ensureLocalMcpServer() }
+            .map { entities -> entities.map { it.toConfig() } }
 
     override suspend fun saveServer(config: McpServerConfig) {
         dao.insertServer(
@@ -73,6 +77,23 @@ internal class McpRepositoryImpl @Inject constructor(
         connectionStates.map { it[serverId] ?: McpConnectionState.Disconnected }
 
     override suspend fun configuredCount(): Int = dao.getCount()
+
+    private suspend fun ensureLocalMcpServer() {
+        val existing = dao.getServerByName(McpLocalConstants.LOCAL_SERVER_NAME)
+        if (existing != null) return
+        dao.insertServer(
+            McpServerEntity(
+                id = McpLocalConstants.LOCAL_SERVER_ID,
+                name = McpLocalConstants.LOCAL_SERVER_NAME,
+                url = McpLocalConstants.LOCAL_SERVER_URL,
+                authTokenAlias = null,
+                isEnabled = true,
+                transportType = McpLocalConstants.LOCAL_TRANSPORT.name,
+                urlPath = "",
+                stdioCommand = null
+            )
+        )
+    }
 
     private fun McpServerEntity.toConfig() = McpServerConfig(
         id = id,

@@ -13,6 +13,23 @@ sealed interface WorkerEvent {
     /** Agent notifies that the LLM request returned an error */
     class RequestError(val text: String) : WorkerEvent
 
+    // ========== TOOL CALLING EVENTS ==========
+
+    /** Model requested a tool call */
+    class ToolCallStarted(
+        val toolCallId: String,
+        val toolName: String,
+        val arguments: String
+    ) : WorkerEvent
+
+    /** Tool call finished */
+    class ToolCallFinished(
+        val toolCallId: String,
+        val toolName: String,
+        val result: String,
+        val isError: Boolean
+    ) : WorkerEvent
+
     // ========== PLANNER-SPECIFIC EVENTS ==========
     
     /**

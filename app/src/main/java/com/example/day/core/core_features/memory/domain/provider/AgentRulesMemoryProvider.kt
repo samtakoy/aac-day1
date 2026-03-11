@@ -1,7 +1,6 @@
 package com.example.day.core.core_features.memory.domain.provider
 
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
-import com.example.day.core.core_features.agent.domain.model.Role
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProvider
 import kotlinx.serialization.builtins.ListSerializer
@@ -60,7 +59,7 @@ class AgentRulesMemoryProvider @Inject constructor(
             }
         }
 
-        return listOf(AContextMessage(role = Role.SYSTEM, content = content.trim()))
+        return listOf(AContextMessage(role = AContextMessage.Role.SYSTEM, content = content.trim()))
     }
 
     /**

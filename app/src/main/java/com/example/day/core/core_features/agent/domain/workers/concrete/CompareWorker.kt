@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.agent.domain.workers.concrete
 
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.utils.extractFromStartBrackets
@@ -33,6 +34,7 @@ class CompareWorker @Inject constructor(
     override suspend fun doWork(
         userPrompt: String,
         chat: Chat,
+        userRole: AContextMessage.Role,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         val inputWithoutCommand = userPrompt
@@ -141,6 +143,8 @@ class CompareWorker @Inject constructor(
                     is WorkerEvent.FactSaved -> Unit
                     is WorkerEvent.StageCompleted -> Unit
                     is WorkerEvent.StageCreationSuggested -> Unit
+                    is WorkerEvent.ToolCallStarted -> Unit
+                    is WorkerEvent.ToolCallFinished -> Unit
                 }
             }
         } catch (e: Exception) {

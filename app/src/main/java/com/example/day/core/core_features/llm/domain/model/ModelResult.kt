@@ -18,7 +18,19 @@ sealed interface ModelResult {
         data class Message(
             val role: String,
             val content: String?,
-            val reasoning: String?
+            val reasoning: String?,
+            val toolCalls: ImmutableList<ToolCall>? = null
+        )
+
+        data class ToolCall(
+            val id: String,
+            val type: String,
+            val function: FunctionCall
+        )
+
+        data class FunctionCall(
+            val name: String,
+            val arguments: String
         )
 
         /**

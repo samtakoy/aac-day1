@@ -11,6 +11,7 @@ object McpToolNames {
     const val GET_USER = "get_user"
     const val CREATE_ISSUE = "create_issue"
     const val CREATE_COMMENT = "create_comment"
+    const val SET_REMINDER = "set_reminder"
 
     val ALLOWED_TOOL_NAMES = setOf(
         GET_ISSUE,
@@ -18,7 +19,8 @@ object McpToolNames {
         GET_ISSUE_COMMENTS,
         GET_USER,
         CREATE_ISSUE,
-        CREATE_COMMENT
+        CREATE_COMMENT,
+        SET_REMINDER
     )
 }
 

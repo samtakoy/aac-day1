@@ -1,6 +1,7 @@
 package com.example.day.core.core_features.agent.domain.strategy.impl
 
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.agent.domain.strategy.ContextSnapshot
 import com.example.day.core.core_features.agent.domain.strategy.ContextStrategy
@@ -13,16 +14,15 @@ class ContextEmptyStrategy : ContextStrategy {
     override suspend fun process(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String?,
         store: AgentContextRepository
     ): ContextSnapshot = ContextSnapshot(messages = emptyList())
 
     override suspend fun afterResponse(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String,
         response: String,
-        store: AgentContextRepository
+        store: AgentContextRepository,
+        fullContext: ContextSnapshot
     ): ContextStrategyResult = ContextStrategyResult(null)
 
     override suspend fun getInfoReport(

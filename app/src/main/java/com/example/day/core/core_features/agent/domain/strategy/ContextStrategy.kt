@@ -18,21 +18,26 @@ interface ContextStrategy {
     suspend fun process(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String?,
         store: AgentContextRepository
     ): ContextSnapshot
 
     /**
      * Called after LLM response is received.
      * Saves messages to context and performs any post-processing (e.g. compression).
-     * @return ContextStrategyResult with optional report message
+     *
+     * @param chat Настройки чата
+     * @param agent Конфигурация агента
+     * @param userPrompt Исходный запрос пользователя
+     * @param response Текстовый ответ от LLM
+     * @param store Репозиторий для сохранения контекста
+     * @param fullContext Полная история сообщений (включая tool calls).
      */
     suspend fun afterResponse(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String,
         response: String,
-        store: AgentContextRepository
+        store: AgentContextRepository,
+        fullContext: ContextSnapshot
     ): ContextStrategyResult
 
     /**

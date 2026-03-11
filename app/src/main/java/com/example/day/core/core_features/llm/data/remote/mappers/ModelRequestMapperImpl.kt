@@ -1,9 +1,13 @@
 package com.example.day.core.core_features.llm.data.remote.mappers
 
 import com.example.day.core.core_features.llm.data.remote.model.request.ChatRequestDto
+import com.example.day.core.core_features.llm.data.remote.model.request.FunctionCallDto
+import com.example.day.core.core_features.llm.data.remote.model.request.FunctionDto
 import com.example.day.core.core_features.llm.data.remote.model.request.MessageDto
 import com.example.day.core.core_features.llm.data.remote.model.request.Reasoning
 import com.example.day.core.core_features.llm.data.remote.model.request.ResponseFormatDto
+import com.example.day.core.core_features.llm.data.remote.model.request.ToolCallDto
+import com.example.day.core.core_features.llm.data.remote.model.request.ToolDto
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import javax.inject.Inject
 
@@ -21,7 +25,30 @@ internal class ModelRequestMapperImpl @Inject constructor(): ModelRequestMapper 
                     role = message.role.toDtoString(),
                     content = message.content,
                     thinking = message.thinking,
-                    cachePrompt = message.cachePrompt
+                    cachePrompt = message.cachePrompt,
+                    toolCalls = message.toolCalls?.map { toolCall ->
+                        ToolCallDto(
+                            id = toolCall.id,
+                            type = toolCall.type,
+                            function = FunctionCallDto(
+                                name = toolCall.function.name,
+                                arguments = toolCall.function.arguments
+                            )
+                        )
+                    },
+                    toolCallId = message.toolCallId
+                )
+            },
+            tools = modelRequest.tools?.map { tool ->
+                ToolDto(
+                    type = when (tool.type) {
+                        ModelRequest.ToolType.Function -> "function"
+                    },
+                    function = FunctionDto(
+                        name = tool.function.name,
+                        description = tool.function.description,
+                        parameters = tool.function.parameters
+                    )
                 )
             },
             responseFormat = modelRequest.responseFormat.toDto(),
@@ -62,6 +89,7 @@ internal class ModelRequestMapperImpl @Inject constructor(): ModelRequestMapper 
             ModelRequest.Role.System -> "system"
             ModelRequest.Role.Assistant -> "assistant"
             ModelRequest.Role.User -> "user"
+            ModelRequest.Role.Tool -> "tool"
         }
     }
 

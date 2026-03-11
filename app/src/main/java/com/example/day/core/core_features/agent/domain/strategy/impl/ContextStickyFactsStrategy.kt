@@ -5,7 +5,6 @@ import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.AContextParams
 import com.example.day.core.core_features.agent.domain.model.AContextState
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
-import com.example.day.core.core_features.agent.domain.model.Role
 import com.example.day.core.core_features.agent.domain.model.addAssistantMessage
 import com.example.day.core.core_features.agent.domain.model.addUserMessage
 import com.example.day.core.core_features.agent.domain.strategy.ContextSnapshot
@@ -36,12 +35,11 @@ class ContextStickyFactsStrategy(
     override suspend fun process(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String?,
         store: AgentContextRepository
     ): ContextSnapshot {
         val state = store.getContextState(agent.id) as? AContextState.StickyFacts
             ?: AContextState.StickyFacts(facts = emptyMap(), messages = persistentListOf())
-        
+
         val params = store.getContextParams(agent.id) as? AContextParams.StickyFacts
         val windowSize = params?.windowSize ?: DEFAULT_WINDOW
 
@@ -61,9 +59,10 @@ class ContextStickyFactsStrategy(
         val window = state.messages.takeLast(windowSize).toPersistentList()
 
         // 3. Build final context: facts first (as system), then messages
+        // НЕ добавляем userPrompt — это сделает LlmRequestUseCase.exec()
         val messages = persistentListOf<AContextMessage>(
-            AContextMessage(role = Role.SYSTEM, content = factsBlock)
-        ).addAll(window).addUserMessage(userPrompt)
+            AContextMessage(role = AContextMessage.Role.SYSTEM, content = factsBlock)
+        ).addAll(window)
 
         return ContextSnapshot(messages = messages)
     }
@@ -71,21 +70,22 @@ class ContextStickyFactsStrategy(
     override suspend fun afterResponse(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String,
         response: String,
-        store: AgentContextRepository
+        store: AgentContextRepository,
+        fullContext: ContextSnapshot
     ): ContextStrategyResult {
         val state = store.getContextState(agent.id) as? AContextState.StickyFacts
             ?: AContextState.StickyFacts(facts = emptyMap(), messages = persistentListOf())
-        
+
         val params = store.getContextParams(agent.id) as? AContextParams.StickyFacts
         val windowSize = params?.windowSize ?: DEFAULT_WINDOW
         val maxFacts = params?.maxFacts ?: DEFAULT_MAX_FACTS
 
+        // fullContext содержит полную историю: initialHistory + prompt + assistant/tool messages
+        val messagesForHistory = fullContext.messages.toPersistentList()
+
         // 1. Update message history (for next window)
-        val updatedHistory = state.messages
-            .addUserMessage(userPrompt)
-            .addAssistantMessage(response)
+        val updatedHistory = messagesForHistory
             .takeLast(windowSize)
             .toPersistentList()
 
@@ -100,7 +100,8 @@ class ContextStickyFactsStrategy(
             modelSettings = chat.model,
             systemPrompt = "You are a factual memory processor. Extract and maintain key facts from conversations.",
             messages = emptyList(),
-            promptText = extractionPrompt
+            prompt = AContextMessage(AContextMessage.Role.USER, extractionPrompt),
+            tools = null
         ).getOrNull()?.getContent() ?: ""
 
         val newFactsMap = parseFacts(rawFacts)

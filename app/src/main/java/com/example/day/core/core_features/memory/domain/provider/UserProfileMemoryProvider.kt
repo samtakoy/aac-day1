@@ -1,7 +1,6 @@
 package com.example.day.core.core_features.memory.domain.provider
 
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
-import com.example.day.core.core_features.agent.domain.model.Role
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProvider
 import com.example.day.core.core_features.memory.domain.usecase.GetFactsByUserProfileUseCase
 import com.example.day.core.core_features.memory.domain.usecase.UpsertFactForProfileUseCase
@@ -37,6 +36,6 @@ class UserProfileMemoryProvider @Inject constructor(
                     appendLine()
                 }
         }
-        return listOf(AContextMessage(role = Role.SYSTEM, content = content.trim()))
+        return listOf(AContextMessage(role = AContextMessage.Role.SYSTEM, content = content.trim()))
     }
 }

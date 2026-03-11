@@ -19,7 +19,9 @@ enum class TransportType {
      * Требует наличия исполняемого файла на устройстве.
      * Пример: `/data/data/com.example/files/mcp-server --stdio`
      */
-    STDIO
+    STDIO,
+    /** Local in-memory MCP implementation (no network). */
+    LOCAL
 }
 
 /** Domain model for MCP Server configuration */
@@ -43,6 +45,11 @@ data class McpTool(
     val name: String,
     val description: String,
     val inputSchemaJson: String = "{}"  // raw JSON string for display
+)
+
+/** Optional context passed to MCP tool calls */
+data class McpToolCallContext(
+    val agentId: Long? = null
 )
 
 /** Connection lifecycle */

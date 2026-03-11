@@ -55,6 +55,7 @@ internal fun AddMcpServerDialog(
 ) {
     var tokenVisible by remember { mutableStateOf(false) }
     val isStdio = transportType == TransportType.STDIO
+    val isLocal = transportType == TransportType.LOCAL
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -79,7 +80,7 @@ internal fun AddMcpServerDialog(
                 )
 
                 // URL — only for network transports
-                if (!isStdio) {
+                if (!isStdio && !isLocal) {
                     OutlinedTextField(
                         value = serverUrl,
                         onValueChange = onUrlChange,
@@ -130,6 +131,7 @@ internal fun AddMcpServerDialog(
                         TransportType.SSE -> "GET {url}{path} → endpoint event → POST"
                         TransportType.STREAMABLE_HTTP -> "POST {url}{path}, Accept: JSON или SSE (spec 2025)"
                         TransportType.STDIO -> "Запуск локального процесса, общение через stdin/stdout"
+                        TransportType.LOCAL -> "Встроенный локальный MCP (без сети)"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -148,7 +150,7 @@ internal fun AddMcpServerDialog(
                             .fillMaxWidth()
                             .padding(top = 4.dp)
                     )
-                } else {
+                } else if (!isLocal) {
                     // ── Network transports: URL path ───────────────────────
                     OutlinedTextField(
                         value = urlPath,
@@ -161,6 +163,7 @@ internal fun AddMcpServerDialog(
                                     TransportType.SSE -> "/sse"
                                     TransportType.STREAMABLE_HTTP -> "/mcp"
                                     TransportType.STDIO -> ""
+                                    TransportType.LOCAL -> ""
                                 }
                             )
                         },
@@ -198,7 +201,11 @@ internal fun AddMcpServerDialog(
         },
         confirmButton = {
             val enabled = serverName.isNotBlank() &&
-                    (if (isStdio) stdioCommand.isNotBlank() else serverUrl.isNotBlank())
+                    when {
+                        isLocal -> true
+                        isStdio -> stdioCommand.isNotBlank()
+                        else -> serverUrl.isNotBlank()
+                    }
             TextButton(onClick = onConfirm, enabled = enabled) {
                 Text(if (isEditMode) "Сохранить" else "Добавить")
             }

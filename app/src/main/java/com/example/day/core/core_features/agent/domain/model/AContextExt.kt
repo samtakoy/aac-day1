@@ -12,15 +12,11 @@ import kotlinx.collections.immutable.toImmutableList
 /**
  * Добавить сообщение пользователя в контекст
  */
-fun PersistentList<AContextMessage>.addUserMessage(content: String?): PersistentList<AContextMessage> {
+fun PersistentList<AContextMessage>.addUserMessage(prompt: AContextMessage): PersistentList<AContextMessage> {
     // Пустое сообщение может быть когда надо просто подергать llm
-    if (content.isNullOrBlank()) return this
-    val newMessage = AContextMessage(
-        role = Role.USER,
-        content = content
-    )
+    if (prompt.content.isNullOrBlank()) return this
     return this.mutate {
-        it.add(newMessage)
+        it.add(prompt)
     }
 }
 
@@ -29,7 +25,7 @@ fun PersistentList<AContextMessage>.addUserMessage(content: String?): Persistent
  */
 fun PersistentList<AContextMessage>.addAssistantMessage(content: String): PersistentList<AContextMessage> {
     val newMessage = AContextMessage(
-        role = Role.ASSISTANT,
+        role = AContextMessage.Role.ASSISTANT,
         content = content,
     )
     return this.mutate {
@@ -42,13 +38,25 @@ fun PersistentList<AContextMessage>.addAssistantMessage(content: String): Persis
  */
 fun AContextMessage.toModelRequestMessage(): ModelRequest.Message {
     val modelRole = when (role) {
-        Role.SYSTEM -> ModelRequest.Role.System
-        Role.USER -> ModelRequest.Role.User
-        Role.ASSISTANT -> ModelRequest.Role.Assistant
+        AContextMessage.Role.SYSTEM -> ModelRequest.Role.System
+        AContextMessage.Role.USER -> ModelRequest.Role.User
+        AContextMessage.Role.ASSISTANT -> ModelRequest.Role.Assistant
+        AContextMessage.Role.TOOL -> ModelRequest.Role.Tool
     }
     return ModelRequest.Message(
         role = modelRole,
-        content = content
+        content = content,
+        toolCallId = toolCallId,
+        toolCalls = toolCalls?.map { ref ->
+            ModelRequest.ToolCall(
+                id = ref.id,
+                type = ref.type,
+                function = ModelRequest.FunctionCall(
+                    name = ref.functionName,
+                    arguments = ref.arguments
+                )
+            )
+        }
     )
 }
 

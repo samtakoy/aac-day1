@@ -1,6 +1,7 @@
 package com.example.day.core.core_features.agent.domain.workers.concrete
 
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.prompt.PlannerPromptBuilder
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.agent.domain.tools.ToolResponseParser
@@ -44,6 +45,7 @@ class PlannerWorker @Inject constructor(
     override suspend fun doWork(
         userPrompt: String,
         chat: Chat,
+        userRole: AContextMessage.Role,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         val chatId: Long = chat.id
@@ -89,7 +91,7 @@ class PlannerWorker @Inject constructor(
         )
 
         // Process the message
-        agent.process(chat.settings, enrichedTask, onEvent)
+        agent.process(chat.settings, prompt = AContextMessage(AContextMessage.Role.USER, enrichedTask), onEvent)
             .onSuccess { result ->
                 val responseText = result.responseText
 

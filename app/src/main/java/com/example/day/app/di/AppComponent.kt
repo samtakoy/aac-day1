@@ -8,6 +8,8 @@ import com.example.day.core.core_features.chat.di.ChatCoreFeatureModule
 import com.example.day.core.core_features.llm.di.LlmCoreFeatureModule
 import com.example.day.core.core_features.mcp.di.McpCoreFeatureModule
 import com.example.day.core.core_features.memory.di.MemoryCoreFeatureModule
+import com.example.day.core.core_features.reminder.di.ReminderCoreFeatureModule
+import com.example.day.core.core_features.reminder.domain.usecase.ExecuteReminderUseCase
 import com.example.day.core.di.NetworkModule
 import com.example.day.core.feature_entries.FeatureEntryProvider
 import com.example.day.features.chats.impl.di.ChatsFeatureApiModule
@@ -31,6 +33,7 @@ import javax.inject.Singleton
         ChatCoreFeatureModule::class,
         MemoryCoreFeatureModule::class,
         AgentCoreFeatureModule::class,
+        ReminderCoreFeatureModule::class,
         ConsoleFeatureApiModule::class,
         ChatsFeatureApiModule::class,
         GroupChoiceFeatureApiModule::class,
@@ -43,6 +46,7 @@ import javax.inject.Singleton
 @Immutable
 interface AppComponent : FeatureEntryProvider, ConsoleFeatureDeps, ChatsFeatureDeps,
     GroupChoiceFeatureDeps, UserSettingsFeatureDeps, McpSettingsFeatureDeps {
+    fun executeReminderUseCase(): ExecuteReminderUseCase
 
     @Component.Factory
     interface Factory {

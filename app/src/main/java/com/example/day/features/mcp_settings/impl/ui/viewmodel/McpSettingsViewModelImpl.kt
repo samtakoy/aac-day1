@@ -201,6 +201,7 @@ internal class McpSettingsViewModelImpl(
         TransportType.SSE -> "/sse"
         TransportType.STREAMABLE_HTTP -> "/mcp"
         TransportType.STDIO -> ""
+        TransportType.LOCAL -> ""
     }
 
     class Factory @Inject constructor(

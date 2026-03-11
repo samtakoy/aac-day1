@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.day.core.core_features.mcp.domain.McpLocalConstants
 import com.example.day.core.core_features.mcp.domain.model.TransportType
 import com.example.day.features.mcp_settings.impl.ui.components.AddMcpServerDialog
 import com.example.day.features.mcp_settings.impl.ui.components.McpServerCard
@@ -95,6 +96,8 @@ internal fun McpSettingsScreen(
             )
         } else {
             state.servers.forEach { server ->
+                val isLocal = server.transportType == TransportType.LOCAL ||
+                    server.name == McpLocalConstants.LOCAL_SERVER_NAME
                 McpServerCard(
                     server = server,
                     isSelected = server.id == state.selectedServerId,
@@ -110,6 +113,8 @@ internal fun McpSettingsScreen(
                     },
                     onRefresh = { viewModel.refresh(server.id) },
                     onDelete = { viewModel.deleteServer(server.id) },
+                    allowEdit = !isLocal,
+                    allowDelete = !isLocal,
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
@@ -172,6 +177,7 @@ internal fun McpSettingsScreen(
                     TransportType.SSE -> "/sse"
                     TransportType.STREAMABLE_HTTP -> "/mcp"
                     TransportType.STDIO -> ""
+                    TransportType.LOCAL -> ""
                 }
             },
             onUrlPathChange = { newUrlPath = it },
@@ -208,6 +214,7 @@ internal fun McpSettingsScreen(
                     TransportType.SSE -> "/sse"
                     TransportType.STREAMABLE_HTTP -> "/mcp"
                     TransportType.STDIO -> ""
+                    TransportType.LOCAL -> ""
                 }
             },
             onUrlPathChange = { editUrlPath = it },

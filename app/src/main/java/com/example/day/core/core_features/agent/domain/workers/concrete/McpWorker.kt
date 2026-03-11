@@ -1,6 +1,7 @@
 package com.example.day.core.core_features.agent.domain.workers.concrete
 
 import android.util.Log
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.chat.domain.model.Chat
@@ -23,12 +24,13 @@ class McpWorker @Inject constructor(
     private val json: Json
 ) : AWorker {
     private companion object {
-        const val TAG = "McpWorker"
+        const val TAG = "McpWorker(ktor)"
     }
 
     override suspend fun doWork(
         userPrompt: String,
         chat: Chat,
+        userRole: AContextMessage.Role,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         val parsed = parseCommand(userPrompt)

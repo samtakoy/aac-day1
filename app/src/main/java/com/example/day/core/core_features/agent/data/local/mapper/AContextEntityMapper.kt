@@ -1,11 +1,16 @@
 package com.example.day.core.core_features.agent.data.local.mapper
 
 import com.example.day.core.core_features.agent.data.local.model.AContextEntityData
-import com.example.day.core.core_features.agent.data.local.model.AContextEntityData.*
+import com.example.day.core.core_features.agent.data.local.model.AContextEntityData.Branching
+import com.example.day.core.core_features.agent.data.local.model.AContextEntityData.Empty
+import com.example.day.core.core_features.agent.data.local.model.AContextEntityData.Full
+import com.example.day.core.core_features.agent.data.local.model.AContextEntityData.SlidingWindow
+import com.example.day.core.core_features.agent.data.local.model.AContextEntityData.StickyFacts
+import com.example.day.core.core_features.agent.data.local.model.AContextEntityData.Summarization
 import com.example.day.core.core_features.agent.data.local.model.AContextMessageEntityData
+import com.example.day.core.core_features.agent.data.local.model.ToolCallRefEntityData
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.AContextState
-import com.example.day.core.core_features.agent.domain.model.Role
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentMap
 import javax.inject.Inject
@@ -84,6 +89,15 @@ internal class AContextEntityMapper @Inject constructor() {
         return AContextMessageEntityData(
             role = message.role.name,
             content = message.content,
+            toolCallId = message.toolCallId,
+            toolCalls = message.toolCalls?.map { ref ->
+                ToolCallRefEntityData(
+                    id = ref.id,
+                    type = ref.type,
+                    functionName = ref.functionName,
+                    arguments = ref.arguments
+                )
+            }
         )
     }
 
@@ -92,8 +106,17 @@ internal class AContextEntityMapper @Inject constructor() {
      */
     fun toDomain(entityData: AContextMessageEntityData): AContextMessage {
         return AContextMessage(
-            role = Role.valueOf(entityData.role),
-            content = entityData.content
+            role = AContextMessage.Role.valueOf(entityData.role),
+            content = entityData.content,
+            toolCallId = entityData.toolCallId,
+            toolCalls = entityData.toolCalls?.map { ref ->
+                AContextMessage.ToolCallRef(
+                    id = ref.id,
+                    type = ref.type,
+                    functionName = ref.functionName,
+                    arguments = ref.arguments
+                )
+            }
         )
     }
 }

@@ -25,8 +25,8 @@ object ModelConst {
     // openai/gpt-4.1  - плыветА
     // z-ai/glm-4.5-air
     // meta-llama/llama-3.3-70b-instruct
-    //const val DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct"
-    const val DEFAULT_MODEL = "meta-llama/llama-4-maverick"
+    const val DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct"
+    //const val DEFAULT_MODEL = "meta-llama/llama-4-maverick"
     ///const val DEFAULT_MODEL = "x-ai/grok-4.1-fast"
     /// const val DEFAULT_MODEL = "nvidia/nemotron-3-nano-30b-a3b"
 }

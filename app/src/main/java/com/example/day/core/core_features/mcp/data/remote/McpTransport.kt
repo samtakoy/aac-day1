@@ -1,7 +1,12 @@
 package com.example.day.core.core_features.mcp.data.remote
 
+import com.example.day.core.core_features.mcp.data.CallToolResult
+import com.example.day.core.core_features.mcp.data.ContentItem
+import com.example.day.core.core_features.mcp.data.local.inmemory.LocalMcpService
+import com.example.day.core.core_features.mcp.domain.McpLocalConstants
 import com.example.day.core.core_features.mcp.domain.model.McpServerConfig
 import com.example.day.core.core_features.mcp.domain.model.McpTool
+import com.example.day.core.core_features.mcp.domain.model.McpToolCallContext
 import com.example.day.core.core_features.mcp.domain.model.TransportType
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.sse.sse
@@ -21,14 +26,15 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Low-level MCP transport supporting three modes:
+ * Low-level MCP transport supporting network transports and local MCP:
  *
  * **HTTP** — классический JSON-RPC POST на `{url}{urlPath}` (напр. `/message`).
  *
@@ -45,17 +51,22 @@ import javax.inject.Singleton
 @Singleton
 internal class McpTransport @Inject constructor(
     private val httpClient: HttpClient,
-    private val json: Json
+    private val json: Json,
+    private val localMcpService: LocalMcpService
 ) {
-    private val requestId = AtomicInteger(0)
+    private val requestId = AtomicLong(0L)
     private val sessionIds = ConcurrentHashMap<String, String>()
 
     /** Dispatches to the correct transport based on [config.transportType]. */
-    suspend fun connect(config: McpServerConfig): List<McpTool> = when (config.transportType) {
-        TransportType.HTTP -> connectHttp(config)
-        TransportType.SSE -> connectSse(config)
-        TransportType.STREAMABLE_HTTP -> connectStreamableHttp(config)
-        TransportType.STDIO -> connectStdio(config)
+    suspend fun connect(config: McpServerConfig): List<McpTool> = when {
+        isLocalConfig(config) -> connectLocal()
+        else -> when (config.transportType) {
+            TransportType.HTTP -> connectHttp(config)
+            TransportType.SSE -> connectSse(config)
+            TransportType.STREAMABLE_HTTP -> connectStreamableHttp(config)
+            TransportType.STDIO -> connectStdio(config)
+            TransportType.LOCAL -> connectLocal()
+        }
     }
 
     // ── HTTP (legacy) ─────────────────────────────────────────────────────────
@@ -149,8 +160,12 @@ internal class McpTransport @Inject constructor(
     internal suspend fun postStreamable(
         config: McpServerConfig,
         request: JsonRpcRequest,
-        includeSessionHeader: Boolean = true
+        includeSessionHeader: Boolean = true,
+        context: McpToolCallContext? = null
     ): JsonRpcResponse {
+        if (isLocalConfig(config)) {
+            return postLocal(request, context)
+        }
         val url = buildUrl(config.url, config.urlPath)
         val response = httpClient.post(url) {
             contentType(ContentType.Application.Json)
@@ -284,7 +299,84 @@ internal class McpTransport @Inject constructor(
         if (path.startsWith("http://") || path.startsWith("https://")) path
         else "${baseUrl.trimEnd('/')}/${path.trimStart('/')}"
 
-    private fun nextId() = requestId.incrementAndGet()
+    private fun nextId(): Long = requestId.incrementAndGet()
+
+    private fun isLocalConfig(config: McpServerConfig): Boolean {
+        return config.transportType == TransportType.LOCAL ||
+            config.name == McpLocalConstants.LOCAL_SERVER_NAME
+    }
+
+    private fun connectLocal(): List<McpTool> {
+        return localMcpService.listTools().map { tool ->
+            McpTool(
+                name = tool.name,
+                description = tool.description,
+                inputSchemaJson = json.encodeToString(
+                    kotlinx.serialization.json.JsonObject.serializer(),
+                    tool.inputSchema
+                )
+            )
+        }
+    }
+
+    private suspend fun postLocal(
+        request: JsonRpcRequest,
+        context: McpToolCallContext?
+    ): JsonRpcResponse {
+        return when (request.method) {
+            McpMethods.INITIALIZE -> JsonRpcResponse(
+                id = request.id,
+                result = json.encodeToJsonElement(
+                    InitializeResult.serializer(),
+                    InitializeResult(
+                        protocolVersion = "2024-11-05",
+                        serverInfo = ServerInfo(name = "LocalMcp", version = "1.0")
+                    )
+                )
+            )
+            McpMethods.TOOLS_LIST -> {
+                val tools = localMcpService.listTools().map { tool ->
+                    ToolDefinition(
+                        name = tool.name,
+                        description = tool.description,
+                        inputSchema = tool.inputSchema
+                    )
+                }
+                JsonRpcResponse(
+                    id = request.id,
+                    result = json.encodeToJsonElement(
+                        ToolsListResult.serializer(),
+                        ToolsListResult(tools)
+                    )
+                )
+            }
+            McpMethods.TOOLS_CALL -> {
+                val params = request.params as? kotlinx.serialization.json.JsonObject
+                val toolName = params?.get("name")?.jsonPrimitive?.content
+                val args = params?.get("arguments") as? kotlinx.serialization.json.JsonObject
+                if (toolName.isNullOrBlank() || args == null) {
+                    JsonRpcResponse(
+                        id = request.id,
+                        error = JsonRpcError(code = -32602, message = "Invalid params")
+                    )
+                } else {
+                    val result = localMcpService.callTool(toolName, args, context)
+                    val payload = CallToolResult(
+                        content = listOf(ContentItem(type = "text", text = result.getOrElse { it.message.orEmpty() })),
+                        isError = result.isFailure
+                    )
+                    JsonRpcResponse(
+                        id = request.id,
+                        result = json.encodeToJsonElement(CallToolResult.serializer(), payload)
+                    )
+                }
+            }
+            else -> JsonRpcResponse(
+                id = request.id,
+                error = JsonRpcError(code = -32601, message = "Method not found")
+            )
+        }
+    }
 }
 
 class McpTransportException(message: String, val code: Int) : Exception(message)

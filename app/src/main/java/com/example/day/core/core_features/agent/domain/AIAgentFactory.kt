@@ -2,6 +2,8 @@ package com.example.day.core.core_features.agent.domain
 
 import com.example.day.core.core_features.agent.domain.model.AContext
 import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
+import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
+import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.agent.domain.usecase.GetOrCreateAgentUseCase
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
@@ -19,7 +21,9 @@ class AIAgentFactory @Inject constructor(
     private val strategyFactory: StrategyFactory,
     private val memoryProviderFactory: MemoryProviderFactory,
     private val contextRepository: AgentContextRepository,
-    private val llmRequestUseCase: LlmRequestUseCase
+    private val llmRequestUseCase: LlmRequestUseCase,
+    private val toolProvider: ToolProvider,
+    private val toolCallOrchestrator: ToolCallOrchestrator
 ) {
     suspend fun getOrCreate(
         systemName: String,
@@ -45,7 +49,9 @@ class AIAgentFactory @Inject constructor(
             contextRepository,
             llmRequestUseCase,
             strategy,
-            memoryProvider
+            memoryProvider,
+            toolProvider,
+            toolCallOrchestrator
         )
     }
 }

@@ -36,6 +36,8 @@ import com.example.day.core.core_features.memory.data.local.model.link.UserToPro
 import com.example.day.core.core_features.memory.data.local.model.user.UserProfileEntity
 import com.example.day.core.core_features.mcp.data.local.dao.McpServerDao
 import com.example.day.core.core_features.mcp.data.local.entity.McpServerEntity
+import com.example.day.core.core_features.reminder.data.local.dao.ReminderDao
+import com.example.day.core.core_features.reminder.data.local.model.ReminderEntity
 
 @Database(
     entities = [
@@ -59,9 +61,10 @@ import com.example.day.core.core_features.mcp.data.local.entity.McpServerEntity
         LTMGroupToChatGroupEntity::class,
         LTMGroupToUserProfileEntity::class,
         UserToProfileEntity::class,
-        McpServerEntity::class
+        McpServerEntity::class,
+        ReminderEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 internal abstract class ChatDatabase : RoomDatabase() {
@@ -81,4 +84,5 @@ internal abstract class ChatDatabase : RoomDatabase() {
     abstract fun artifactDao(): ArtifactDao
     abstract fun userProfileDao(): UserProfileDao
     abstract fun mcpServerDao(): McpServerDao
+    abstract fun reminderDao(): ReminderDao
 }

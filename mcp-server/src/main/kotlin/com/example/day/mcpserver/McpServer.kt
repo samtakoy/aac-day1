@@ -33,7 +33,9 @@ fun main() {
     val token = System.getenv("GITHUB_TOKEN")
         ?: error("GITHUB_TOKEN environment variable not set")
     val defaultOwner = System.getenv("GITHUB_OWNER")
+        ?: error("GITHUB_OWNER environment variable not set")
     val defaultRepo = System.getenv("GITHUB_REPO")
+        ?: error("GITHUB_REPO environment variable not set")
 
     val githubClient = GitHubApiClient(
         baseUrl = ServerConstants.API_BASE_URL,

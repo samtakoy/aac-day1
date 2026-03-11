@@ -1,7 +1,6 @@
 package com.example.day.core.core_features.agent.domain.workers.task.states_config
 
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
-import com.example.day.core.core_features.agent.domain.model.Role
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -20,10 +19,10 @@ fun TaskStateMessage.toContextMessage() = AContextMessage(
     content = content
 )
 
-fun TaskStateMessage.Role.toContextRole(): Role = when (this) {
-    TaskStateMessage.Role.SYSTEM -> Role.SYSTEM
-    TaskStateMessage.Role.USER -> Role.USER
-    TaskStateMessage.Role.ASSISTANT -> Role.ASSISTANT
+fun TaskStateMessage.Role.toContextRole(): AContextMessage.Role = when (this) {
+    TaskStateMessage.Role.SYSTEM -> AContextMessage.Role.SYSTEM
+    TaskStateMessage.Role.USER -> AContextMessage.Role.USER
+    TaskStateMessage.Role.ASSISTANT -> AContextMessage.Role.ASSISTANT
 }
 
 fun AContextMessage.toTaskMessage() = TaskStateMessage(
@@ -31,8 +30,9 @@ fun AContextMessage.toTaskMessage() = TaskStateMessage(
     content = content
 )
 
-fun Role.toTaskRole(): TaskStateMessage.Role = when (this) {
-    Role.SYSTEM -> TaskStateMessage.Role.SYSTEM
-    Role.USER -> TaskStateMessage.Role.USER
-    Role.ASSISTANT -> TaskStateMessage.Role.ASSISTANT
+fun AContextMessage.Role.toTaskRole(): TaskStateMessage.Role = when (this) {
+    AContextMessage.Role.SYSTEM -> TaskStateMessage.Role.SYSTEM
+    AContextMessage.Role.USER -> TaskStateMessage.Role.USER
+    AContextMessage.Role.ASSISTANT -> TaskStateMessage.Role.ASSISTANT
+    AContextMessage.Role.TOOL -> TaskStateMessage.Role.ASSISTANT // TOOL не поддерживается в TaskStateMessage
 }

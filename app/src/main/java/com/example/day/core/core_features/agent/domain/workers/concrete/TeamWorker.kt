@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.agent.domain.workers.concrete
 
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.workers.base.askLlm
@@ -21,6 +22,7 @@ class TeamWorker @Inject constructor(
     override suspend fun doWork(
         userPrompt: String,
         chat: Chat,
+        userRole: AContextMessage.Role,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         val messageHistory = mutableListOf<ModelRequest.Message>()
@@ -81,7 +83,7 @@ class TeamWorker @Inject constructor(
     ): Result<ModelResult.Success> {
         return llmRequestUseCase.askLlm(
             model = chatSettings.model,
-            userPrompt = prompt,
+            prompt = AContextMessage(AContextMessage.Role.USER, prompt),
             systemPrompt = TEAM_SYSTEM_PROMPT,
             history = history,
             onEvent = onEvent

@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.agent.domain.workers.base
 
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
@@ -12,9 +13,10 @@ import com.example.day.core.core_features.llm.domain.model.ModelSettings
  */
 internal suspend fun LlmRequestUseCase.askLlm(
     model: ModelSettings,
-    userPrompt: String,
+    prompt: AContextMessage?,
     systemPrompt: String? = null,
     history: List<ModelRequest.Message> = emptyList(),
+    tools: List<ModelRequest.Tool>? = null,
     onEvent: (suspend (WorkerEvent) -> Unit)? = null
 ): Result<ModelResult.Success> {
     onEvent?.invoke(WorkerEvent.RequestStart)
@@ -22,7 +24,8 @@ internal suspend fun LlmRequestUseCase.askLlm(
         modelSettings = model,
         systemPrompt = systemPrompt,
         messages = history,
-        promptText = userPrompt,
+        prompt = prompt,
+        tools = tools,
     ).onSuccess {
         onEvent?.invoke(WorkerEvent.RequestSuccess(it))
     }.onFailure {

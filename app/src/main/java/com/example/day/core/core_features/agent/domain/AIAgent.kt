@@ -1,15 +1,16 @@
-package com.example.day.core.core_features.agent.domain
+﻿package com.example.day.core.core_features.agent.domain
 
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.AIAgentResult
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.agent.domain.model.toModelRequestMessages
 import com.example.day.core.core_features.agent.domain.strategy.ContextStrategy
+import com.example.day.core.core_features.agent.domain.tools.ToolCallContext
+import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
+import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
-import com.example.day.core.core_features.agent.domain.workers.base.askLlm
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
-import com.example.day.core.core_features.llm.domain.model.getContent
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProvider
 
 /**
@@ -26,7 +27,9 @@ class AIAgent(
     private val llmProvider: LlmRequestUseCase,
     // TODO больше тут не актуально - нужно вынести в AgentContextMemoryProvider или AgentMessageHistoryProvider
     private val strategy: ContextStrategy,
-    private val memoryProvider: MemoryProvider    // Долговременная + Рабочая
+    private val memoryProvider: MemoryProvider,    // Долговременная + Рабочая
+    private val toolProvider: ToolProvider,
+    private val orchestrator: ToolCallOrchestrator
 ) {
 
     /**
@@ -39,50 +42,40 @@ class AIAgent(
      */
     suspend fun process(
         chat: ChatSettings,
-        userPrompt: String,
+        prompt: AContextMessage,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ): Result<AIAgentResult> {
         // 1. Получаем "знания" (LTM + Working Memory) в виде промптов
         val memoryMessages = memoryProvider.getMemoryContext()
-        val snapshot = strategy.process(chat, config, userPrompt, contextRepository)
-        // 3. Собираем итоговый пирог для LLM
-        // Порядок: System Prompt -> Memory (LTM/Working) -> History -> User Prompt
-        val history = (memoryMessages + snapshot.messages).toModelRequestMessages()
-
-        val requestDebugInfo = buildRequestDebugInfo(config.systemPrompt, memoryMessages, userPrompt)
-
-        return llmProvider.askLlm(
-            // Модель теперь берется из агента, а не из чата. В чате - это только прототип для копирования.
-            model = config.modelSettings,
-            userPrompt = userPrompt,
+        val snapshot = strategy.process(chat, config, contextRepository)
+        
+        val result = orchestrator.execute(
+            initialHistory = snapshot.messages.toModelRequestMessages(),
+            memoryMessages = memoryMessages,  // ← НОВОЕ: только для LLM запроса
+            prompt = prompt,
             systemPrompt = config.systemPrompt,
-            history = history,
+            modelSettings = config.modelSettings,
+            tools = toolProvider.getTools(),
+            context = ToolCallContext(agentId = config.id),
             onEvent = onEvent
-        ).map { result ->
-            val responseText = result.getContent()
-            val strategyResult = strategy.afterResponse(chat, config, userPrompt, responseText, contextRepository)
-            AIAgentResult(responseText, strategyResult.reportMessage, requestDebugInfo)
-        }
-    }
+        )
 
-    private fun buildRequestDebugInfo(
-        systemPrompt: String?,
-        memoryMessages: List<AContextMessage>,
-        userPrompt: String
-    ): String = buildString {
-        appendLine("=== LLM запрос (без истории) ===")
-        if (!systemPrompt.isNullOrBlank()) {
-            appendLine("[SYSTEM]")
-            appendLine(systemPrompt.trimEnd())
-            appendLine()
+        return result.map { toolCallingResult ->
+            // 4. Сохраняем ПОЛНУЮ историю от LLM (включая tool calls, НО БЕЗ memoryMessages)
+            val extendedSnapshot = snapshot.copy(messages = toolCallingResult.allMessages)
+
+            // 5. Передаём расширенный контекст в strategy
+            val strategyResult = strategy.afterResponse(
+                chat = chat,
+                agent = config,
+                response = toolCallingResult.finalResponseText,
+                store = contextRepository,
+                fullContext = extendedSnapshot
+            )
+
+            val requestDebugInfo = buildRequestDebugInfo(config.systemPrompt, memoryMessages, prompt)
+            AIAgentResult(toolCallingResult.finalResponseText, strategyResult.reportMessage, requestDebugInfo)
         }
-        memoryMessages.forEach { msg ->
-            appendLine("[MEMORY:${msg.role.name}]")
-            appendLine(msg.content.trimEnd())
-            appendLine()
-        }
-        appendLine("[USER]")
-        append(userPrompt.trimEnd())
     }
 
     /** Returns formatted info about current context strategy/params state. */
@@ -97,5 +90,24 @@ class AIAgent(
      */
     suspend fun setupParams(params: Map<String, String>): String =
         strategy.updateParams(config, params, contextRepository)
-}
 
+    private fun buildRequestDebugInfo(
+        systemPrompt: String?,
+        memoryMessages: List<AContextMessage>,
+        prompt: AContextMessage
+    ): String = buildString {
+        appendLine("=== LLM запрос (без истории) ===")
+        if (!systemPrompt.isNullOrBlank()) {
+            appendLine("[SYSTEM]")
+            appendLine(systemPrompt.trimEnd())
+            appendLine()
+        }
+        memoryMessages.forEach { msg ->
+            appendLine("[MEMORY:${msg.role.name}]")
+            appendLine(msg.content.trimEnd())
+            appendLine()
+        }
+        appendLine("[${prompt.role.name}]")
+        append(prompt.content.trimEnd())
+    }
+}

@@ -77,7 +77,7 @@ curl -X POST http://localhost:3000/mcp `
 Шаг 2. Открыть MCP Settings в приложении.
 1) Add Server:
    - Name: GitHub Issues
-   - URL: http://10.0.2.2:3000
+     - URL: http://10.0.2.2:3000
    - Transport: STREAMABLE_HTTP
    - URL Path: /mcp
    - Auth Token: пусто (сервер сам ходит в GitHub)

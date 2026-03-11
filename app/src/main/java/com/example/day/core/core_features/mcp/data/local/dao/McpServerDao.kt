@@ -18,6 +18,9 @@ internal interface McpServerDao {
     @Query("SELECT * FROM mcp_servers WHERE id = :serverId")
     suspend fun getServerById(serverId: String): McpServerEntity?
 
+    @Query("SELECT * FROM mcp_servers WHERE name = :name LIMIT 1")
+    suspend fun getServerByName(name: String): McpServerEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertServer(server: McpServerEntity)
 

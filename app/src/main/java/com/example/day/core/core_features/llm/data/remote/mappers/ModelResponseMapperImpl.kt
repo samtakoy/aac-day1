@@ -29,7 +29,17 @@ internal class ModelResponseMapperImpl @Inject constructor() : ModelResponseMapp
                     message = ModelResult.Success.Message(
                         role = choiceDto.message.role,
                         content = choiceDto.message.content,
-                        reasoning = choiceDto.message.reasoning
+                        reasoning = choiceDto.message.reasoning,
+                        toolCalls = choiceDto.message.toolCalls?.map { toolCallDto ->
+                            ModelResult.Success.ToolCall(
+                                id = toolCallDto.id,
+                                type = toolCallDto.type,
+                                function = ModelResult.Success.FunctionCall(
+                                    name = toolCallDto.function.name,
+                                    arguments = toolCallDto.function.arguments
+                                )
+                            )
+                        }?.toImmutableList()
                     ),
                     finishReason = choiceDto.finishReason
                 )

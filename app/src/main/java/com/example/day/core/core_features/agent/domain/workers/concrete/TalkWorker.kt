@@ -1,22 +1,17 @@
 package com.example.day.core.core_features.agent.domain.workers.concrete
 
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
-import android.util.Log
-import com.example.day.core.core_features.agent.domain.prompt.McpSystemPrompt
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
-import com.example.day.core.core_features.agent.domain.tools.McpToolCallParser
+import com.example.day.core.core_features.agent.domain.tools.ToolCallingConstants
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.workers.innercommand.InnerCommandParser
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.CommandDispatcher
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
-import com.example.day.core.core_features.mcp.domain.McpFormatting
-import com.example.day.core.core_features.mcp.domain.McpToolNames
-import com.example.day.core.core_features.mcp.domain.repository.McpRepository
-import com.example.day.core.core_features.mcp.domain.tools.McpTools
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import javax.inject.Inject
 
 /**
@@ -43,12 +38,9 @@ class TalkWorker @Inject constructor(
     private val aiAgentFactory: AIAgentFactory,
     private val commandDispatcher: CommandDispatcher,
     private val chatTools: ChatTools,
-    private val mcpRepository: McpRepository,
-    private val mcpTools: McpTools,
     private val json: Json
 ) : AWorker {
     private companion object {
-        const val TAG = "TalkWorker"
         const val AGENT_NAME = "talk_agent"
     }
 
@@ -58,11 +50,12 @@ class TalkWorker @Inject constructor(
     override suspend fun doWork(
         userPrompt: String,
         chat: Chat,
+        userRole: AContextMessage.Role,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         val commandHandled = processCommand(userPrompt, chat)
         if (commandHandled) return
-        processMessage(userPrompt, chat, onEvent)
+        processMessage(userPrompt, userRole, chat, onEvent)
     }
 
     /**
@@ -89,49 +82,45 @@ class TalkWorker @Inject constructor(
      * Process a regular message (non-command) through the AI agent.
      */
     private suspend fun processMessage(
-        task: String,
+        userPrompt: String,
+        userRole: AContextMessage.Role,
         chat: Chat,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         val agent = aiAgentFactory.getOrCreate(
             AGENT_NAME,
             chat.id,
-            McpSystemPrompt.appendTo(chat.settings.systemPromt),
+            chat.settings.systemPromt,
             defaultModel = { chat.settings.model },
             defaultContext = { AContextDefaultFactory.createFull() }
         )
-        agent.process(chat.settings, task, onEvent)
+        val eventHandler: suspend (WorkerEvent) -> Unit = { event ->
+            when (event) {
+                is WorkerEvent.ToolCallStarted -> {
+                    chatTools.addInfoMessage(
+                        chat.id,
+                        "${ToolCallingConstants.TOOL_EVENT_START_PREFIX}: ${event.toolName}"
+                    )
+                }
+                is WorkerEvent.ToolCallFinished -> {
+                    val status = if (event.isError) "error" else "ok"
+                    val formattedResult = formatToolResult(event.result)
+                    chatTools.addInfoMessage(
+                        chat.id,
+                        "${ToolCallingConstants.TOOL_EVENT_RESULT_PREFIX} ($status): ${event.toolName}\n$formattedResult"
+                    )
+                }
+                else -> Unit
+            }
+            onEvent?.invoke(event)
+        }
+
+        agent.process(chat.settings, AContextMessage(userRole, userPrompt), eventHandler)
             .onSuccess { result ->
                 result.requestDebugInfo?.let { chatTools.addInfoMessage(chat.id, it) }
                 result.reportMessage?.let { chatTools.addInfoMessage(chat.id, it) }
-
-                // TODO рефакторинг - тут специфичная логика про обработку tools
-                val parsed = McpToolCallParser.tryParse(result.responseText, json)
-                if (parsed == null || !McpToolNames.ALLOWED_TOOL_NAMES.contains(parsed.tool)) {
+                if (result.responseText.isNotBlank()) {
                     chatTools.addBotMessage(chat.id, result.responseText)
-                    return@onSuccess
-                }
-
-                val serverId = resolveServerId()
-                if (serverId == null) {
-                    chatTools.addBotMessage(chat.id, "MCP сервер не настроен")
-                    return@onSuccess
-                }
-
-                Log.d(TAG, "Auto MCP tool call: ${parsed.tool}")
-                if (parsed.cleanedText.isNotBlank()) {
-                    chatTools.addBotMessage(chat.id, parsed.cleanedText)
-                }
-
-                chatTools.addInfoMessage(chat.id, "🔧 MCP: ${parsed.tool}")
-                // Вызов MCP тула
-                val toolResult = mcpTools.callTool(serverId, parsed.tool, parsed.arguments)
-                toolResult.onSuccess { text ->
-                    val formatted = McpFormatting.formatResult(text, json)
-                    chatTools.addInfoMessage(chat.id, "MCP Result:\n$formatted")
-                }.onFailure { error ->
-                    Log.e(TAG, "MCP tool failed: ${error.message}", error)
-                    chatTools.addBotMessage(chat.id, "Ошибка MCP: ${error.message}")
                 }
             }
             .onFailure { exception ->
@@ -139,9 +128,10 @@ class TalkWorker @Inject constructor(
             }
     }
 
-    private suspend fun resolveServerId(): String? {
-        val servers = mcpRepository.getServers().first()
-        val enabled = servers.firstOrNull { it.isEnabled }
-        return enabled?.id ?: servers.firstOrNull()?.id
+    private fun formatToolResult(raw: String): String {
+        val trimmed = raw.trim()
+        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return raw
+        val element = runCatching { json.parseToJsonElement(trimmed) }.getOrNull() ?: return raw
+        return runCatching { json.encodeToString(JsonElement.serializer(), element) }.getOrDefault(raw)
     }
 }

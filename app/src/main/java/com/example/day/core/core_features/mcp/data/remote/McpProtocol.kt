@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 internal data class JsonRpcRequest(
     @kotlinx.serialization.SerialName("jsonrpc") val jsonrpc: String = "2.0",
-    @kotlinx.serialization.SerialName("id") val id: Int,
+    @kotlinx.serialization.SerialName("id") val id: Long,
     @kotlinx.serialization.SerialName("method") val method: String,
     @kotlinx.serialization.SerialName("params") val params: JsonElement? = null
 )
@@ -17,7 +17,7 @@ internal data class JsonRpcRequest(
 @Serializable
 internal data class JsonRpcResponse(
     @kotlinx.serialization.SerialName("jsonrpc") val jsonrpc: String = "2.0",
-    @kotlinx.serialization.SerialName("id") val id: Int? = null,
+    @kotlinx.serialization.SerialName("id") val id: Long? = null,
     @kotlinx.serialization.SerialName("result") val result: JsonElement? = null,
     @kotlinx.serialization.SerialName("error") val error: JsonRpcError? = null
 )

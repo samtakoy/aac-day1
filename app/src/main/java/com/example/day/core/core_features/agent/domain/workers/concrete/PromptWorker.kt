@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.agent.domain.workers.concrete
 
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.workers.base.askLlm
@@ -16,12 +17,13 @@ class PromptWorker @Inject constructor(
     override suspend fun doWork(
         userPrompt: String,
         chat: Chat,
+        userRole: AContextMessage.Role,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         // 1. Compose the prompt
         val promptResult = llmRequestUseCase.askLlm(
             model = chat.settings.model,
-            userPrompt = "Составь промпт для LLM для решения задачи: $userPrompt\n",
+            prompt = AContextMessage(AContextMessage.Role.USER, "Составь промпт для LLM для решения задачи: $userPrompt\n"),
             systemPrompt = SYSTEM_PROMPT,
             onEvent = onEvent
         )
@@ -45,7 +47,7 @@ class PromptWorker @Inject constructor(
         // 2. Give the task as a prompt:
         llmRequestUseCase.askLlm(
             model = chat.settings.model,
-            userPrompt = generatedPrompt,
+            prompt = AContextMessage(AContextMessage.Role.USER, generatedPrompt),
             onEvent = onEvent
         )
             .onSuccess { result  ->

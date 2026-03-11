@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.agent.domain.workers.concrete
 
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.workers.base.askLlm
@@ -18,6 +19,7 @@ class StepWorker @Inject constructor(
     override suspend fun doWork(
         userPrompt: String,
         chat: Chat,
+        userRole: AContextMessage.Role,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         // Message history for maintaining context
@@ -35,7 +37,7 @@ class StepWorker @Inject constructor(
             chatTools.addBotMessage(chat.id, "--- Думаю над шагом №$currentStep ---")
             val response = llmRequestUseCase.askLlm(
                 model = chat.settings.model,
-                userPrompt = nextUserMessage,
+                prompt = AContextMessage(AContextMessage.Role.USER, nextUserMessage),
                 systemPrompt = STEP_BY_STEP_SYSTEM_PROMPT,
                 history = messageHistory,
                 onEvent = onEvent

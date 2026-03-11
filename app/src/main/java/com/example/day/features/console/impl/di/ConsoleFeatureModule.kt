@@ -15,7 +15,8 @@ internal class ConsoleFeatureModule {
         return PlannerTalkDelegate(
             addChatMessageUseCase = deps.addChatMessageUseCase,
             taskWorker = deps.taskWorker,
-            chatTools = deps.chatTools
+            chatTools = deps.chatTools,
+            json = deps.json
         )
     }
 }

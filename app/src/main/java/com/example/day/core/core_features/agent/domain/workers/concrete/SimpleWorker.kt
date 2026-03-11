@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.agent.domain.workers.concrete
 
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.workers.base.askLlm
@@ -18,12 +19,13 @@ class SimpleWorker @Inject constructor(
     override suspend fun doWork(
         userPrompt: String,
         chat: Chat,
+        userRole: AContextMessage.Role,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         // Just execute the request and return the result
         llmRequestUseCase.askLlm(
             model = chat.settings.model,
-            userPrompt = userPrompt,
+            prompt = AContextMessage(AContextMessage.Role.USER, userPrompt),
             systemPrompt = "Ответ давай на русском языке.",
             onEvent = onEvent
         )

@@ -11,6 +11,8 @@ import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseC
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import javax.inject.Inject
 
 /**
@@ -23,7 +25,8 @@ internal class PlannerTalkDelegate @Inject constructor(
     private val addChatMessageUseCase: AddChatMessageUseCase,
     // private val plannerWorker: PlannerWorker,
     private val taskWorker: TaskWorker,
-    private val chatTools: ChatTools
+    private val chatTools: ChatTools,
+    private val json: Json
 ) : TalkDelegate {
 
     // Events for UI (stage creation suggestions, etc.)
@@ -110,7 +113,28 @@ internal class PlannerTalkDelegate @Inject constructor(
             is WorkerEvent.RequestError -> {
                 chatTools.addBotMessage(chatId, "❌ Ошибка: ${event.text}")
             }
+            is WorkerEvent.ToolCallStarted -> {
+                chatTools.addInfoMessage(
+                    chatId,
+                    "MCP tool: ${event.toolName}"
+                )
+            }
+            is WorkerEvent.ToolCallFinished -> {
+                val status = if (event.isError) "error" else "ok"
+                val formattedResult = formatToolResult(event.result)
+                chatTools.addInfoMessage(
+                    chatId,
+                    "MCP result ($status): ${event.toolName}\n$formattedResult"
+                )
+            }
             else -> { /* Ignore other events */ }
         }
+    }
+
+    private fun formatToolResult(raw: String): String {
+        val trimmed = raw.trim()
+        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return raw
+        val element = runCatching { json.parseToJsonElement(trimmed) }.getOrNull() ?: return raw
+        return runCatching { json.encodeToString(JsonElement.serializer(), element) }.getOrDefault(raw)
     }
 }

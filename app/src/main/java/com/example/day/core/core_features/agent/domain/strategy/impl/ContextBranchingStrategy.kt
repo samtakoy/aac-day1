@@ -1,6 +1,7 @@
 package com.example.day.core.core_features.agent.domain.strategy.impl
 
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.AContextParams
 import com.example.day.core.core_features.agent.domain.model.AContextState
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
@@ -33,39 +34,34 @@ class ContextBranchingStrategy : ContextStrategy {
     override suspend fun process(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String?,
         store: AgentContextRepository
     ): ContextSnapshot {
         val state = store.getContextState(agent.id) as? AContextState.Branching
             ?: createInitialState()
 
         // Get messages from current branch
+        // НЕ добавляем userPrompt — это сделает LlmRequestUseCase.exec()
         val currentMessages = state.branches[state.currentBranchId] ?: persistentListOf()
 
-        return ContextSnapshot(messages = currentMessages.addUserMessage(userPrompt))
+        return ContextSnapshot(messages = currentMessages)
     }
 
     override suspend fun afterResponse(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String,
         response: String,
-        store: AgentContextRepository
+        store: AgentContextRepository,
+        fullContext: ContextSnapshot
     ): ContextStrategyResult {
         val state = store.getContextState(agent.id) as? AContextState.Branching
             ?: createInitialState()
 
-        // Get current branch messages
-        val currentBranchMessages = state.branches[state.currentBranchId] ?: persistentListOf()
-
-        // Add messages to current branch
-        val updatedBranchMessages = currentBranchMessages
-            .addUserMessage(userPrompt)
-            .addAssistantMessage(response)
+        // fullContext содержит полную историю: initialHistory + prompt + assistant/tool messages
+        val messagesToSave = fullContext.messages.toPersistentList()
 
         // Update branches map
         val updatedBranches = state.branches.toMutableMap().apply {
-            put(state.currentBranchId, updatedBranchMessages)
+            put(state.currentBranchId, messagesToSave)
         }
 
         store.saveContextState(
@@ -74,7 +70,7 @@ class ContextBranchingStrategy : ContextStrategy {
         )
 
         return ContextStrategyResult(
-            "Сохранено в ветку: ${state.currentBranchId} (${updatedBranchMessages.size} сообщений)"
+            "Сохранено в ветку: ${state.currentBranchId} (${messagesToSave.size} сообщений)"
         )
     }
 

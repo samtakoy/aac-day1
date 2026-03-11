@@ -80,5 +80,19 @@ sealed interface AContextEntitySettings {
 @Serializable
 data class AContextMessageEntityData(
     val role: String,  // Role enum serialized as String
-    val content: String
+    val content: String,
+    val toolCallId: String? = null,
+    val toolCalls: List<ToolCallRefEntityData>? = null
+)
+
+/**
+ * Data layer representation of tool call reference.
+ * Mirrors [com.example.day.core.core_features.agent.domain.model.AContextMessage.ToolCallRef]
+ */
+@Serializable
+data class ToolCallRefEntityData(
+    val id: String,
+    val type: String,
+    val functionName: String,
+    val arguments: String
 )

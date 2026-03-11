@@ -5,6 +5,7 @@ import com.example.day.core.core_features.mcp.data.remote.JsonRpcRequest
 import com.example.day.core.core_features.mcp.data.remote.McpMethods
 import com.example.day.core.core_features.mcp.data.remote.McpTransport
 import com.example.day.core.core_features.mcp.domain.model.McpConnectionState
+import com.example.day.core.core_features.mcp.domain.model.McpToolCallContext
 import com.example.day.core.core_features.mcp.domain.repository.McpRepository
 import com.example.day.core.core_features.mcp.domain.tools.McpTools
 import kotlinx.coroutines.flow.first
@@ -15,6 +16,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,13 +27,15 @@ internal class McpToolsImpl @Inject constructor(
     private val json: Json
 ) : McpTools {
     private companion object {
-        const val TAG = "McpTools"
+        const val TAG = "McpTools(ktor)"
+        private val requestId = AtomicLong(1L)
     }
 
     override suspend fun callTool(
         serverId: String,
         toolName: String,
-        arguments: JsonObject
+        arguments: JsonObject,
+        context: McpToolCallContext?
     ): Result<String> = runCatching {
         val serverConfig = repository.getServers().first().find { it.id == serverId }
             ?: error("Server not found")
@@ -42,7 +46,7 @@ internal class McpToolsImpl @Inject constructor(
         }
 
         val request = JsonRpcRequest(
-            id = System.currentTimeMillis().toInt(),
+            id = requestId.incrementAndGet(),
             method = McpMethods.TOOLS_CALL,
             params = buildJsonObject {
                 put("name", JsonPrimitive(toolName))
@@ -51,7 +55,7 @@ internal class McpToolsImpl @Inject constructor(
         )
 
         Log.d(TAG, "POST tools/call to ${serverConfig.url}${serverConfig.urlPath} tool=$toolName")
-        val response = transport.postStreamable(serverConfig, request)
+        val response = transport.postStreamable(serverConfig, request, context = context)
         val result = response.result ?: error("Empty tool response")
         val decoded = json.decodeFromJsonElement(CallToolResult.serializer(), result)
         val text = decoded.content.joinToString("\n") { it.text }

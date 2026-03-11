@@ -37,6 +37,8 @@ internal fun McpServerCard(
     onEdit: () -> Unit,
     onRefresh: () -> Unit,
     onDelete: () -> Unit,
+    allowEdit: Boolean = true,
+    allowDelete: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -57,10 +59,13 @@ internal fun McpServerCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = server.name, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = if (server.transportType == com.example.day.core.core_features.mcp.domain.model.TransportType.STDIO)
-                        (server.stdioCommand ?: "—")
-                    else
-                        "${server.url}${server.urlPath}",
+                    text = when (server.transportType) {
+                        com.example.day.core.core_features.mcp.domain.model.TransportType.STDIO ->
+                            (server.stdioCommand ?: "—")
+                        com.example.day.core.core_features.mcp.domain.model.TransportType.LOCAL ->
+                            (server.url.ifBlank { "local" })
+                        else -> "${server.url}${server.urlPath}"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -104,11 +109,15 @@ internal fun McpServerCard(
                 IconButton(onClick = onRefresh) {
                     Icon(Icons.Default.Refresh, contentDescription = "Переподключиться")
                 }
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "Редактировать")
+                if (allowEdit) {
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Default.Edit, contentDescription = "Редактировать")
+                    }
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Удалить сервер")
+                if (allowDelete) {
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "Удалить сервер")
+                    }
                 }
             }
         }

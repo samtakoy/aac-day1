@@ -10,5 +10,6 @@ package com.example.day.core.core_features.agent.domain.model
 data class AIAgentResult(
     val responseText: String,
     val reportMessage: String?,
-    val requestDebugInfo: String? = null
+    val requestDebugInfo: String? = null,
+    val toolLoop: Boolean = false
 )

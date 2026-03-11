@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.agent.domain.workers.base
 
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.chat.domain.model.Chat
 
 /**
@@ -10,6 +11,7 @@ interface AWorker {
     suspend fun doWork(
         userPrompt: String,
         chat: Chat,
+        userRole: AContextMessage.Role = AContextMessage.Role.USER,
         onEvent: (suspend (WorkerEvent) -> Unit)? = null
     )
 }

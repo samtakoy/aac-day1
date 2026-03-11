@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.llm.domain
 
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.ModelResult
 import com.example.day.core.core_features.llm.domain.model.ModelSettings
@@ -14,7 +15,8 @@ internal class LlmRequestUseCaseImpl @Inject constructor(
         modelSettings: ModelSettings,
         systemPrompt: String?,
         messages: List<ModelRequest.Message>,
-        promptText: String,
+        prompt: AContextMessage?,
+        tools: List<ModelRequest.Tool>?
     ): Result<ModelResult.Success> {
         val request = ModelRequest(
             model = modelSettings.name,
@@ -26,9 +28,12 @@ internal class LlmRequestUseCaseImpl @Inject constructor(
                 // Предыдущая история
                 addAll(messages)
                 // Текущее сообщение
-                add(promptText.reqUserMessage())
+                if (prompt?.content?.isNullOrBlank() == false) {
+                    add(prompt.reqUserMessage())
+                }
             },
             responseFormat = modelSettings.reqResponseFormat(),
+            tools = tools,
             maxTokens = modelSettings.maxTokens,
             maxCompletionTokens = modelSettings.maxCompletionTokens,
             temperature = modelSettings.temperature,
@@ -44,9 +49,14 @@ internal class LlmRequestUseCaseImpl @Inject constructor(
         return mapResult(result)
     }
 
-    private fun String.reqUserMessage() = ModelRequest.Message(
-        role = ModelRequest.Role.User,
-        content = this,
+    private fun AContextMessage.reqUserMessage() = ModelRequest.Message(
+        role = when (role) {
+            AContextMessage.Role.SYSTEM -> ModelRequest.Role.System
+            AContextMessage.Role.USER -> ModelRequest.Role.User
+            AContextMessage.Role.ASSISTANT -> ModelRequest.Role.Assistant
+            AContextMessage.Role.TOOL -> ModelRequest.Role.Tool
+        },
+        content = this.content,
         thinking = null,
         cachePrompt = false
     )

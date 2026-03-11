@@ -68,7 +68,27 @@ internal data class MessageDto(
     @SerialName("content")
     val content: String? = null,
     @SerialName("reasoning")
-    val reasoning: String? = null
+    val reasoning: String? = null,
+    @SerialName("tool_calls")
+    val toolCalls: List<ToolCallDto>? = null
+)
+
+@Serializable
+internal data class ToolCallDto(
+    @SerialName("id")
+    val id: String,
+    @SerialName("type")
+    val type: String,
+    @SerialName("function")
+    val function: FunctionCallDto
+)
+
+@Serializable
+internal data class FunctionCallDto(
+    @SerialName("name")
+    val name: String,
+    @SerialName("arguments")
+    val arguments: String
 )
 
 /**

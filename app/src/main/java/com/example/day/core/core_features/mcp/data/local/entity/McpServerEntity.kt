@@ -23,7 +23,7 @@ internal data class McpServerEntity(
     @ColumnInfo(name = "is_enabled")
     val isEnabled: Boolean = true,
 
-    /** "HTTP", "SSE", "STREAMABLE_HTTP", or "STDIO" */
+    /** "HTTP", "SSE", "STREAMABLE_HTTP", "STDIO", or "LOCAL" */
     @ColumnInfo(name = "transport_type")
     val transportType: String = "HTTP",
 

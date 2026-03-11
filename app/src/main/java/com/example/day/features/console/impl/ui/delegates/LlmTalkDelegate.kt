@@ -1,5 +1,6 @@
 package com.example.day.features.console.impl.ui.delegates
 
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
@@ -63,7 +64,8 @@ internal class LlmTalkDelegate @Inject constructor(
         messages = history.map { chatMessage ->
             chatMessage.mapToRequestMessage()
         },
-        promptText = promptText,
+        prompt = AContextMessage(AContextMessage.Role.USER, promptText),
+        tools = null,
     )
 
     private fun ChatMessage.mapToRequestMessage(): ModelRequest.Message = ModelRequest.Message(

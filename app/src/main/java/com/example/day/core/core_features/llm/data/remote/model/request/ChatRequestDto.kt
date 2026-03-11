@@ -2,6 +2,7 @@ package com.example.day.core.core_features.llm.data.remote.model.request
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Запрос к OpenRouter Chat API
@@ -28,6 +29,8 @@ class ChatRequestDto(
     val model: String,
     @SerialName("messages")
     val messages: List<MessageDto>,
+    @SerialName("tools")
+    val tools: List<ToolDto>? = null,
     @SerialName("response_format")
     val responseFormat: ResponseFormatDto? = null,
     @SerialName("stream")
@@ -114,4 +117,22 @@ class JsonSchemaDto(
     val schema: String? = null,
     @SerialName("strict")
     val strict: Boolean? = null
+)
+
+@Serializable
+class ToolDto(
+    @SerialName("type")
+    val type: String,
+    @SerialName("function")
+    val function: FunctionDto
+)
+
+@Serializable
+class FunctionDto(
+    @SerialName("name")
+    val name: String,
+    @SerialName("description")
+    val description: String,
+    @SerialName("parameters")
+    val parameters: JsonObject
 )

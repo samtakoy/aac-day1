@@ -5,7 +5,6 @@ import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.AContextParams
 import com.example.day.core.core_features.agent.domain.model.AContextState
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
-import com.example.day.core.core_features.agent.domain.model.Role
 import com.example.day.core.core_features.agent.domain.model.addAssistantMessage
 import com.example.day.core.core_features.agent.domain.model.addUserMessage
 import com.example.day.core.core_features.agent.domain.strategy.ContextSnapshot
@@ -33,18 +32,18 @@ class ContextSummaryStrategy(
     override suspend fun process(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String?,
         store: AgentContextRepository
     ): ContextSnapshot {
         val state = store.getContextState(agent.id) as? AContextState.Summary
             ?: AContextState.Summary("", persistentListOf())
+        // НЕ добавляем userPrompt — это сделает LlmRequestUseCase.exec()
         return ContextSnapshot(
-            messages = state.messages.addUserMessage(userPrompt).mutate { list ->
+            messages = state.messages.mutate { list ->
                 if (state.summary.isNotBlank()) {
                     list.add(
                         0,
                         AContextMessage(
-                            role = Role.ASSISTANT,
+                            role = AContextMessage.Role.ASSISTANT,
                             content = "Previous conversation summary: ${state.summary}"
                         )
                     )
@@ -56,31 +55,30 @@ class ContextSummaryStrategy(
     override suspend fun afterResponse(
         chat: ChatSettings,
         agent: AgentConfig,
-        userPrompt: String,
         response: String,
-        store: AgentContextRepository
+        store: AgentContextRepository,
+        fullContext: ContextSnapshot
     ): ContextStrategyResult {
         val state = store.getContextState(agent.id) as? AContextState.Summary
             ?: AContextState.Summary("", persistentListOf())
         val params = store.getContextParams(agent.id) as? AContextParams.Summarization
 
-        val updatedMessages = state.messages
-            .addUserMessage(userPrompt)
-            .addAssistantMessage(response)
+        // fullContext содержит полную историю: initialHistory + prompt + assistant/tool messages
+        val messagesToSave = fullContext.messages.toPersistentList()
 
         // Check if compression is needed
         val threshold = if (params != null) params.msgLimit + params.extraLimit else Int.MAX_VALUE
-        val needsCompression = params != null && updatedMessages.size > threshold
+        val needsCompression = params != null && messagesToSave.size > threshold
 
         if (!needsCompression) {
-            store.saveContextState(agent.id, state.copy(messages = updatedMessages))
+            store.saveContextState(agent.id, state.copy(messages = messagesToSave))
             return ContextStrategyResult(null)
         }
 
         // Compress: summarize old messages, keep recent ones
-        val toCompressCount = (updatedMessages.size - params!!.msgLimit).coerceAtLeast(0)
-        val toCompress = updatedMessages.take(toCompressCount)
-        val remaining = updatedMessages.drop(toCompressCount)
+        val toCompressCount = (messagesToSave.size - params!!.msgLimit).coerceAtLeast(0)
+        val toCompress = messagesToSave.take(toCompressCount)
+        val remaining = messagesToSave.drop(toCompressCount)
         val prevSummary = state.summary.takeIf { it.isNotBlank() }
 
         val prompt = SummarizationPrompt.buildSummarizationPrompt(prevSummary, toCompress)
@@ -88,7 +86,8 @@ class ContextSummaryStrategy(
             modelSettings = chat.model,
             systemPrompt = null,
             messages = emptyList(),
-            promptText = prompt
+            prompt = AContextMessage(AContextMessage.Role.USER, prompt),
+            tools = null
         ).getOrThrow().getContent()
 
         store.saveContextState(

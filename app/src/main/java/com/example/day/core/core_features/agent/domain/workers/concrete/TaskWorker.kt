@@ -4,15 +4,18 @@ import android.util.Log
 import com.example.day.core.core_features.agent.domain.AIAgent
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.TaskLlmResponse
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
+import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.workers.task.TaskResponseParser
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateData
 import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
+import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
@@ -35,6 +38,8 @@ class TaskWorker @Inject constructor(
     private val llmRequestUseCase: LlmRequestUseCase,
     private val strategyFactory: StrategyFactory,
     private val stateStore: StateStore,
+    private val toolProvider: ToolProvider,
+    private val toolCallOrchestrator: ToolCallOrchestrator
 ) : AWorker {
 
     companion object {
@@ -47,6 +52,7 @@ class TaskWorker @Inject constructor(
     override suspend fun doWork(
         userPrompt: String,
         chat: Chat,
+        userRole: AContextMessage.Role,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
         // Get or create agent. System prompt is empty — TaskStateMemoryProvider manages it dynamically.
@@ -76,7 +82,9 @@ class TaskWorker @Inject constructor(
             contextRepository = contextRepository,
             llmProvider = llmRequestUseCase,
             strategy = strategy,
-            memoryProvider = compositeProvider
+            memoryProvider = compositeProvider,
+            toolProvider = toolProvider,
+            orchestrator = toolCallOrchestrator
         )
 
         //  current state to chat before LLM call
@@ -85,7 +93,7 @@ class TaskWorker @Inject constructor(
         // Call agent.process() for automatic context management
         val result = agentWithTaskState.process(
             chat = chat.settings,
-            userPrompt = userPrompt,
+            prompt = AContextMessage(AContextMessage.Role.USER, userPrompt),
             onEvent = onEvent
         )
 
@@ -134,7 +142,7 @@ class TaskWorker @Inject constructor(
         }
 
         if (result.llmRequest != null) {
-            doWork(result.llmRequest.userPrompt.orEmpty(), chat, onEvent)
+            doWork(result.llmRequest.userPrompt.orEmpty(), chat, AContextMessage.Role.USER, onEvent)
         }
     }
 

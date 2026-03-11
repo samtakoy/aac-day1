@@ -2,7 +2,6 @@ package com.example.day.core.core_features.memory.domain.provider
 
 import android.util.Log
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
-import com.example.day.core.core_features.agent.domain.model.Role
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateData
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.toContextMessage
@@ -41,8 +40,8 @@ class TaskStateMemoryProvider(
         val assistantHistory = stateData?.history?.map { it.toContextMessage() }
 
         return buildList {
-            add(AContextMessage(role = Role.SYSTEM, content = systemPrompt))
-            assistantPreFill?.let { add(AContextMessage(role = Role.ASSISTANT, content = it)) }
+            add(AContextMessage(role = AContextMessage.Role.SYSTEM, content = systemPrompt))
+            assistantPreFill?.let { add(AContextMessage(role = AContextMessage.Role.ASSISTANT, content = it)) }
             assistantHistory?.let { addAll(it) }
         }
     }

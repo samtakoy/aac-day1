@@ -3,6 +3,7 @@ package com.example.day.core.core_features.agent.di
 import com.example.day.core.core_features.agent.data.AgentContextRepositoryImpl
 import com.example.day.core.core_features.agent.data.AgentRepositoryImpl
 import com.example.day.core.core_features.agent.data.repository.AgentMemoryRepositoryImpl
+import com.example.day.core.core_features.agent.data.tools.McpToolProvider
 import com.example.day.core.core_features.agent.data.local.dao.AgentDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentContextMemoryDao
 import com.example.day.core.core_features.agent.data.local.dao.AgentMemoryDao
@@ -10,13 +11,17 @@ import com.example.day.core.core_features.agent.data.local.dao.AgentToChatDao
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
+import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
+import com.example.day.core.core_features.agent.domain.tools.impl.ToolCallOrchestratorImpl
 import com.example.day.core.core_features.state_machine.domain.StateStore
 import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskStateStoreImpl
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentToolsImpl
+import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.chat.data.local.ChatDatabase
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.tools.ChatToolsImpl
+import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -48,18 +53,23 @@ internal interface AgentCoreFeatureModule {
     fun bindsAgentTools(impl: AgentToolsImpl): AgentTools
 
     @Binds
+    fun bindsToolProvider(impl: McpToolProvider): ToolProvider
+
+    @Binds
     fun bindsChatTools(impl: ChatToolsImpl): ChatTools
 
-    /**
-     * TODO это будет работать только пока у нас 1 агент работающий с этим стором
-     *  Если их станет больше, то они полезут в память друг к другу, т.к. [TaskStateStoreImpl] кеширует значения в памяти
-     *  Должно быть один агент - один [StateStore]
-     * */
     @Binds
     @Singleton
     fun bindsTaskStateStore(impl: TaskStateStoreImpl): StateStore
 
     companion object {
+
+        @Provides
+        @Singleton
+        internal fun provideToolCallOrchestrator(
+            llmRequestUseCase: LlmRequestUseCase,
+            toolProvider: ToolProvider
+        ): ToolCallOrchestrator = ToolCallOrchestratorImpl(llmRequestUseCase, toolProvider)
 
         @Provides
         @Singleton

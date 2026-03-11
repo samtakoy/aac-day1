@@ -63,8 +63,8 @@ private fun registerGetIssue(server: Server, api: GitHubApiClient) {
         description = "Get issue by number from a GitHub repository",
         inputSchema = ToolSchema(
             properties = buildJsonObject {
-                put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
-                put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
+                // put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
+                // put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
                 put("issueNumber", buildJsonObject { put("type", JsonPrimitive("integer")) })
             },
             required = listOf("issueNumber")
@@ -90,8 +90,8 @@ private fun registerListIssues(server: Server, api: GitHubApiClient) {
         description = "List issues for a repository (PRs excluded by default)",
         inputSchema = ToolSchema(
             properties = buildJsonObject {
-                put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
-                put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
+                // put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
+                // put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
                 put("state", buildJsonObject { put("type", JsonPrimitive("string")) })
                 put("labels", buildJsonObject { put("type", JsonPrimitive("array")) })
                 put("per_page", buildJsonObject { put("type", JsonPrimitive("integer")) })
@@ -128,8 +128,8 @@ private fun registerGetIssueComments(server: Server, api: GitHubApiClient) {
         description = "Get comments for an issue",
         inputSchema = ToolSchema(
             properties = buildJsonObject {
-                put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
-                put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
+                // put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
+                // put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
                 put("issueNumber", buildJsonObject { put("type", JsonPrimitive("integer")) })
             },
             required = listOf("issueNumber")
@@ -176,8 +176,8 @@ private fun registerCreateIssue(server: Server, api: GitHubApiClient) {
         description = "Create a new issue in a repository",
         inputSchema = ToolSchema(
             properties = buildJsonObject {
-                put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
-                put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
+                // put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
+                // put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
                 put("title", buildJsonObject { put("type", JsonPrimitive("string")) })
                 put("body", buildJsonObject { put("type", JsonPrimitive("string")) })
                 put("labels", buildJsonObject { put("type", JsonPrimitive("array")) })
@@ -212,8 +212,8 @@ private fun registerCreateComment(server: Server, api: GitHubApiClient) {
         description = "Create a comment for an issue",
         inputSchema = ToolSchema(
             properties = buildJsonObject {
-                put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
-                put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
+                // put("owner", buildJsonObject { put("type", JsonPrimitive("string")) })
+                // put("repo", buildJsonObject { put("type", JsonPrimitive("string")) })
                 put("issueNumber", buildJsonObject { put("type", JsonPrimitive("integer")) })
                 put("body", buildJsonObject { put("type", JsonPrimitive("string")) })
             },

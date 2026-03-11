@@ -125,8 +125,9 @@ class GitHubApiClient(
     }
 
     private fun resolveRepo(owner: String?, repo: String?): Pair<String, String> {
-        val resolvedOwner = owner ?: defaultOwner
-        val resolvedRepo = repo ?: defaultRepo
+        // TODO всегда наши на данный момент
+        val resolvedOwner = defaultOwner // owner ?: defaultOwner
+        val resolvedRepo = defaultRepo // repo ?: defaultRepo
         if (resolvedOwner.isNullOrBlank() || resolvedRepo.isNullOrBlank()) {
             error("Repository not configured. Provide owner/repo arguments or set GITHUB_OWNER/GITHUB_REPO.")
         }

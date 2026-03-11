@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.memory.domain.usecase
 
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.llm.domain.model.getContent
@@ -18,7 +19,8 @@ class GenerateProfileAvatarUseCase @Inject constructor(
             modelSettings = model,
             systemPrompt = "",
             messages = emptyList(),
-            promptText = prompt
+            prompt = AContextMessage(AContextMessage.Role.USER, prompt),
+            tools = null
         ).onFailure {
             return Result.failure(it)
         }

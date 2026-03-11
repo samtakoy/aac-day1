@@ -26,6 +26,7 @@ data class ModelRequest(
     val model: String,
     val messages: List<Message>,
     val responseFormat: ResponseFormat,
+    val tools: List<Tool>? = null,
     val stream: Boolean? = null,
     val maxCompletionTokens: Int? = null,
     val maxTokens: Int? = null,
@@ -72,14 +73,43 @@ data class ModelRequest(
     enum class Role {
         System,
         Assistant,
-        User
+        User,
+        Tool
     }
 
     data class Message(
         val role: Role,
         val content: String,
         val thinking: String? = null,
-        val cachePrompt: Boolean? = null
+        val cachePrompt: Boolean? = null,
+        val toolCalls: List<ToolCall>? = null,
+        val toolCallId: String? = null
+    )
+
+    enum class ToolType {
+        Function
+    }
+
+    data class Tool(
+        val type: ToolType = ToolType.Function,
+        val function: Function
+    )
+
+    data class Function(
+        val name: String,
+        val description: String,
+        val parameters: kotlinx.serialization.json.JsonObject
+    )
+
+    data class ToolCall(
+        val id: String,
+        val type: String,
+        val function: FunctionCall
+    )
+
+    data class FunctionCall(
+        val name: String,
+        val arguments: String
     )
 }
 
