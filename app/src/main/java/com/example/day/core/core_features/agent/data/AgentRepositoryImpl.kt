@@ -165,7 +165,8 @@ internal class AgentRepositoryImpl @Inject constructor(
         chatId: Long,
         systemPrompt: String,
         defaultModel: () -> ModelSettings,
-        defaultContext: () -> AContext
+        defaultContext: () -> AContext,
+        onCreateCallback: (suspend (Long) -> Unit)?
     ): AgentConfig {
         // 1. Искать агента по systemName + chatId
         val existingAgent = agentToChatDao.getAgentBySystemNameAndChatId(systemName, chatId)
@@ -190,6 +191,9 @@ internal class AgentRepositoryImpl @Inject constructor(
         if (chatId != 0L) {
             bindAgentToChat(newAgentId, chatId)
         }
+
+        // 4. Вызываем callback ТОЛЬКО при создании нового агента
+        onCreateCallback?.invoke(newAgentId)
 
         return getAgentById(newAgentId)
             ?: throw IllegalStateException("Failed to create chat-specific agent")

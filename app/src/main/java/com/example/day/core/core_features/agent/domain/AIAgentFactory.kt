@@ -30,14 +30,16 @@ class AIAgentFactory @Inject constructor(
         chatId: Long,
         systemPrompt: String,
         defaultModel: () -> ModelSettings,
-        defaultContext: () -> AContext
+        defaultContext: () -> AContext,
+        onCreateCallback: (suspend (Long) -> Unit)? = null
     ): AIAgent {
         val config = getOrCreateAgentUseCase(
             systemName = systemName,
             chatId = chatId,
             systemPrompt = systemPrompt,
             defaultModel = defaultModel,
-            defaultContext = defaultContext
+            defaultContext = defaultContext,
+            onCreateCallback = onCreateCallback
         )
         val strategy = strategyFactory.create(config.contextStrategyType)
         val memoryProvider = memoryProviderFactory.create(

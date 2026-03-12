@@ -12,6 +12,14 @@ object McpToolNames {
     const val CREATE_ISSUE = "create_issue"
     const val CREATE_COMMENT = "create_comment"
     const val SET_REMINDER = "set_reminder"
+    
+    // Day 19: Git file investigation tools
+    const val INVESTIGATE_GIT_FILE = "investigate_git_file"
+    const val GET_FILE_ANALYSIS = "get_file_analysis"
+    const val ANALYZE_CODE_CONTENT = "analyze_code_content"
+    const val GET_GIT_FILE_LIST = "get_git_file_list"
+    const val GET_FILE_CONTENT = "get_file_content"
+    const val RESET_GIT_FILE_LIST_CACHE = "reset_git_file_list_cache"
 
     val ALLOWED_TOOL_NAMES = setOf(
         GET_ISSUE,
@@ -20,7 +28,13 @@ object McpToolNames {
         GET_USER,
         CREATE_ISSUE,
         CREATE_COMMENT,
-        SET_REMINDER
+        SET_REMINDER,
+        INVESTIGATE_GIT_FILE,
+        GET_FILE_ANALYSIS,
+        ANALYZE_CODE_CONTENT,
+        GET_GIT_FILE_LIST,
+        GET_FILE_CONTENT,
+        RESET_GIT_FILE_LIST_CACHE
     )
 }
 

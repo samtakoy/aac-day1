@@ -29,12 +29,16 @@ import com.example.day.core.core_features.memory.data.local.model.LongTermMemory
 import com.example.day.core.core_features.chat.data.local.model.MessageEntity
 import com.example.day.core.core_features.memory.data.local.model.ProjectArtifactEntity
 import com.example.day.core.core_features.chat.data.local.model.UserEntity
+import com.example.day.core.core_features.mcp.data.local.dao.FileAnalysisDao
 import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupToAgentEntity
 import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupToChatGroupEntity
 import com.example.day.core.core_features.memory.data.local.model.link.LTMGroupToUserProfileEntity
 import com.example.day.core.core_features.memory.data.local.model.link.UserToProfileEntity
 import com.example.day.core.core_features.memory.data.local.model.user.UserProfileEntity
+import com.example.day.core.core_features.mcp.data.local.dao.GitFileCacheDao
 import com.example.day.core.core_features.mcp.data.local.dao.McpServerDao
+import com.example.day.core.core_features.mcp.data.local.entity.FileAnalysisEntity
+import com.example.day.core.core_features.mcp.data.local.entity.GitFileCacheEntity
 import com.example.day.core.core_features.mcp.data.local.entity.McpServerEntity
 import com.example.day.core.core_features.reminder.data.local.dao.ReminderDao
 import com.example.day.core.core_features.reminder.data.local.model.ReminderEntity
@@ -62,9 +66,11 @@ import com.example.day.core.core_features.reminder.data.local.model.ReminderEnti
         LTMGroupToUserProfileEntity::class,
         UserToProfileEntity::class,
         McpServerEntity::class,
-        ReminderEntity::class
+        ReminderEntity::class,
+        GitFileCacheEntity::class,
+        FileAnalysisEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 internal abstract class ChatDatabase : RoomDatabase() {
@@ -85,4 +91,6 @@ internal abstract class ChatDatabase : RoomDatabase() {
     abstract fun userProfileDao(): UserProfileDao
     abstract fun mcpServerDao(): McpServerDao
     abstract fun reminderDao(): ReminderDao
+    abstract fun gitFileCacheDao(): GitFileCacheDao
+    abstract fun fileAnalysisDao(): FileAnalysisDao
 }

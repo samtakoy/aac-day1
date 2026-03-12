@@ -12,13 +12,11 @@ import com.example.day.core.core_features.chat.domain.model.ChatSettings
 class ContextEmptyStrategy : ContextStrategy {
 
     override suspend fun process(
-        chat: ChatSettings,
         agent: AgentConfig,
         store: AgentContextRepository
     ): ContextSnapshot = ContextSnapshot(messages = emptyList())
 
     override suspend fun afterResponse(
-        chat: ChatSettings,
         agent: AgentConfig,
         response: String,
         store: AgentContextRepository,

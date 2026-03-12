@@ -32,7 +32,6 @@ class ContextBranchingStrategy : ContextStrategy {
     }
 
     override suspend fun process(
-        chat: ChatSettings,
         agent: AgentConfig,
         store: AgentContextRepository
     ): ContextSnapshot {
@@ -47,7 +46,6 @@ class ContextBranchingStrategy : ContextStrategy {
     }
 
     override suspend fun afterResponse(
-        chat: ChatSettings,
         agent: AgentConfig,
         response: String,
         store: AgentContextRepository,

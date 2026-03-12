@@ -161,7 +161,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
                         ModelRequest.Message(
                             role = ModelRequest.Role.Assistant,
                             // content = "Я попытался использовать вызов ${call.function}, но это закончилось  неудачей. Теперь отчитаюсь пользователю."
-                            content = "Я попытался использовать вызов ${call.function.name}, но это закончилось  неудачей. Теперь отчитаюсь пользователю."
+                            content = "Хм, вызов ${call.function.name} закончился  неудачей. Может получится позже. Теперь отчитаюсь пользователю."
                         )
                     )
                 } else {

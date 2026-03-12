@@ -5,6 +5,7 @@ import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRep
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.memory.domain.provider.AgentRulesMemoryProvider
+import com.example.day.core.core_features.memory.domain.provider.AgentToolsMemoryProvider
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -17,6 +18,9 @@ import javax.inject.Inject
  *   --addrule "текст"     добавить новое правило диалога
  *   --listrules           вывести список всех правил
  *   --clearrules          удалить все правила диалога
+ *   --addtool tool_name   добавить инструмент в список разрешённых
+ *   --listtools           вывести список разрешённых инструментов
+ *   --cleartools          удалить все инструменты из списка
  */
 class AgentCommandHandler @Inject constructor(
     private val aiAgentFactory: AIAgentFactory,
@@ -31,9 +35,13 @@ class AgentCommandHandler @Inject constructor(
             "addrule" in paramsMap -> handleAddRule(paramsMap["addrule"], chat)
             "listrules" in paramsMap -> handleListRules(chat)
             "clearrules" in paramsMap -> handleClearRules(chat)
+            "addtool" in paramsMap -> handleAddTool(paramsMap["addtool"], chat)
+            "listtools" in paramsMap -> handleListTools(chat)
+            "cleartools" in paramsMap -> handleClearTools(chat)
             else -> CommandResult.Error(
                 "Неизвестная команда agent.\n" +
-                "Доступные: --addrule \"текст\" | --listrules | --clearrules"
+                "Доступные: --addrule \"текст\" | --listrules | --clearrules\n" +
+                "           --addtool tool_name | --listtools | --cleartools"
             )
         }
     }
@@ -120,6 +128,77 @@ class AgentCommandHandler @Inject constructor(
             return emptyList()
         }
 
+        return try {
+            Json.decodeFromString(ListSerializer(String.serializer()), fact.fact)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    // ── Tools management ─────────────────────────────────────────────────────
+
+    private suspend fun handleAddTool(toolName: String?, chat: Chat): CommandResult {
+        if (toolName.isNullOrBlank()) {
+            return CommandResult.Error("Укажите инструмент: @@talk(agent --addtool tool_name)")
+        }
+
+        val agent = aiAgentFactory.getOrCreate(
+            AGENT_NAME, chat.id, chat.settings.systemPromt,
+            defaultModel = { chat.settings.model },
+            defaultContext = { AContextDefaultFactory.createFull() }
+        )
+
+        val currentTools = getCurrentTools(agent.config.id)
+        if (toolName in currentTools) {
+            return CommandResult.Success("Инструмент '$toolName' уже в списке разрешённых")
+        }
+        val updatedTools = currentTools + toolName
+        agentMemoryRepository.upsertFact(
+            agentId = agent.config.id,
+            memoryKey = AgentToolsMemoryProvider.MEMORY_KEY,
+            category = AgentToolsMemoryProvider.CATEGORY,
+            fact = Json.encodeToString(updatedTools)
+        )
+        return CommandResult.Success("Инструмент добавлен. Всего: ${updatedTools.size}")
+    }
+
+    private suspend fun handleListTools(chat: Chat): CommandResult {
+        val agent = aiAgentFactory.getOrCreate(
+            AGENT_NAME, chat.id, chat.settings.systemPromt,
+            defaultModel = { chat.settings.model },
+            defaultContext = { AContextDefaultFactory.createFull() }
+        )
+        val tools = getCurrentTools(agent.config.id)
+        if (tools.isEmpty()) {
+            return CommandResult.Success(
+                "Инструменты не настроены — все доступные разрешены.\n" +
+                "Добавьте: @@talk(agent --addtool tool_name)"
+            )
+        }
+        return CommandResult.Success(buildString {
+            appendLine("Разрешённые инструменты (${tools.size}):")
+            tools.forEachIndexed { i, t -> appendLine("${i + 1}. $t") }
+        }.trim())
+    }
+
+    private suspend fun handleClearTools(chat: Chat): CommandResult {
+        val agent = aiAgentFactory.getOrCreate(
+            AGENT_NAME, chat.id, chat.settings.systemPromt,
+            defaultModel = { chat.settings.model },
+            defaultContext = { AContextDefaultFactory.createFull() }
+        )
+        agentMemoryRepository.deleteFact(
+            agentId = agent.config.id,
+            memoryKey = AgentToolsMemoryProvider.MEMORY_KEY,
+            category = AgentToolsMemoryProvider.CATEGORY
+        )
+        return CommandResult.Success("Все инструменты удалены — снова доступны все")
+    }
+
+    private suspend fun getCurrentTools(agentId: Long): List<String> {
+        val fact = agentMemoryRepository.getFact(
+            agentId, AgentToolsMemoryProvider.MEMORY_KEY, AgentToolsMemoryProvider.CATEGORY
+        ) ?: return emptyList()
         return try {
             Json.decodeFromString(ListSerializer(String.serializer()), fact.fact)
         } catch (e: Exception) {

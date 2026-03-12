@@ -30,6 +30,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+import dagger.Lazy
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -52,7 +53,7 @@ import javax.inject.Singleton
 internal class McpTransport @Inject constructor(
     private val httpClient: HttpClient,
     private val json: Json,
-    private val localMcpService: LocalMcpService
+    private val localMcpService: Lazy<LocalMcpService>  // Lazy разрывает цикл Dagger
 ) {
     private val requestId = AtomicLong(0L)
     private val sessionIds = ConcurrentHashMap<String, String>()
@@ -307,7 +308,7 @@ internal class McpTransport @Inject constructor(
     }
 
     private fun connectLocal(): List<McpTool> {
-        return localMcpService.listTools().map { tool ->
+        return localMcpService.get().listTools().map { tool ->
             McpTool(
                 name = tool.name,
                 description = tool.description,
@@ -335,7 +336,7 @@ internal class McpTransport @Inject constructor(
                 )
             )
             McpMethods.TOOLS_LIST -> {
-                val tools = localMcpService.listTools().map { tool ->
+                val tools = localMcpService.get().listTools().map { tool ->
                     ToolDefinition(
                         name = tool.name,
                         description = tool.description,
@@ -360,7 +361,7 @@ internal class McpTransport @Inject constructor(
                         error = JsonRpcError(code = -32602, message = "Invalid params")
                     )
                 } else {
-                    val result = localMcpService.callTool(toolName, args, context)
+                    val result = localMcpService.get().callTool(toolName, args, context)
                     val payload = CallToolResult(
                         content = listOf(ContentItem(type = "text", text = result.getOrElse { it.message.orEmpty() })),
                         isError = result.isFailure

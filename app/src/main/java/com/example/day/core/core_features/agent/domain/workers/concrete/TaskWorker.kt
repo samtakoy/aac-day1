@@ -92,7 +92,6 @@ class TaskWorker @Inject constructor(
 
         // Call agent.process() for automatic context management
         val result = agentWithTaskState.process(
-            chat = chat.settings,
             prompt = AContextMessage(AContextMessage.Role.USER, userPrompt),
             onEvent = onEvent
         )

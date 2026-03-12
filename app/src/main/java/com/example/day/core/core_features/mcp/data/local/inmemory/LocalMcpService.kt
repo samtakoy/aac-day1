@@ -7,9 +7,17 @@ import javax.inject.Singleton
 
 @Singleton
 internal class LocalMcpService @Inject constructor(
-    private val setReminderTool: SetReminderTool
+    private val setReminderTool: SetReminderTool,
+    private val investigateGitFileTool: InvestigateGitFileTool,
+    private val getFileAnalysisTool: GetFileAnalysisTool,
+    private val analyzeCodeContentTool: AnalyzeCodeContentTool
 ) {
-    private val tools: List<LocalMcpTool> = listOf(setReminderTool)
+    private val tools: List<LocalMcpTool> = listOf(
+        setReminderTool,
+        investigateGitFileTool,
+        getFileAnalysisTool,
+        analyzeCodeContentTool
+    )
 
     fun listTools(): List<LocalMcpTool> = tools
 

@@ -1,9 +1,15 @@
 package com.example.day.core.core_features.mcp.di
 
 import com.example.day.core.core_features.chat.data.local.ChatDatabase
+import com.example.day.core.core_features.mcp.data.FileAnalysisRepositoryImpl
+import com.example.day.core.core_features.mcp.data.GitFileCacheRepositoryImpl
 import com.example.day.core.core_features.mcp.data.McpRepositoryImpl
 import com.example.day.core.core_features.mcp.data.McpToolsImpl
+import com.example.day.core.core_features.mcp.data.local.dao.FileAnalysisDao
+import com.example.day.core.core_features.mcp.data.local.dao.GitFileCacheDao
 import com.example.day.core.core_features.mcp.data.local.dao.McpServerDao
+import com.example.day.core.core_features.mcp.domain.repository.FileAnalysisRepository
+import com.example.day.core.core_features.mcp.domain.repository.GitFileCacheRepository
 import com.example.day.core.core_features.mcp.domain.repository.McpRepository
 import com.example.day.core.core_features.mcp.domain.tools.McpTools
 import dagger.Binds
@@ -26,8 +32,22 @@ internal interface McpCoreFeatureModule {
     @Singleton
     fun bindsMcpTools(impl: McpToolsImpl): McpTools
 
+    @Binds
+    @Singleton
+    fun bindsGitFileCacheRepository(impl: GitFileCacheRepositoryImpl): GitFileCacheRepository
+
+    @Binds
+    @Singleton
+    fun bindsFileAnalysisRepository(impl: FileAnalysisRepositoryImpl): FileAnalysisRepository
+
     companion object {
         @Provides
         internal fun provideMcpServerDao(db: ChatDatabase): McpServerDao = db.mcpServerDao()
+
+        @Provides
+        internal fun provideGitFileCacheDao(db: ChatDatabase): GitFileCacheDao = db.gitFileCacheDao()
+
+        @Provides
+        internal fun provideFileAnalysisDao(db: ChatDatabase): FileAnalysisDao = db.fileAnalysisDao()
     }
 }

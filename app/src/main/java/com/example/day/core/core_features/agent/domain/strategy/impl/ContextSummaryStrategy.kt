@@ -30,7 +30,6 @@ class ContextSummaryStrategy(
 ) : ContextStrategy {
 
     override suspend fun process(
-        chat: ChatSettings,
         agent: AgentConfig,
         store: AgentContextRepository
     ): ContextSnapshot {
@@ -53,7 +52,6 @@ class ContextSummaryStrategy(
     }
 
     override suspend fun afterResponse(
-        chat: ChatSettings,
         agent: AgentConfig,
         response: String,
         store: AgentContextRepository,
@@ -83,7 +81,7 @@ class ContextSummaryStrategy(
 
         val prompt = SummarizationPrompt.buildSummarizationPrompt(prevSummary, toCompress)
         val newSummary = llmRequestUseCase.exec(
-            modelSettings = chat.model,
+            modelSettings = agent.modelSettings,
             systemPrompt = null,
             messages = emptyList(),
             prompt = AContextMessage(AContextMessage.Role.USER, prompt),

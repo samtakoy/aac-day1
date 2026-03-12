@@ -115,6 +115,7 @@ interface AgentRepository {
      * @param chatId chat id to bind agent to (0 для агента не привязанного к чату)
      * @param systemPrompt agent system prompt
      * @param defaultModel factory method to create ModelSettings only if agent needs to be created
+     * @param onCreateCallback suspend callback invoked ONLY when a new agent is created (with agentId)
      * @return existing or newly created Agent
      */
     suspend fun getOrCreateAgent(
@@ -122,7 +123,8 @@ interface AgentRepository {
         chatId: Long,
         systemPrompt: String,
         defaultModel: () -> ModelSettings,
-        defaultContext: () -> AContext
+        defaultContext: () -> AContext,
+        onCreateCallback: (suspend (Long) -> Unit)? = null
     ): AgentConfig
 
     // === Agent Memory Types ===

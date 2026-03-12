@@ -91,7 +91,7 @@ class PlannerWorker @Inject constructor(
         )
 
         // Process the message
-        agent.process(chat.settings, prompt = AContextMessage(AContextMessage.Role.USER, enrichedTask), onEvent)
+        agent.process(prompt = AContextMessage(AContextMessage.Role.USER, enrichedTask), onEvent)
             .onSuccess { result ->
                 val responseText = result.responseText
 

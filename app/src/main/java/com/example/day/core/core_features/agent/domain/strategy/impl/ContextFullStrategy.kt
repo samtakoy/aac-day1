@@ -17,7 +17,6 @@ import kotlinx.collections.immutable.toPersistentList
 class ContextFullStrategy : ContextStrategy {
 
     override suspend fun process(
-        chat: ChatSettings,
         agent: AgentConfig,
         store: AgentContextRepository
     ): ContextSnapshot {
@@ -28,7 +27,6 @@ class ContextFullStrategy : ContextStrategy {
     }
 
     override suspend fun afterResponse(
-        chat: ChatSettings,
         agent: AgentConfig,
         response: String,
         store: AgentContextRepository,

@@ -115,7 +115,7 @@ class TalkWorker @Inject constructor(
             onEvent?.invoke(event)
         }
 
-        agent.process(chat.settings, AContextMessage(userRole, userPrompt), eventHandler)
+        agent.process(AContextMessage(userRole, userPrompt), eventHandler)
             .onSuccess { result ->
                 result.requestDebugInfo?.let { chatTools.addInfoMessage(chat.id, it) }
                 result.reportMessage?.let { chatTools.addInfoMessage(chat.id, it) }

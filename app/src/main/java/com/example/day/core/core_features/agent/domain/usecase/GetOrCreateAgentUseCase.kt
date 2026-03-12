@@ -19,14 +19,16 @@ class GetOrCreateAgentUseCase @Inject constructor(
         chatId: Long,
         systemPrompt: String,
         defaultModel: () -> ModelSettings,
-        defaultContext: () -> AContext
+        defaultContext: () -> AContext,
+        onCreateCallback: (suspend (Long) -> Unit)? = null
     ): AgentConfig {
         return repository.getOrCreateAgent(
             systemName = systemName,
             chatId = chatId,
             systemPrompt = systemPrompt,
             defaultModel = defaultModel,
-            defaultContext = defaultContext
+            defaultContext = defaultContext,
+            onCreateCallback = onCreateCallback
         )
     }
 }

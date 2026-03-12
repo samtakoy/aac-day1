@@ -22,7 +22,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "day1_codex"
+rootProject.name = "day1_qwen"
 include(":app")
 include(":mcp-server")
  

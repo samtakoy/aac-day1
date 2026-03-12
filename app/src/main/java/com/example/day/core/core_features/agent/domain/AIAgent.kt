@@ -41,13 +41,12 @@ class AIAgent(
      * @return Result with response text and optional report message (e.g. compression stats)
      */
     suspend fun process(
-        chat: ChatSettings,
         prompt: AContextMessage,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ): Result<AIAgentResult> {
         // 1. Получаем "знания" (LTM + Working Memory) в виде промптов
         val memoryMessages = memoryProvider.getMemoryContext()
-        val snapshot = strategy.process(chat, config, contextRepository)
+        val snapshot = strategy.process(config, contextRepository)
         
         val result = orchestrator.execute(
             initialHistory = snapshot.messages.toModelRequestMessages(),
@@ -55,7 +54,7 @@ class AIAgent(
             prompt = prompt,
             systemPrompt = config.systemPrompt,
             modelSettings = config.modelSettings,
-            tools = toolProvider.getTools(),
+            tools = toolProvider.getTools(agentId = config.id),
             context = ToolCallContext(agentId = config.id),
             onEvent = onEvent
         )
@@ -66,7 +65,6 @@ class AIAgent(
 
             // 5. Передаём расширенный контекст в strategy
             val strategyResult = strategy.afterResponse(
-                chat = chat,
                 agent = config,
                 response = toolCallingResult.finalResponseText,
                 store = contextRepository,

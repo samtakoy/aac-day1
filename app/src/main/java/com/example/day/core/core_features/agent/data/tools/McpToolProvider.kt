@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.agent.data.tools
 
+import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.agent.domain.tools.ToolCallingConstants
 import com.example.day.core.core_features.agent.domain.tools.ToolCallContext
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
@@ -12,6 +13,7 @@ import com.example.day.core.core_features.mcp.domain.model.McpServerConfig
 import com.example.day.core.core_features.mcp.domain.model.McpTool
 import com.example.day.core.core_features.mcp.domain.repository.McpRepository
 import com.example.day.core.core_features.mcp.domain.tools.McpTools
+import com.example.day.core.core_features.memory.domain.provider.AgentToolsMemoryProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -23,23 +25,32 @@ import javax.inject.Inject
 internal class McpToolProvider @Inject constructor(
     private val repository: McpRepository,
     private val mcpTools: McpTools,
+    private val agentMemoryRepository: AgentMemoryRepository,
     private val json: Json
 ) : ToolProvider {
 
     private val toolToServer = ConcurrentHashMap<String, String>()
 
-    override suspend fun getTools(): List<ModelRequest.Tool> {
+    override suspend fun getTools(agentId: Long?): List<ModelRequest.Tool> {
         val servers = getEnabledServers()
         if (servers.isEmpty()) return emptyList()
 
         toolToServer.clear()
         // toolToServer map is rebuilt for each tool listing
 
+        // Получаем список разрешенных tools для агента (если задан agentId)
+        val allowedTools = agentId?.let { getAllowedTools(it) }
+
         val collected = mutableListOf<ModelRequest.Tool>()
         servers.forEach { server ->
             val tools = getConnectedTools(server.id)
             tools.forEach { tool ->
+                // Проверка 1: tool в глобальном списке разрешенных
                 if (!McpToolNames.ALLOWED_TOOL_NAMES.contains(tool.name)) return@forEach
+
+                // Проверка 2: tool в списке разрешенных для агента (если задан)
+                if (allowedTools != null && !allowedTools.contains(tool.name)) return@forEach
+
                 if (toolToServer.containsKey(tool.name)) return@forEach
                 toolToServer[tool.name] = server.id
                 collected.add(
@@ -80,6 +91,25 @@ internal class McpToolProvider @Inject constructor(
             arguments = arguments,
             context = McpToolCallContext(agentId = context.agentId)
         )
+    }
+
+    /**
+     * Get list of tools allowed for specific agent.
+     * Returns null if no restrictions are set (all tools allowed).
+     */
+    private suspend fun getAllowedTools(agentId: Long): List<String>? {
+        val fact = agentMemoryRepository.getFact(
+            agentId = agentId,
+            memoryKey = AgentToolsMemoryProvider.MEMORY_KEY,
+            category = AgentToolsMemoryProvider.CATEGORY
+        ) ?: return null  // Нет ограничений - все инструменты разрешены
+
+        return try {
+            val tools = Json.decodeFromString<List<String>>(fact.fact)
+            if (tools.isEmpty()) null else tools
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private suspend fun getEnabledServers(): List<McpServerConfig> {

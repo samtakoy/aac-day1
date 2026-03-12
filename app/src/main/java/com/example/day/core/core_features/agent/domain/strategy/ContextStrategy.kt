@@ -16,7 +16,6 @@ interface ContextStrategy {
      * @param userPrompt не обязан присутствовать, можно дернуть llm и без него
      */
     suspend fun process(
-        chat: ChatSettings,
         agent: AgentConfig,
         store: AgentContextRepository
     ): ContextSnapshot
@@ -33,7 +32,6 @@ interface ContextStrategy {
      * @param fullContext Полная история сообщений (включая tool calls).
      */
     suspend fun afterResponse(
-        chat: ChatSettings,
         agent: AgentConfig,
         response: String,
         store: AgentContextRepository,

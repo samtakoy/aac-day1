@@ -49,7 +49,8 @@ data class McpTool(
 
 /** Optional context passed to MCP tool calls */
 data class McpToolCallContext(
-    val agentId: Long? = null
+    val agentId: Long? = null,
+    val chatId: Long? = null
 )
 
 /** Connection lifecycle */

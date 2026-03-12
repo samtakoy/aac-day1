@@ -20,6 +20,10 @@ object GitHubToolNames {
     const val GET_USER = "get_user"
     const val CREATE_ISSUE = "create_issue"
     const val CREATE_COMMENT = "create_comment"
+    // Day 19: Git file investigation
+    const val GET_GIT_FILE_LIST = "get_git_file_list"
+    const val GET_FILE_CONTENT = "get_file_content"
+    const val RESET_GIT_FILE_LIST_CACHE = "reset_git_file_list_cache"
 }
 
 object GitHubToolDefaults {
@@ -36,6 +40,10 @@ fun registerMcpTools(server: Server, api: GitHubApiClient) {
     registerGetUser(server, api)
     registerCreateIssue(server, api)
     registerCreateComment(server, api)
+    // Day 19: Git file investigation tools
+    registerGetGitFileList(server, api)
+    registerGetFileContent(server, api)
+    registerResetGitFileListCache(server, api)
 }
 
 private fun registerEcho(server: Server) {
@@ -237,5 +245,94 @@ private fun registerCreateComment(server: Server, api: GitHubApiClient) {
             body = body
         )
         CallToolResult(content = listOf(TextContent(text = text)))
+    }
+}
+
+private fun registerGetGitFileList(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.GET_GIT_FILE_LIST,
+        description = "Получает список всех полных имён файлов из git репозитория. " +
+            "Возвращает массив путей в формате /path/to/file.ext. " +
+            "owner и repo берутся из переменных окружения.",
+        inputSchema = ToolSchema(properties = buildJsonObject {})
+    ) { _ ->
+        api.listAllFiles().fold(
+            onSuccess = { fileList ->
+                val responseJson = buildJsonObject {
+                    put("status", JsonPrimitive("ok"))
+                    put("content", JsonArray(fileList.map { JsonPrimitive(it) }))
+                }
+                CallToolResult(content = listOf(TextContent(text = responseJson.toString())))
+            },
+            onFailure = { error ->
+                val responseJson = buildJsonObject {
+                    put("status", JsonPrimitive("error"))
+                    put("content", JsonArray(emptyList()))
+                    put("error", JsonPrimitive(error.message ?: "Unknown error"))
+                }
+                CallToolResult(
+                    content = listOf(TextContent(text = responseJson.toString())),
+                    isError = true
+                )
+            }
+        )
+    }
+}
+
+private fun registerGetFileContent(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.GET_FILE_CONTENT,
+        description = "Скачивает содержимое файла из git репозитория по полному пути.",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("file_path", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Полный путь к файлу (например /path/to/file.kt)"))
+                })
+            },
+            required = listOf("file_path")
+        )
+    ) { request ->
+        val filePath = request.arguments?.get("file_path")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "file_path is required")),
+                isError = true
+            )
+        api.getFileContent(filePath).fold(
+            onSuccess = { content ->
+                val responseJson = buildJsonObject {
+                    put("status", JsonPrimitive("ok"))
+                    put("content", JsonPrimitive(content))
+                }
+                CallToolResult(content = listOf(TextContent(text = responseJson.toString())))
+            },
+            onFailure = { error ->
+                val responseJson = buildJsonObject {
+                    put("status", JsonPrimitive("error"))
+                    put("error", JsonPrimitive(error.message ?: "Unknown error"))
+                }
+                CallToolResult(
+                    content = listOf(TextContent(text = responseJson.toString())),
+                    isError = true
+                )
+            }
+        )
+    }
+}
+
+private fun registerResetGitFileListCache(server: Server, @Suppress("UNUSED_PARAMETER") api: GitHubApiClient) {
+    // Кеш живёт на стороне приложения (GitFileCacheRepository).
+    // Этот tool служит сигналом для приложения сбросить кеш.
+    // Само по себе просто возвращает ok — логика сброса на стороне app.
+    server.addTool(
+        name = GitHubToolNames.RESET_GIT_FILE_LIST_CACHE,
+        description = "Сбрасывает кеш списка файлов git. Используйте для принудительного обновления.",
+        inputSchema = ToolSchema(properties = buildJsonObject {})
+    ) { _ ->
+        val responseJson = buildJsonObject {
+            put("status", JsonPrimitive("ok"))
+            put("content", JsonArray(emptyList()))
+        }
+        CallToolResult(content = listOf(TextContent(text = responseJson.toString())))
     }
 }

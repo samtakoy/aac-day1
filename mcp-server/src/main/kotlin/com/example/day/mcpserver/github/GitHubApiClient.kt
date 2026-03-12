@@ -25,7 +25,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.util.Base64
 
 class GitHubApiClient(
     private val baseUrl: String,
@@ -122,6 +125,54 @@ class GitHubApiClient(
             setBody(buildJsonObject { put("body", JsonPrimitive(body)) })
         }
         return response.body()
+    }
+
+    /**
+     * Получает список всех файлов в репозитории через GitHub Tree API (рекурсивно).
+     * Возвращает пути в формате /path/to/file.ext
+     */
+    suspend fun listAllFiles(): Result<List<String>> = runCatching {
+        val (resolvedOwner, resolvedRepo) = resolveRepo(null, null)
+
+        // Получаем SHA default branch через repo info
+        val repoInfo = client.get("/repos/$resolvedOwner/$resolvedRepo")
+            .body<JsonObject>()
+        val defaultBranch = repoInfo["default_branch"]?.jsonPrimitive?.content ?: "main"
+
+        // Запрашиваем дерево файлов рекурсивно
+        val treeResponse = client.get(
+            "/repos/$resolvedOwner/$resolvedRepo/git/trees/$defaultBranch?recursive=1"
+        ).body<JsonObject>()
+
+        val tree = treeResponse["tree"]?.jsonArray
+            ?: error("Invalid tree response: missing 'tree' field")
+
+        tree.mapNotNull { element ->
+            val obj = element.jsonObject
+            val type = obj["type"]?.jsonPrimitive?.content
+            val path = obj["path"]?.jsonPrimitive?.content
+            if (type == "blob" && path != null) "/$path" else null
+        }
+    }
+
+    /**
+     * Скачивает содержимое файла по полному пути.
+     * GitHub возвращает содержимое в base64, метод декодирует его.
+     */
+    suspend fun getFileContent(filePath: String): Result<String> = runCatching {
+        val (resolvedOwner, resolvedRepo) = resolveRepo(null, null)
+        val cleanPath = filePath.trimStart('/')
+
+        val response = client.get(
+            "/repos/$resolvedOwner/$resolvedRepo/contents/$cleanPath"
+        ).body<JsonObject>()
+
+        val contentBase64 = response["content"]?.jsonPrimitive?.content
+            ?: error("No 'content' field in response for $filePath")
+
+        // GitHub добавляет переносы строк в base64 — убираем их
+        val cleanBase64 = contentBase64.replace("\n", "").replace("\r", "")
+        String(Base64.getDecoder().decode(cleanBase64), Charsets.UTF_8)
     }
 
     private fun resolveRepo(owner: String?, repo: String?): Pair<String, String> {
