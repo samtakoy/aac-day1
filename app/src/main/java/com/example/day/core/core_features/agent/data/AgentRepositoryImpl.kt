@@ -82,9 +82,18 @@ internal class AgentRepositoryImpl @Inject constructor(
     }
     
     override suspend fun deleteAgent(agentId: Long) {
+        agentContextRepository.clearAgentContext(agentId)
         agentDao.deleteById(agentId)
     }
-    
+
+    override suspend fun deleteAgent(systemName: String, chatId: Long) {
+        val existingAgent = agentToChatDao.getAgentBySystemNameAndChatId(systemName, chatId)
+        existingAgent?.let {
+            agentContextRepository.clearAgentContext(existingAgent.agent.id)
+            agentDao.deleteById(existingAgent.agent.id)
+        }
+    }
+
     override suspend fun getAgentById(agentId: Long): AgentConfig? {
         return agentDao.getByIdWithMemories(agentId)?.let(agentMapper::toDomain)
     }

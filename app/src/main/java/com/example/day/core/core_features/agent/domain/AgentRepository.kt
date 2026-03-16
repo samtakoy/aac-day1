@@ -38,7 +38,9 @@ interface AgentRepository {
      * Delete an agent by id
      */
     suspend fun deleteAgent(agentId: Long)
-    
+
+    suspend fun deleteAgent(systemName: String, chatId: Long)
+
     /**
      * Get agent by id
      */

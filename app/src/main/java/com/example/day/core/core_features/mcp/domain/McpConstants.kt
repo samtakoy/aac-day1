@@ -21,6 +21,7 @@ object McpToolNames {
     const val GET_FILE_CONTENT = "get_file_content"
     const val RESET_GIT_FILE_LIST_CACHE = "reset_git_file_list_cache"
 
+    // TODO это как тут оказалось? это инструменты сервера, мы не должны их хардкодить
     val ALLOWED_TOOL_NAMES = setOf(
         GET_ISSUE,
         LIST_ISSUES,

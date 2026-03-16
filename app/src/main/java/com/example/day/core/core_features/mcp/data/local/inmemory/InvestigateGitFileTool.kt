@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.mcp.data.local.inmemory
 
+import android.util.Log
 import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.agent.domain.workers.concrete.JustWorkConfig
@@ -8,10 +9,12 @@ import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.mcp.domain.McpToolNames
 import com.example.day.core.core_features.mcp.domain.model.McpToolCallContext
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
@@ -60,9 +63,13 @@ internal class InvestigateGitFileTool @Inject constructor(
         val fileRequestMessage = arguments["file_request_message"]?.jsonPrimitive?.content
             ?: return Result.failure(IllegalArgumentException("file_request_message is required"))
 
+        Log.d("ktor", "[$TOOL_NAME] call started: request='$fileRequestMessage', chatId=${context?.chatId}, agentId=${context?.agentId}")
+
         val chatId = context?.chatId
             ?: resolveChatId(context?.agentId)
             ?: return Result.failure(IllegalStateException("chatId is required in context"))
+
+        Log.d("ktor", "[$TOOL_NAME] creating agent '$AGENT_NAME' for chatId=$chatId")
 
         val config = JustWorkConfig(
             agentName = AGENT_NAME,
@@ -72,22 +79,32 @@ internal class InvestigateGitFileTool @Inject constructor(
                 McpToolNames.GET_GIT_FILE_LIST,
                 McpToolNames.GET_FILE_ANALYSIS
             ),
-            defaultModel = { ModelSettings.default() },
-            defaultContext = { AContextDefaultFactory.createFull() }
+            defaultModel = { ModelSettings.default().copy(jsonFormat = true) },
+            defaultContext = { AContextDefaultFactory.createFull() },
+            recreateAgent = true
         )
 
         return justWorkWorker.doWork(
             config = config,
             userPrompt = "Мне нужен результат анализа файла. $fileRequestMessage"
         ).mapCatching { responseText ->
-            buildJsonObject {
-                put("content", JsonPrimitive(responseText))
-            }.toString()
-        }.recoverCatching { e ->
-            buildJsonObject {
-                put("content", JsonPrimitive(null as String?))
-                put("error", JsonPrimitive(e.message ?: "Unknown error"))
-            }.toString()
+            Log.d("ktor", "[$TOOL_NAME] agent raw response: $responseText")
+            // Агент возвращает JSON {"message":"...","content":"..."} — пропускаем как есть.
+            // Если ответ невалидный JSON — оборачиваем в наш формат как запасной вариант.
+            runCatching {
+                Json.parseToJsonElement(responseText.trim()).jsonObject
+                responseText.trim()
+            }.getOrElse { e ->
+                Log.d("ktor", "[$TOOL_NAME] agent response is not valid JSON, wrapping: ${e.message}")
+                buildJsonObject {
+                    put("message", JsonPrimitive("Результат получен"))
+                    put("content", JsonPrimitive(responseText))
+                }.toString()
+            }.also { result ->
+                Log.d("ktor", "[$TOOL_NAME] final result: $result")
+            }
+        }.onFailure { e ->
+            Log.d("ktor", "[$TOOL_NAME] doWork error: ${e.message}")
         }
     }
 
@@ -97,13 +114,44 @@ internal class InvestigateGitFileTool @Inject constructor(
     }
 
     private fun buildSystemPrompt(): String =
-        """Тебе доступны инструменты:
-- get_git_file_list для получения списка файлов
-- get_file_analysis для получения анализа по файлу
+        """
+== ЗАДАЧА ==
+По описанию пользователя найти файл в git, запросить его анализ и результат выдать пользователю.
+Если точного совпадения не найдено - покажи пользователю наиболее подходящие имена.
 
+== АЛГОРИТМ РАБОТЫ ==
 Действуй строго последовательно и прямолинейно:
-1. Получи список файлов с помощью get_git_file_list
-2. Найди в списке файл (включая полный путь) наиболее подходящий под описание пользователя
-3. Используй get_file_analysis для получения анализа по файлу
-4. Скажи пользователю полное имя файла и текст полученного анализа"""
+1. Получи список файлов с помощью одного доступных инструментов с git
+2. Найди в списке файл (включая полный путь) наиболее подходящий под описание пользователя.
+4. Если точное совпадение не найдено - выдай в content список наиболее подходящих файлов, свой комментарий в message и закончи работу.
+5. Если файл идентифицирован в списке, то используй инструменты и получени анализ по файлу
+6. Скажи пользователю полное имя файла в поле message и текст полученного анализа в поле content 
+
+== ФОРМАТ ОТВЕТА ==
+Весь ответ — это ОДИН валидный JSON-объект, без markdown, без пояснений до/после.
+Ты должен отвечать строго ТОЛЬКО в формате JSON:
+{
+    "message": "твое сообщение, описывающее результат работы",
+    "content": "Анализ файла, либо список имен наиболее подходящих файлов"
+}
+Текст message - формальный и сухой.
+
+Пример 1:
+{
+    "message": "Вот полный анализ файла [имя файла] по вашему запросу",
+    "content": "[Текст анализа файла]"
+}
+
+Пример 2:
+{
+    "message": "Подходящего по имени файла не найдено, вот несколько похожих вариантов",
+    "content": "[список полных имен файлов через запятую]"
+}
+
+Пример 3:
+{
+    "message": "Не найдено подходящего инструмента для выполнения вашего запроса",
+    "content": "null"
+}
+"""
 }

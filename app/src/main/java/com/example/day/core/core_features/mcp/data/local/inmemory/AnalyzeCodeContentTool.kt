@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.mcp.data.local.inmemory
 
+import android.util.Log
 import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.agent.domain.workers.concrete.JustWorkConfig
@@ -48,9 +49,13 @@ internal class AnalyzeCodeContentTool @Inject constructor(
         val content = arguments["content"]?.jsonPrimitive?.content
             ?: return Result.failure(IllegalArgumentException("content is required"))
 
+        Log.d("ktor", "[$TOOL_NAME] call started: contentLength=${content.length}, chatId=${context?.chatId}, agentId=${context?.agentId}")
+
         val chatId = context?.chatId
             ?: resolveChatId(context?.agentId)
             ?: return Result.failure(IllegalStateException("chatId is required in context"))
+
+        Log.d("ktor", "[$TOOL_NAME] creating agent '$AGENT_NAME' for chatId=$chatId")
 
         val config = JustWorkConfig(
             agentName = AGENT_NAME,
@@ -58,22 +63,23 @@ internal class AnalyzeCodeContentTool @Inject constructor(
             systemPrompt = buildSystemPrompt(),
             allowedTools = emptyList(),
             defaultModel = { ModelSettings.default() },
-            defaultContext = { AContextDefaultFactory.createFull() }
+            defaultContext = { AContextDefaultFactory.createFull() },
+            recreateAgent = true
         )
 
         return justWorkWorker.doWork(
             config = config,
             userPrompt = "Проанализируй пожалуйста это:\n$content"
         ).mapCatching { responseText ->
+            Log.d("ktor", "[$TOOL_NAME] agent response length=${responseText.length}")
             buildJsonObject {
-                put("status", JsonPrimitive("ok"))
-                put("analysis_result", JsonPrimitive(responseText))
-            }.toString()
-        }.recoverCatching { e ->
-            buildJsonObject {
-                put("status", JsonPrimitive("error"))
-                put("error", JsonPrimitive(e.message ?: "Unknown error"))
-            }.toString()
+                put("message", JsonPrimitive("Анализ содержимого выполнен успешно"))
+                put("content", JsonPrimitive(responseText))
+            }.toString().also { result ->
+                Log.d("ktor", "[$TOOL_NAME] result: $result")
+            }
+        }.onFailure { e ->
+            Log.d("ktor", "[$TOOL_NAME] doWork error: ${e.message}")
         }
     }
 
@@ -84,5 +90,6 @@ internal class AnalyzeCodeContentTool @Inject constructor(
 
     private fun buildSystemPrompt(): String =
         """Ты Kotlin Senior Developer, с многолетним опытом разработки и построения больших, но понятных и расширяемых систем; фанат Clean Architecture, SOLID, Design Patterns и best coding practicles.
-Твоя задача проанализировать текст, который тебе принес пользователь. Выдать какое-то резюме: короткое описание содержимого, что хорошо, что плохо, рекомендации."""
+Твоя задача проанализировать текст, который тебе принес пользователь. Выдать какое-то резюме: короткое описание содержимого, что хорошо, что плохо, рекомендации.
+"""
 }

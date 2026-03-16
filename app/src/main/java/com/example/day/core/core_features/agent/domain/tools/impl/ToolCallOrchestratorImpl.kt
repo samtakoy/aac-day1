@@ -209,16 +209,10 @@ class ToolCallOrchestratorImpl @Inject constructor(
                 )
             )
 
-            // Остановка при ошибке любого из инструментов
+            // При ошибке инструмента — НЕ прерываем цикл досрочно.
+            // Следующая итерация даёт LLM возможность сформировать финальный ответ с объяснением ошибки.
             if (hasError) {
-                Log.w(TAG, "Tool loop: ошибка инструмента, прерываем (итерация $loopIndex)")
-                return Result.success(
-                    ToolCallingResult(
-                        finalResponseText = llmResult.getContent(),
-                        toolCallSessions = sessions,
-                        allMessages = newMessages.toAContextMessages()  // ← ТОЛЬКО новые сообщения
-                    )
-                )
+                Log.w(TAG, "Tool loop: ошибка инструмента на итерации $loopIndex, продолжаем для получения финального ответа")
             }
 
             loopIndex++

@@ -20,5 +20,6 @@ data class JustWorkConfig(
     val systemPrompt: String,
     val allowedTools: List<String>,
     val defaultModel: () -> ModelSettings,
-    val defaultContext: () -> AContext
+    val defaultContext: () -> AContext,
+    val recreateAgent: Boolean
 )

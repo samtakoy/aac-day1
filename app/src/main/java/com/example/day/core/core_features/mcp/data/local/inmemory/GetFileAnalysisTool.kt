@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.mcp.data.local.inmemory
 
+import android.util.Log
 import com.example.day.core.core_features.mcp.domain.McpLocalConstants
 import com.example.day.core.core_features.mcp.domain.McpToolNames
 import com.example.day.core.core_features.mcp.domain.model.McpConnectionState
@@ -43,15 +44,16 @@ internal class GetFileAnalysisTool @Inject constructor(
     override val name: String = TOOL_NAME
 
     override val description: String =
-        "Получает анализ по полному имени файла из git репозитория. " +
-            "Результат кешируется для повторных запросов."
+        "Получает анализ файла по его точному полному пути (например /app/src/main/java/com/example/File.kt). " +
+            "ВАЖНО: требует точный полный путь — не имя файла. " +
+            "Если известно только имя файла, сначала вызови get_git_file_list чтобы найти полный путь."
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", JsonPrimitive("object"))
         put("properties", buildJsonObject {
             put("file_full_path", buildJsonObject {
                 put("type", JsonPrimitive("string"))
-                put("description", JsonPrimitive("Полный путь к файлу (например /path/to/file.kt)"))
+                put("description", JsonPrimitive("Точный полный путь к файлу (например /app/src/main/java/com/example/File.kt). Не имя файла — полный путь."))
             })
         })
         put("required", JsonArray(listOf(JsonPrimitive("file_full_path"))))
@@ -64,38 +66,39 @@ internal class GetFileAnalysisTool @Inject constructor(
         val filePath = arguments["file_full_path"]?.jsonPrimitive?.content
             ?: error("file_full_path is required")
 
+        Log.d("ktor", "[$TOOL_NAME] call started: filePath='$filePath', chatId=${context?.chatId}")
+
         // 1. Проверяем кеш
         val cached = fileAnalysisRepository.getAnalysis(filePath)
         if (cached != null) {
+            Log.d("ktor", "[$TOOL_NAME] cache hit for '$filePath'")
             return@runCatching buildJsonObject {
-                put("status", JsonPrimitive("ok"))
-                put("file_full_path", JsonPrimitive(filePath))
+                put("message", JsonPrimitive("Анализ файла $filePath получен из кеша"))
                 put("content", JsonPrimitive(cached.content))
             }.toString()
         }
 
+        Log.d("ktor", "[$TOOL_NAME] cache miss, downloading content for '$filePath'")
+
         // 2. Скачиваем содержимое файла через remote MCP tool get_file_content
         val fileContent = downloadFileContent(filePath, context)
+        Log.d("ktor", "[$TOOL_NAME] downloaded content for '$filePath', length=${fileContent.length}")
 
         // 3. Анализируем через local MCP tool analyze_code_content
+        Log.d("ktor", "[$TOOL_NAME] calling analyze_code_content for '$filePath'")
         val analysisResult = analyzeContent(fileContent, context)
+        Log.d("ktor", "[$TOOL_NAME] analysis done for '$filePath', resultLength=${analysisResult.length}")
 
         // 4. Сохраняем в кеш
         fileAnalysisRepository.saveAnalysis(filePath, analysisResult)
 
         buildJsonObject {
-            put("status", JsonPrimitive("ok"))
-            put("file_full_path", JsonPrimitive(filePath))
+            put("message", JsonPrimitive("Анализ файла $filePath выполнен успешно"))
             put("content", JsonPrimitive(analysisResult))
         }.toString()
-    }.recoverCatching { e ->
-        buildJsonObject {
-            put("status", JsonPrimitive("error"))
-            put("file_full_path", JsonPrimitive(
-                arguments["file_full_path"]?.jsonPrimitive?.content ?: ""
-            ))
-            put("error_text", JsonPrimitive(e.message ?: "Unknown error"))
-        }.toString()
+    }.onFailure { e ->
+        val filePath = arguments["file_full_path"]?.jsonPrimitive?.content ?: ""
+        Log.d("ktor", "[$TOOL_NAME] error for '$filePath': ${e.message}")
     }
 
     private suspend fun downloadFileContent(filePath: String, context: McpToolCallContext?): String {
@@ -126,12 +129,12 @@ internal class GetFileAnalysisTool @Inject constructor(
             context = context
         ).getOrElse { e -> error("Failed to analyze content: ${e.message}") }
 
-        // Парсим ответ: {"status":"ok","analysis_result":"...","error":"..."}
+        // Парсим ответ: {"message":"...","content":"..."}
         val responseObj = runCatching {
             json.parseToJsonElement(resultJson).jsonObject
         }.getOrNull()
 
-        return responseObj?.get("analysis_result")?.jsonPrimitive?.content
+        return responseObj?.get("content")?.jsonPrimitive?.content
             ?: resultJson  // fallback
     }
 

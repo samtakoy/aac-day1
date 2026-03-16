@@ -1,6 +1,7 @@
 package com.example.day.core.core_features.agent.domain.workers.concrete
 
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
+import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
@@ -35,6 +36,7 @@ class JustWorkWorker @Inject constructor(
     private val aiAgentFactory: AIAgentFactory,
     private val chatTools: ChatTools,
     private val agentMemoryRepository: AgentMemoryRepository,
+    private val agentRepository: AgentRepository,
     private val json: Json
 ) {
 
@@ -55,6 +57,15 @@ class JustWorkWorker @Inject constructor(
         userRole: AContextMessage.Role = AContextMessage.Role.USER,
         onEvent: (suspend (WorkerEvent) -> Unit)? = null
     ): Result<String> {
+        if (config.recreateAgent) {
+            // TODO пока так, но нужно переделать на очистку историй сообщений агента
+            //  Пока он используется с чистой историей на старте
+            agentRepository.deleteAgent(
+                systemName = config.agentName,
+                chatId = config.chatId
+            )
+        }
+
         val agent = aiAgentFactory.getOrCreate(
             systemName = config.agentName,
             chatId = config.chatId,

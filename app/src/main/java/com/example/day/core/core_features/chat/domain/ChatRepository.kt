@@ -10,6 +10,11 @@ import com.example.day.core.core_features.chat.domain.model.User
 import com.example.day.core.core_features.chat.domain.model.UserType
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * TODO при удалении группы чатов - надо удалять и все его данные и чаты
+ *  при удалении чата - надо удалять все сопутствующие данные и привязанных агентов
+ *  при удалении агента - очищать все что с ним связано
+ * */
 interface ChatRepository {
     // Existing chat methods
     suspend fun createChat(title: String, chatGroupId: Long): Long
