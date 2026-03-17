@@ -33,7 +33,6 @@ class ToolCallOrchestratorImpl @Inject constructor(
     private companion object {
         private const val TAG = "ToolCallOrchestrator(ktor)"
         private const val MAX_TOOL_LOOPS = 3
-        private var maxToolCalls = 10 // защита от спама на время дебага
     }
 
     override suspend fun execute(
@@ -68,7 +67,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
         var loopIndex = 0
         var lastLlmResult: ModelResult.Success? = null
 
-        while (loopIndex < MAX_TOOL_LOOPS && maxToolCalls > 0) {
+        while (loopIndex < MAX_TOOL_LOOPS) {
             // 1. Запрос к LLM
             val llmResult = llmProvider.askLlm(
                 model = modelSettings,
@@ -133,8 +132,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
                     )
                 )
 
-                maxToolCalls--
-                Log.e(TAG, "tool call ${call.function}, ${call.id}, rest maxToolCalls: $maxToolCalls")
+                Log.d(TAG, "tool call ${call.function}, ${call.id}")
                 // 4.2. Выполняем инструмент — используем ModelResult.Success.ToolCall
                 val toolResult = toolProvider.executeToolCall(call, context)
                 val content = toolResult.getOrElse { error ->
@@ -156,23 +154,6 @@ class ToolCallOrchestratorImpl @Inject constructor(
                         isError = toolResult.isFailure
                     )
                 )
-                if (toolResult.isFailure) {
-                    toolMessages.add(
-                        ModelRequest.Message(
-                            role = ModelRequest.Role.Assistant,
-                            // content = "Я попытался использовать вызов ${call.function}, но это закончилось  неудачей. Теперь отчитаюсь пользователю."
-                            content = "Хм, вызов ${call.function.name} закончился  неудачей. Может получится позже. Теперь отчитаюсь пользователю."
-                        )
-                    )
-                } else {
-                    toolMessages.add(
-                        ModelRequest.Message(
-                            role = ModelRequest.Role.Assistant,
-                            content = "Я успешно использовал вызов ${call.function.name}. Сообщу пользователю на его человеческом языке."
-                        )
-                    )
-                }
-
                 // 4.4. Уведомляем о завершении вызова
                 onEvent?.invoke(
                     WorkerEvent.ToolCallFinished(

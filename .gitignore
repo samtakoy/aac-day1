@@ -45,3 +45,5 @@ google-services.json
 # Android Profiling
 *.hprof
 /mcp-server/build/
+/rag-server/build/
+/rag-server/rag_index.db

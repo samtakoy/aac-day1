@@ -23,6 +23,9 @@ object McpToolNames {
 
     // TODO это как тут оказалось? это инструменты сервера, мы не должны их хардкодить
     val ALLOWED_TOOL_NAMES = setOf(
+        "search_codebase",
+        "search_codebase_fixed"
+        /*
         GET_ISSUE,
         LIST_ISSUES,
         GET_ISSUE_COMMENTS,
@@ -35,7 +38,7 @@ object McpToolNames {
         ANALYZE_CODE_CONTENT,
         GET_GIT_FILE_LIST,
         GET_FILE_CONTENT,
-        RESET_GIT_FILE_LIST_CACHE
+        RESET_GIT_FILE_LIST_CACHE*/
     )
 }
 
