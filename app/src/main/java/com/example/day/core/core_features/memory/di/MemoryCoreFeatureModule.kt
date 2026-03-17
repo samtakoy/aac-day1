@@ -7,7 +7,9 @@ import com.example.day.core.core_features.memory.data.local.dao.LongTermMemoryDa
 import com.example.day.core.core_features.memory.data.repository.ArtifactRepositoryImpl
 import com.example.day.core.core_features.memory.data.repository.LTMGroupRepositoryImpl
 import com.example.day.core.core_features.memory.data.repository.LongTermMemoryRepositoryImpl
+import com.example.day.core.core_features.memory.data.repository.RagSearchRepositoryImpl
 import com.example.day.core.core_features.memory.data.repository.UserProfileRepositoryImpl
+import com.example.day.core.core_features.memory.domain.provider.rag.RagSearchRepository
 import com.example.day.core.core_features.memory.domain.repository.ArtifactRepository
 import com.example.day.core.core_features.memory.domain.repository.LTMGroupRepository
 import com.example.day.core.core_features.memory.domain.repository.LongTermMemoryRepository
@@ -29,6 +31,9 @@ internal interface MemoryCoreFeatureModule {
 
     @Binds
     fun bindsUserProfileRepository(impl: UserProfileRepositoryImpl): UserProfileRepository
+
+    @Binds
+    fun bindsRagSearchRepository(impl: RagSearchRepositoryImpl): RagSearchRepository
 
     companion object {
         @Provides

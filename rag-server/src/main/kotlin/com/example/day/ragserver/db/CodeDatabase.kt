@@ -1,5 +1,7 @@
 package com.example.day.ragserver.db
 
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -12,6 +14,7 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.api.ExposedBlob
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.nio.ByteBuffer
+import java.time.Instant
 
 object CodeChunksTable : Table("code_chunks") {
     val id = long("id").autoIncrement()
@@ -33,12 +36,39 @@ object CodeVectorsTable : Table("code_vectors") {
     override val primaryKey = PrimaryKey(chunkId)
 }
 
+object ClassMetadataTable : Table("class_metadata") {
+    val id = long("id").autoIncrement()
+    val className = varchar("class_name", 200)
+    val filePath = text("file_path")
+    val metadataJson = text("metadata_json")
+    val indexedAt = varchar("indexed_at", 50)
+    override val primaryKey = PrimaryKey(id)
+}
+
+// Векторы эмбеддингов для поля responsibility каждого класса.
+// Хранятся отдельно от текстовых метаданных — разные жизненные циклы:
+// метаданные генерирует LLM, векторы — embedding-модель.
+// Это позволяет пересчитывать только векторы при смене embedding-модели,
+// не затрагивая дорогостоящую LLM-генерацию.
+object ClassMetadataVectorsTable : Table("class_metadata_vectors") {
+    val className = varchar("class_name", 255)
+    val vector = blob("vector")
+    override val primaryKey = PrimaryKey(className)
+}
+
 class CodeDatabase(private val dbPath: String) {
+
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     fun connect() {
         Database.connect("jdbc:sqlite:$dbPath", driver = "org.sqlite.JDBC")
         transaction {
-            SchemaUtils.createMissingTablesAndColumns(CodeChunksTable, CodeVectorsTable)
+            SchemaUtils.createMissingTablesAndColumns(
+                CodeChunksTable,
+                CodeVectorsTable,
+                ClassMetadataTable,
+                ClassMetadataVectorsTable,
+            )
         }
         println("CodeDatabase connected: $dbPath")
     }
@@ -103,6 +133,62 @@ class CodeDatabase(private val dbPath: String) {
                 entity to vector
             }
     }
+
+    // --- Методы для текстовых метаданных классов ---
+
+    fun hasClassMetadata(className: String): Boolean = transaction {
+        ClassMetadataTable.selectAll()
+            .where { ClassMetadataTable.className eq className }
+            .count() > 0
+    }
+
+    fun saveClassMetadata(metadata: ClassMetadata, filePath: String) = transaction {
+        ClassMetadataTable.deleteWhere { className eq metadata.className }
+        ClassMetadataTable.insert {
+            it[className] = metadata.className
+            it[ClassMetadataTable.filePath] = filePath
+            it[metadataJson] = Json.encodeToString(metadata)
+            it[indexedAt] = Instant.now().toString()
+        }
+    }
+
+    fun getClassMetadata(name: String): ClassMetadata? = transaction {
+        ClassMetadataTable.selectAll()
+            .where { ClassMetadataTable.className eq name }
+            .firstOrNull()
+            ?.let { json.decodeFromString<ClassMetadata>(it[ClassMetadataTable.metadataJson]) }
+    }
+
+    fun getAllClassMetadata(): List<ClassMetadata> = transaction {
+        ClassMetadataTable.selectAll()
+            .map { json.decodeFromString<ClassMetadata>(it[ClassMetadataTable.metadataJson]) }
+    }
+
+    // --- Методы для векторов метаданных (Stage 1 поиска) ---
+
+    fun hasMetadataVector(className: String): Boolean = transaction {
+        ClassMetadataVectorsTable.selectAll()
+            .where { ClassMetadataVectorsTable.className eq className }
+            .count() > 0
+    }
+
+    fun saveMetadataVector(className: String, vector: FloatArray) = transaction {
+        ClassMetadataVectorsTable.deleteWhere { ClassMetadataVectorsTable.className eq className }
+        ClassMetadataVectorsTable.insert {
+            it[ClassMetadataVectorsTable.className] = className
+            it[ClassMetadataVectorsTable.vector] = ExposedBlob(vector.toByteArray())
+        }
+    }
+
+    fun getAllMetadataVectors(): List<Pair<String, FloatArray>> = transaction {
+        ClassMetadataVectorsTable.selectAll().map { row ->
+            val name = row[ClassMetadataVectorsTable.className]
+            val vector = row[ClassMetadataVectorsTable.vector].bytes.toFloatArray2()
+            name to vector
+        }
+    }
+
+    // --- Статистика ---
 
     fun getStats(): IndexStats {
         val total = transaction { CodeChunksTable.selectAll().count().toInt() }

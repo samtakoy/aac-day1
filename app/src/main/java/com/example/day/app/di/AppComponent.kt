@@ -46,6 +46,7 @@ import javax.inject.Singleton
 @Immutable
 interface AppComponent : FeatureEntryProvider, ConsoleFeatureDeps, ChatsFeatureDeps,
     GroupChoiceFeatureDeps, UserSettingsFeatureDeps, McpSettingsFeatureDeps {
+    // TODO ого какая хрень
     fun executeReminderUseCase(): ExecuteReminderUseCase
 
     @Component.Factory

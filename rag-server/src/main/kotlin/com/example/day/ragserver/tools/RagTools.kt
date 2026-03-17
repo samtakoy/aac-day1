@@ -1,8 +1,12 @@
 package com.example.day.ragserver.tools
 
 import com.example.day.ragserver.db.CodeDatabase
-import com.example.day.ragserver.db.formatHeader
+import com.example.day.ragserver.embedding.EmbeddingProvider
+import com.example.day.ragserver.search.QueryTranslator
 import com.example.day.ragserver.search.SearchService
+import com.example.day.ragserver.search.TwoStageSearchService
+import com.example.day.ragserver.search.context.ContextFormatter
+import com.example.day.ragserver.search.context.ContextPacker
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
@@ -10,19 +14,37 @@ import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import org.slf4j.LoggerFactory
 
-fun registerRagTools(server: Server, searchService: SearchService, db: CodeDatabase, topK: Int) {
-    registerSearchCodebase(server, searchService, topK)
-    registerSearchCodebaseFixed(server, searchService, topK)
-    registerGetIndexStatus(server, db)
+private val log = LoggerFactory.getLogger("RagTools")
+
+fun registerRagTools(
+    server: Server,
+    searchService: SearchService,
+    db: CodeDatabase,
+    topK: Int,
+    embeddingProvider: EmbeddingProvider,
+    queryTranslator: QueryTranslator? = null,
+) {
+    val contextPacker = ContextPacker()
+    val twoStageSearchService = TwoStageSearchService(db, embeddingProvider)
+    //registerSearchCodebase(server, searchService, contextPacker, topK)
+    //registerSearchCodebaseFixed(server, searchService, topK)
+    registerSearchCodebaseSmart(server, twoStageSearchService, contextPacker, topK, queryTranslator)
+    //registerGetIndexStatus(server, db)
 }
 
-private fun registerSearchCodebase(server: Server, searchService: SearchService, topK: Int) {
+private fun registerSearchCodebase(
+    server: Server,
+    searchService: SearchService,
+    contextPacker: ContextPacker,
+    topK: Int,
+) {
     server.addTool(
         name = RagToolNames.SEARCH_CODEBASE,
         description = "Используй для поиска по внутренней кодовой базе Android-проекта: " +
             "архитектура, реализация классов, use cases, репозитории, DI-компоненты. " +
-            "Возвращает логически завершённые блоки кода (функции, классы). " +
+            "Возвращает логически завершённые блоки кода (функции, классы), сгруппированные по классам. " +
             "Передавай вопрос на естественном языке или название класса/метода.",
         inputSchema = ToolSchema(
             properties = buildJsonObject {
@@ -41,7 +63,7 @@ private fun registerSearchCodebase(server: Server, searchService: SearchService,
             isError = true
         )
 
-        val results = runBlocking { searchService.search(query, "structural", topK) }
+        val results = runBlocking { searchService.search(query, "structural", topK * 2) }
         if (results.isEmpty()) {
             return@addTool CallToolResult(
                 content = listOf(TextContent(
@@ -51,11 +73,8 @@ private fun registerSearchCodebase(server: Server, searchService: SearchService,
             )
         }
 
-        val separator = "\n${"=".repeat(60)}\n"
-        val text = results.mapIndexed { i, r ->
-            "[${i + 1}/${results.size}] ${r.chunk.formatHeader()} | score: ${"%.3f".format(r.score)}\n\n${r.chunk.content}"
-        }.joinToString(separator)
-
+        val packed = contextPacker.pack(results)
+        val text = ContextFormatter.format(packed)
         CallToolResult(content = listOf(TextContent(text = text)))
     }
 }
@@ -93,11 +112,58 @@ private fun registerSearchCodebaseFixed(server: Server, searchService: SearchSer
             )
         }
 
-        val separator = "\n${"=".repeat(60)}\n"
-        val text = results.mapIndexed { i, r ->
-            "[${i + 1}/${results.size}] ${r.chunk.formatHeader()} | score: ${"%.3f".format(r.score)}\n\n${r.chunk.content}"
-        }.joinToString(separator)
+        val text = ContextFormatter.formatFlat(results)
+        CallToolResult(content = listOf(TextContent(text = text)))
+    }
+}
 
+private fun registerSearchCodebaseSmart(
+    server: Server,
+    twoStageSearchService: TwoStageSearchService,
+    contextPacker: ContextPacker,
+    topK: Int,
+    queryTranslator: QueryTranslator? = null,
+) {
+    server.addTool(
+        name = RagToolNames.SEARCH_CODEBASE_SMART,
+        description = "Умный двухэтапный поиск по кодовой базе: " +
+                "архитектура, реализация классов, use cases, репозитории, DI-компоненты. " +
+                "Возвращает логически завершённые блоки кода (функции, классы), сгруппированные по классам. " +
+                "Передавай вопрос на естественном языке или название класса/метода.",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("query", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Концептуальный вопрос или описание фичи"))
+                })
+            },
+            required = listOf("query")
+        )
+    ) { request ->
+        val query = request.arguments?.get("query")?.let {
+            (it as? JsonPrimitive)?.content
+        } ?: return@addTool CallToolResult(
+            content = listOf(TextContent(text = "Параметр query обязателен")),
+            isError = true
+        )
+
+        log.info("[Search] >>> RAW QUERY: '{}' | translator: {}", query, if (queryTranslator != null) "enabled" else "disabled")
+
+        val results = runBlocking {
+            val searchQuery = queryTranslator?.translateIfNeeded(query) ?: query
+            if (searchQuery != query) log.info("[Search] Translated query: '{}'", searchQuery)
+            twoStageSearchService.search(searchQuery, topK * 2)
+        }
+        if (results.isEmpty()) {
+            return@addTool CallToolResult(
+                content = listOf(TextContent(
+                    text = "Ничего не найдено. Убедитесь что индекс метаданных создан (EXTRACT_METADATA=true)."
+                ))
+            )
+        }
+
+        val packed = contextPacker.pack(results)
+        val text = ContextFormatter.format(packed)
         CallToolResult(content = listOf(TextContent(text = text)))
     }
 }

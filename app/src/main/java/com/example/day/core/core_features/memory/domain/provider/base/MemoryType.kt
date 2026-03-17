@@ -13,4 +13,6 @@ enum class MemoryType(val dbName: String) {
     ChatGroup("chat_group"),
     /** Строгие правила диалога агента */
     AgentRules("agent_rules"),
+    /** Автоматическое обогащение промпта через RAG-сервер */
+    AutoRag("auto_rag"),
 }

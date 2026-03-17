@@ -46,12 +46,13 @@ class AIAgent(
     ): Result<AIAgentResult> {
         // 1. Получаем "знания" (LTM + Working Memory) в виде промптов
         val memoryMessages = memoryProvider.getMemoryContext()
+        val enrichedPrompt = memoryProvider.appendUserPrompt(prompt)
         val snapshot = strategy.process(config, contextRepository)
-        
+
         val result = orchestrator.execute(
             initialHistory = snapshot.messages.toModelRequestMessages(),
             memoryMessages = memoryMessages,  // ← НОВОЕ: только для LLM запроса
-            prompt = prompt,
+            prompt = enrichedPrompt,
             systemPrompt = config.systemPrompt,
             modelSettings = config.modelSettings,
             tools = toolProvider.getTools(agentId = config.id),
@@ -71,7 +72,7 @@ class AIAgent(
                 fullContext = extendedSnapshot
             )
 
-            val requestDebugInfo = buildRequestDebugInfo(config.systemPrompt, memoryMessages, prompt)
+            val requestDebugInfo = buildRequestDebugInfo(config.systemPrompt, memoryMessages, enrichedPrompt)
             AIAgentResult(toolCallingResult.finalResponseText, strategyResult.reportMessage, requestDebugInfo)
         }
     }

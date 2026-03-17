@@ -32,6 +32,10 @@ import javax.inject.Inject
  * - @@talk(agent --addrule "текст") - добавить новое правило диалога
  * - @@talk(agent --listrules) - вывести список всех правил диалога
  * - @@talk(agent --clearrules) - удалить все правила диалога
+ * - @@talk(rag --on) - включить RAG-обогащение промптов через rag-server
+ * - @@talk(rag --off) - выключить RAG
+ * - @@talk(rag --state) - показать статус RAG и URL сервера
+ * - @@talk(rag --url <url>) - задать URL rag-server (default: http://10.0.2.2:3001)
  * - @@talk <text> - send text to LLM
  */
 class TalkWorker @Inject constructor(

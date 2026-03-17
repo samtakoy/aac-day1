@@ -10,4 +10,7 @@ class CompositeMemoryProvider(
     override suspend fun getMemoryContext(): List<AContextMessage> {
         return providers.map { it.getMemoryContext() }.flatten()
     }
+
+    override suspend fun appendUserPrompt(prompt: AContextMessage): AContextMessage =
+        providers.fold(prompt) { acc, provider -> provider.appendUserPrompt(acc) }
 }

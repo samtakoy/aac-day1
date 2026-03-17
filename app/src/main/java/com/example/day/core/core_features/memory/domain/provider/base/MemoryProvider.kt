@@ -17,6 +17,13 @@ interface MemoryProvider {
      */
     // suspend fun getMemoryContext(params: MemoryParams): List<ChatMessage>
     suspend fun getMemoryContext(): List<AContextMessage>
+
+    /**
+     * Optionally enriches the user prompt before it is sent to the LLM.
+     * Default: returns [prompt] unchanged.
+     * Override to inject additional context (e.g. RAG results) into prompt content.
+     */
+    suspend fun appendUserPrompt(prompt: AContextMessage): AContextMessage = prompt
 }
 
 /*

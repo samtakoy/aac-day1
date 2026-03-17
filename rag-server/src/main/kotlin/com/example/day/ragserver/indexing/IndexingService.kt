@@ -7,7 +7,9 @@ import com.example.day.ragserver.embedding.EmbeddingProvider
 class IndexingService(
     private val db: CodeDatabase,
     private val embeddingProvider: EmbeddingProvider,
+    private val llmProvider: LlmProvider? = null,
 ) {
+    private val metadataExtractor = llmProvider?.let { MetadataExtractor(it) }
 
     suspend fun indexAll(scanner: FileScanner, config: RagConfig) {
         val files = scanner.scan(config.codePath)
@@ -17,6 +19,13 @@ class IndexingService(
         )
         for (strategy in strategies) {
             indexStrategy(strategy, files, config.forceReindex)
+        }
+
+        // Извлекаем метаданные если включено.
+        // Инкрементальная логика: пропускаем уже обработанные классы,
+        // принудительная перегенерация только при FORCE_REINDEX=true.
+        if (config.extractMetadata && metadataExtractor != null) {
+            extractMetadataForAll(files, config.forceReindex)
         }
     }
 
@@ -71,5 +80,57 @@ class IndexingService(
         }
 
         println("IndexingService: '$name' done — $chunkCount chunks saved, $errorCount errors")
+    }
+
+    private suspend fun extractMetadataForAll(files: List<java.io.File>, forceReindex: Boolean) {
+        val ktFiles = files.filter { it.name.endsWith(".kt") }
+        println("[Metadata] Starting extraction for ${ktFiles.size} Kotlin files...")
+
+        // Ollama обрабатывает generate-запросы последовательно —
+        // параллельные вызовы вызывают таймауты. Обрабатываем файлы по одному.
+        var totalProcessed = 0
+        var totalErrors = 0
+        for (file in ktFiles) {
+            val (p, e) = processFileMetadata(file, forceReindex)
+            totalProcessed += p
+            totalErrors += e
+        }
+        val totalSkipped = ktFiles.size - totalProcessed - totalErrors
+        println("[Metadata] Done — $totalProcessed extracted, $totalSkipped skipped, $totalErrors errors")
+    }
+
+    // Обрабатывает один файл: один LLM-запрос на файл, className = имя файла.
+    // Возвращает Pair(processed, errors). Skipped = файл не трогается (0, 0).
+    private suspend fun processFileMetadata(
+        file: java.io.File,
+        forceReindex: Boolean,
+    ): Pair<Int, Int> {
+        val className = file.nameWithoutExtension
+
+        if (!forceReindex && db.hasClassMetadata(className)) {
+            println("  [Metadata] Skipping '$className' — already indexed")
+            return 0 to 0
+        }
+
+        val content = try {
+            file.readText()
+        } catch (e: Exception) {
+            println("  [WARN] Cannot read ${file.name}: ${e.message}")
+            return 0 to 1
+        }
+
+        val metadata = metadataExtractor!!.extract(content, className)
+            ?: return 0 to 1
+
+        db.saveClassMetadata(metadata, file.absolutePath)
+
+        try {
+            val vector = embeddingProvider.embed(metadata.responsibility)
+            db.saveMetadataVector(metadata.className, vector)
+        } catch (e: Exception) {
+            println("  [WARN] Metadata vector failed for '$className': ${e.message}")
+        }
+
+        return 1 to 0
     }
 }

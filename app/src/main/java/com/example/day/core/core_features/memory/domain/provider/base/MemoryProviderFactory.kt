@@ -3,6 +3,7 @@ package com.example.day.core.core_features.memory.domain.provider.base
 import com.example.day.core.core_features.memory.domain.provider.AgentRulesMemoryProvider
 import com.example.day.core.core_features.memory.domain.provider.AgentSystemPromptMemoryProvider
 import com.example.day.core.core_features.memory.domain.provider.AgentToolsMemoryProvider
+import com.example.day.core.core_features.memory.domain.provider.AutoRagMemoryProvider
 import com.example.day.core.core_features.memory.domain.provider.CompositeMemoryProvider
 import com.example.day.core.core_features.memory.domain.provider.EmptyMemoryProvider
 import com.example.day.core.core_features.memory.domain.provider.ToolCallHelperMemoryProvider
@@ -14,7 +15,8 @@ class MemoryProviderFactory @Inject constructor(
     private val agentRulesMemoryProvider: AgentRulesMemoryProvider,
     private val toolCallHelperMemoryProvider: ToolCallHelperMemoryProvider,
     private val agentSystemPromptMemoryProvider: AgentSystemPromptMemoryProvider,
-    private val agentToolsMemoryProvider: AgentToolsMemoryProvider
+    private val agentToolsMemoryProvider: AgentToolsMemoryProvider,
+    private val autoRagMemoryProvider: AutoRagMemoryProvider
 ) {
     fun create(
         memoryTypes: List<MemoryType>,
@@ -50,6 +52,12 @@ class MemoryProviderFactory @Inject constructor(
                 agentId?.let {
                     agentRulesMemoryProvider.bindAgentId(it)
                     agentRulesMemoryProvider
+                }
+            }
+            MemoryType.AutoRag -> {
+                agentId?.let {
+                    autoRagMemoryProvider.bindAgentId(it)
+                    autoRagMemoryProvider
                 }
             }
         }

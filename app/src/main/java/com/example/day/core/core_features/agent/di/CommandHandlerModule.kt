@@ -7,6 +7,7 @@ import com.example.day.core.core_features.agent.domain.workers.branch.SwitchBran
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.AgentCommandHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.AgentMemoryCommandHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.CommandHandler
+import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.RagCommandHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.ContextCommandHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.InfoCommandHandler
 import com.example.day.core.core_features.agent.domain.workers.innercommand.handler.ProfileCommandHandler
@@ -72,4 +73,8 @@ abstract class CommandHandlerModule {
     @Binds
     @IntoSet
     abstract fun bindAgentHandler(handler: AgentCommandHandler): CommandHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindRagHandler(handler: RagCommandHandler): CommandHandler
 }

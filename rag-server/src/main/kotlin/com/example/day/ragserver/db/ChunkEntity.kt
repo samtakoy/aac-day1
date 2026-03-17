@@ -29,6 +29,15 @@ data class SearchResult(
     val score: Float,
 )
 
+data class ScoredChunk(
+    val chunk: ChunkEntity,
+    val embeddingScore: Double,
+    val keywordScore: Double,
+) {
+    val finalScore: Double
+        get() = 0.6 * embeddingScore + 0.4 * keywordScore
+}
+
 data class IndexStats(
     val totalChunks: Int,
     val structuralChunks: Int,
