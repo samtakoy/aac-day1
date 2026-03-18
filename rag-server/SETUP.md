@@ -1,9 +1,11 @@
 # RAG MCP Server — Инструкция по настройке и запуску
 
-Сервер индексирует Kotlin/Markdown файлы кодовой базы, генерирует эмбеддинги и предоставляет MCP-тулы для AI-агента:
+Сервер индексирует Kotlin/Markdown файлы кодовой базы, генерирует эмбеддинги и предоставляет:
+- **MCP-тулы** для AI-агента (search_codebase_smart и др.)
+- **HTTP REST API** для Android-приложения (`/search`, `/evaluate`)
 
 | Тул | Описание | Когда использовать |
-|-----|----------|--------------------|
+|-----|----------|---|
 | `search_codebase` | Hybrid поиск по структурным блокам (функции, классы) | Конкретный класс или метод по имени |
 | `search_codebase_fixed` | Hybrid поиск по чанкам фиксированного размера | Широкий контекстный поиск |
 | `search_codebase_smart` | 2-Stage: сначала классы по домену, потом методы | Концептуальные вопросы ("как работает X") |
@@ -15,7 +17,7 @@
 
 - JDK 17+
 - Gradle 8.5+ (или использовать `./gradlew` из корня проекта)
-- Ollama (для локальных эмбеддингов) **или** ключ OpenRouter
+- Ollama (для локальных эмбеддингов и LLM) **или** ключ OpenRouter (только для embeddings)
 
 ---
 
@@ -31,23 +33,22 @@ ollama serve
 # Скачать embedding-модель (обязательно)
 ollama pull nomic-embed-text
 
-# Скачать LLM для метаданных (нужна только если EXTRACT_METADATA=true)
-ollama pull qwen2.5-coder:7b
+# Скачать LLM (нужна для метаданных / query optimization / reranking)
+ollama pull qwen2.5-coder:7b-instruct
 ```
 
-Проверить что embedding-модель работает:
+Проверить embedding-модель:
 ```bash
 curl http://localhost:11434/api/embeddings \
   -d '{"model":"nomic-embed-text","prompt":"hello world"}'
+# Ожидаемый ответ: {"embedding":[0.123, ...]} (массив из 768 чисел)
 ```
-
-Ожидаемый ответ: `{"embedding":[0.123, ...]}` (массив из 768 чисел)
 
 ---
 
 ## 2. Переменные окружения
 
-### Основные (как раньше)
+### Основные
 
 | Переменная | Обязательная | По умолчанию | Описание |
 |-----------|:---:|---|---|
@@ -59,134 +60,221 @@ curl http://localhost:11434/api/embeddings \
 | `OPENROUTER_API_KEY` | если provider=openrouter | — | Ключ OpenRouter API |
 | `RAG_SERVER_PORT` | нет | `3001` | Порт HTTP-сервера |
 | `FORCE_REINDEX` | нет | `false` | `true` — принудительно перестроить индекс |
-| `SEARCH_TOP_K` | нет | `5` | Сколько результатов возвращать при поиске |
+| `SEARCH_TOP_K` | нет | `5` | Дефолтный top-K для MCP-тулов |
 
-### Новые (для метаданных и 2-Stage поиска)
+### Метаданные и 2-Stage поиск
 
 | Переменная | Обязательная | По умолчанию | Описание |
 |-----------|:---:|---|---|
 | `EXTRACT_METADATA` | нет | `false` | `true` — включить LLM-анализ классов при индексации |
-| `LLM_MODEL` | нет | `qwen2.5-coder:7b` | Ollama-модель для анализа кода (только если `EXTRACT_METADATA=true`) |
+| `LLM_MODEL` | нет | `qwen2.5-coder:7b-instruct` | Ollama-модель для анализа кода |
 
-> **Примечание:** `EXTRACT_METADATA=true` увеличивает время первичной индексации (~1–3 сек на класс).
-> Для проекта из 100 классов — ~3–5 минут дополнительно.
-> Индексация **инкрементальная**: при повторном запуске уже обработанные классы пропускаются.
-> После индексации сервер работает как обычно, скорость поиска не меняется.
+> Увеличивает время первичной индексации (~1–3 сек на класс). Инкрементальная: уже обработанные пропускаются.
 
-### Новые (для перевода запросов)
+### Query Optimization (rewrite + translate)
 
 | Переменная | Обязательная | По умолчанию | Описание |
 |-----------|:---:|---|---|
-| `TRANSLATE_QUERIES` | нет | `false` | `true` — переводить запросы на английский перед поиском |
-| `TRANSLATE_LLM_MODEL` | нет | значение `LLM_MODEL` | Ollama-модель для перевода (можно указать отдельную, более быструю) |
+| `TRANSLATE_QUERIES` | нет | `false` | `true` — включить query optimizer (rewrite + перевод) |
+| `TRANSLATE_LLM_MODEL` | нет | значение `LLM_MODEL` | Модель для оптимизации запросов (можно быстрее основной) |
 
-> **Когда включать:** если поисковые запросы приходят на русском или другом языке.
-> Определение языка — эвристика: если >30% букв кириллица → запрос переводится.
-> Перевод выполняется перед каждым поиском, логируется: `[Translate] 'запрос' → 'query'`.
-> Требует работающего Ollama (`EMBEDDING_PROVIDER=ollama`).
+> Включать если запросы на русском. Оптимизирует любые запросы: переводит + добавляет технические ключевые слова.
+> Активируется через env (`TRANSLATE_QUERIES=true`) + query param (`enable_query_optimize=true`).
+> Если env=false, но query param=true — шаг пропускается с логом в консоль.
+
+### LLM Reranker
+
+| Переменная | Обязательная | По умолчанию | Описание |
+|-----------|:---:|---|---|
+| `RERANKER_LLM_MODEL` | нет | значение `LLM_MODEL` | Модель для LLM reranker. Можно задать быструю: `qwen2.5:3b` |
+
+> Reranker LLM создаётся всегда при старте (cheap операция). Сетевые вызовы только при активном реранке.
 
 ---
 
 ## 3. Сборка
 
 ```bash
-# Из корня проекта
 ./gradlew :rag-server:build
 ```
 
-Jar находится в `rag-server/build/libs/rag-server.jar`
+Jar: `rag-server/build/libs/rag-server.jar`
 
 ---
 
 ## 4. Варианты запуска
 
-### Базовый (как раньше — только embedding поиск + keyword + context packing)
+### Минимальный (только embedding поиск)
 
 ```bash
 export CODE_PATH="/path/to/your/kotlin/project/src"
-
 java -jar rag-server/build/libs/rag-server.jar
 ```
 
-Доступны тулы: `search_codebase`, `search_codebase_fixed`, `get_index_status`
-
----
-
-### С метаданными (+ тул `search_codebase_smart`)
+### С метаданными (рекомендуется)
 
 ```bash
 export CODE_PATH="/path/to/your/kotlin/project/src"
 export EXTRACT_METADATA=true
-export LLM_MODEL=qwen2.5-coder:7b-instruct   # или другая локальная модель
-
+export LLM_MODEL=qwen2.5-coder:7b-instruct
 java -jar rag-server/build/libs/rag-server.jar
 ```
 
-Доступны все 4 тула, включая `search_codebase_smart`.
-
-> При первом запуске генерируются метаданные и embedding-векторы для каждого класса.
-> При последующих запусках уже обработанные классы **пропускаются автоматически**.
-
----
-
-### С метаданными и переводом запросов (рекомендуется для русскоязычных запросов)
+### Полный (метаданные + query optimization + reranking)
 
 ```bash
 export CODE_PATH="/path/to/your/kotlin/project/src"
 export EXTRACT_METADATA=true
 export LLM_MODEL=qwen2.5-coder:7b-instruct
 export TRANSLATE_QUERIES=true
-# Опционально: отдельная модель для перевода (быстрее чем coder-модель)
-# export TRANSLATE_LLM_MODEL=qwen2.5:3b
-
+export TRANSLATE_LLM_MODEL=qwen2.5:3b   # быстрая модель для оптимизации
+export RERANKER_LLM_MODEL=qwen2.5:3b    # быстрая модель для reranker
 java -jar rag-server/build/libs/rag-server.jar
 ```
-
----
-
-### С OpenRouter вместо Ollama (только embeddings, без метаданных)
-
-```bash
-export CODE_PATH="/path/to/project/src"
-export EMBEDDING_PROVIDER=openrouter
-export OPENROUTER_API_KEY=sk-or-...
-export EMBEDDING_MODEL=openai/text-embedding-3-small
-
-java -jar rag-server/build/libs/rag-server.jar
-```
-
-> `EXTRACT_METADATA` работает только с Ollama (использует `/api/generate`).
-
----
 
 ### Через Gradle
 
 ```bash
 export CODE_PATH="/path/to/your/kotlin/project/src"
-
 ./gradlew :rag-server:run
 ```
 
 ---
 
-## 5. Выбор тула — когда что использовать
+## 5. HTTP REST API
+
+### GET /search — Поиск по кодовой базе
 
 ```
-Запрос агента
-     │
-     ├─ "найди метод createUser"          → search_codebase
-     ├─ "где определён ChatRepository"    → search_codebase
-     ├─ "как работает авторизация"        → search_codebase_smart (если EXTRACT_METADATA=true)
-     │                                      search_codebase (если без метаданных)
-     ├─ "покажи код вокруг ошибки X"      → search_codebase_fixed
-     └─ "индекс готов?"                   → get_index_status
+GET /search?query=<текст>&[параметры pipeline]
+```
+
+#### Pipeline параметры
+
+| Параметр | Тип | По умолчанию | Описание |
+|----------|-----|---|---|
+| `preset` | String | — | Именованный пресет (базовая конфигурация). Индивидуальные параметры переопределяют поверх. |
+| `retrieval_strategy` | String | `two_stage` | `two_stage` — двухэтапный поиск; `hybrid` — embedding+keyword |
+| `chunking_strategy` | String | `structural` | `structural` или `fixed` (только для `hybrid`) |
+| `retrieval_topK` | Int | `10` | Top-K ДО фильтрации — сколько кандидатов достаём |
+| `threshold` | Double | `0.0` | Порог similarity (0.0 = фильтр выключен; рекомендуется 0.5–0.65) |
+| `rerank_strategy` | String | `none` | `none`, `heuristic`, `llm` |
+| `final_topK` | Int | `5` | Top-K ПОСЛЕ фильтра и реранка — сколько передаём в LLM |
+| `enable_query_optimize` | Boolean | `false` | Включить query rewrite + translation (требует `TRANSLATE_QUERIES=true`) |
+
+#### Именованные пресеты
+
+| Пресет | retrieval_topK | threshold | rerank | final_topK | Описание |
+|--------|:-:|:-:|---|:-:|---|
+| `baseline` | 10 | — | none | 5 | Текущий baseline, только двухэтапный поиск |
+| `filtered` | 15 | 0.65 | none | 5 | +threshold filter: отсекаем нерелевантных |
+| `reranked_heuristic` | 15 | 0.50 | heuristic | 5 | +keyword overlap bonus |
+| `reranked_llm` | 15 | 0.50 | llm | 5 | +LLM оценивает релевантность каждого чанка |
+
+#### Примеры
+
+```bash
+# Baseline (без фильтра и реранка)
+curl "http://localhost:3001/search?query=как+работает+ContextPacker"
+
+# Пресет filtered
+curl "http://localhost:3001/search?query=how+does+ContextPacker+work&preset=filtered"
+
+# LLM reranking с query optimization
+curl "http://localhost:3001/search?query=как+работает+упаковка+контекста&preset=reranked_llm&enable_query_optimize=true"
+
+# Кастомные параметры поверх пресета
+curl "http://localhost:3001/search?query=embedding+search&preset=filtered&threshold=0.7&final_topK=3"
+
+# Hybrid retrieval
+curl "http://localhost:3001/search?query=ContextPacker&retrieval_strategy=hybrid&chunking_strategy=structural&retrieval_topK=20&final_topK=5"
+```
+
+#### Формат ответа
+
+```
+Pipeline: RERANKED_LLM | Retrieved: 15 → Filtered: 9 → Final: 5
+Timings: retrieve=312ms, filter=0ms, rerank=2100ms, top_k=0ms, pack=1ms
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[CLASS] ContextPacker
+File: search/context/ContextPacker.kt
+Score: 0.841
+...
 ```
 
 ---
 
-## 6. Проверка работы (curl)
+### POST /evaluate — Автоматизированное тестирование
 
-### Шаг 1 — инициализация сессии
+Запускает тестовые вопросы через один или несколько pipeline-пресетов. Сохраняет MD-отчёты на сервере.
+
+```bash
+# Все 4 пресета
+curl -X POST http://localhost:3001/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "questions": [
+      "Как работает двухэтапный поиск?",
+      "Где хранятся эмбеддинги?",
+      "Как работает ContextPacker?"
+    ],
+    "presets": ["all"]
+  }'
+
+# Отдельные пресеты
+curl -X POST http://localhost:3001/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "questions": ["Как работает ContextPacker?"],
+    "presets": ["baseline", "reranked_llm"]
+  }'
+```
+
+#### Ответ
+
+```json
+{
+  "savedReports": [
+    "reports/eval_BASELINE_2024-03-18_14-30.md",
+    "reports/eval_FILTERED_2024-03-18_14-30.md",
+    "reports/eval_RERANKED_HEURISTIC_2024-03-18_14-30.md",
+    "reports/eval_RERANKED_LLM_2024-03-18_14-30.md"
+  ],
+  "summary": "4 пресета(ов) × 3 вопросов\nBASELINE avg: 0.72 | FILTERED avg: 0.68 | ..."
+}
+```
+
+Отчёты сохраняются в `./reports/` относительно рабочей директории сервера.
+
+---
+
+### Из Android-приложения
+
+```
+@@talk(rag --gentest)                          # все 4 пресета
+@@talk(rag --gentest baseline)                 # один пресет
+@@talk(rag --gentest filtered,reranked_llm)    # несколько через запятую
+```
+
+---
+
+## 6. Отчёты Evaluation
+
+Файлы сохраняются в `./reports/eval_{PRESET}_{yyyy-MM-dd_HH-mm}.md`.
+
+Каждый отчёт содержит:
+- Конфигурацию пресета
+- Для каждого вопроса: оптимизированный запрос, метрики pipeline, RAG-контекст
+- Summary таблицу с avg scores
+
+Для сравнения пресетов — смотреть строку `Summary` в каждом файле или `summary` в JSON-ответе `/evaluate`.
+
+---
+
+## 7. MCP API (для AI-агента)
+
+### Инициализация сессии
 
 ```bash
 curl -N -X POST http://localhost:3001/mcp \
@@ -194,9 +282,7 @@ curl -N -X POST http://localhost:3001/mcp \
   -H "Accept: application/json, text/event-stream" \
   -D- \
   -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "initialize",
+    "jsonrpc": "2.0", "id": 1, "method": "initialize",
     "params": {
       "protocolVersion": "2024-11-05",
       "capabilities": {},
@@ -205,103 +291,53 @@ curl -N -X POST http://localhost:3001/mcp \
   }'
 ```
 
-В ответе в заголовках будет `Mcp-Session-Id: <session_id>`.
+В ответе в заголовках: `Mcp-Session-Id: <session_id>`
 
-### Шаг 2 — вызов тула (с session ID)
+### Вызов тула
 
 ```bash
-# Статус индекса
 curl -N -X POST http://localhost:3001/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: <session_id>" \
   -d '{
-    "jsonrpc": "2.0",
-    "id": 2,
-    "method": "tools/call",
-    "params": {
-      "name": "get_index_status",
-      "arguments": {}
-    }
-  }'
-
-# Hybrid поиск
-curl -N -X POST http://localhost:3001/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Mcp-Session-Id: <session_id>" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 3,
-    "method": "tools/call",
-    "params": {
-      "name": "search_codebase",
-      "arguments": { "query": "createUser" }
-    }
-  }'
-
-# 2-Stage Smart поиск
-curl -N -X POST http://localhost:3001/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Mcp-Session-Id: <session_id>" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 4,
-    "method": "tools/call",
-    "params": {
-      "name": "search_codebase_smart",
-      "arguments": { "query": "как работает авторизация" }
-    }
+    "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+    "params": {"name": "search_codebase_smart", "arguments": {"query": "как работает авторизация"}}
   }'
 ```
 
 ---
 
-## 7. Подключение в Android-приложении
+## 8. Подключение в Android-приложении
 
-В настройках MCP-серверов добавить новый сервер:
-- **URL**: `http://10.0.2.2:3001` (из эмулятора) или `http://localhost:3001` (физическое устройство через adb forward)
+- **URL эмулятор:** `http://10.0.2.2:3001`
+- **URL физическое устройство:** `http://localhost:3001` (через `adb forward tcp:3001 tcp:3001`)
 
-После подключения агент увидит все доступные тулы.
+Настройка через команды:
+```
+@@talk(rag --url http://10.0.2.2:3001)
+@@talk(rag --on)
+@@talk(rag --state)
+```
 
 ---
 
-## 8. Повторная индексация
-
-По умолчанию сервер **не** переиндексирует если индекс уже есть. Для принудительного пересоздания:
+## 9. Повторная индексация
 
 ```bash
+# Пересоздать чанки и эмбеддинги (метаданные не трогает)
 FORCE_REINDEX=true java -jar rag-server/build/libs/rag-server.jar
-```
 
-Или удалить файл базы данных:
-```bash
+# Полное пересоздание (удалить БД)
 rm rag_index.db
 ```
 
-> `FORCE_REINDEX=true` пересобирает чанки и эмбеддинги, но **не** затрагивает таблицу метаданных.
-> Для полного пересоздания метаданных и их векторов — удалите `rag_index.db` и запустите с `EXTRACT_METADATA=true`.
-
-### Когда нужен FORCE_REINDEX
-
 | Ситуация | Что делать |
-|----------|-----------|
-| Добавились новые файлы в проект | Ничего — при запуске новые классы добавятся автоматически |
-| Изменился код существующих классов | `FORCE_REINDEX=true` — пересоздать чанки и эмбеддинги |
-| Сменилась embedding-модель | Удалить `rag_index.db`, переиндексировать полностью |
-| Нужно обновить метаданные классов | `FORCE_REINDEX=true` + `EXTRACT_METADATA=true` |
-
----
-
-## 9. Индексируемые файлы
-
-Сервер сканирует `CODE_PATH` рекурсивно и индексирует файлы с расширениями:
-- `.kt` — Kotlin source files
-- `.kts` — Kotlin scripts
-- `.md` — Markdown документация
-
-Игнорируются директории: `build/`, `.git/`, `.gradle/`, `generated/`, `.idea/`
+|----------|---|
+| Добавились новые файлы | Ничего — новые добавятся автоматически |
+| Изменился код существующих файлов | `FORCE_REINDEX=true` |
+| Сменилась embedding-модель | Удалить `rag_index.db`, переиндексировать |
+| Обновить метаданные классов | `FORCE_REINDEX=true` + `EXTRACT_METADATA=true` |
 
 ---
 
@@ -309,10 +345,14 @@ rm rag_index.db
 
 | Улучшение | Эффект |
 |-----------|--------|
-| **Hybrid Retrieval** | Точные имена методов/классов теперь находятся надёжно |
-| **Context Packing** | Результаты сгруппированы по классам, нет дублей, виден Big Picture |
-| **Structured Metadata** | LLM описывает каждый класс — responsibility, dependencies, domain |
-| **2-Stage Smart Search** | Концептуальные вопросы находят правильные классы, не случайные методы |
-| **Embedding-based Stage 1** | Stage 1 использует семантическое сходство вместо keyword — работает на любом языке |
-| **Incremental Metadata** | Повторный запуск не регенерирует уже обработанные классы — быстрый старт |
-| **Query Translation** | Русскоязычные запросы переводятся на английский перед поиском (`TRANSLATE_QUERIES=true`) |
+| **Настраиваемый Pipeline** | Фильтр + реранк управляются query params или именованными пресетами |
+| **Threshold Filter** | Отсечение нерелевантных по similarity score — меньше шума в контексте LLM |
+| **Heuristic Reranker** | Keyword overlap boost — поднимает точные совпадения выше |
+| **LLM Reranker** | Локальная модель оценивает релевантность каждого чанка — самый точный реранк |
+| **Query Optimizer** | Rewrite + translation: запросы становятся самодостаточными, добавляются технические ключевые слова |
+| **Top-K управление** | `retrieval_topK` (до фильтра) и `final_topK` (после) — видны в debug-заголовке ответа |
+| **Evaluation endpoint** | `/evaluate` прогоняет вопросы через все пресеты, сохраняет MD-отчёты для сравнения |
+| **@@talk(rag --gentest)** | Автоматизированный запуск тестов из Android-приложения |
+| **Hybrid Retrieval** | Embedding (0.6) + Keyword (0.4) — альтернатива двухэтапному поиску |
+| **2-Stage Smart Search** | Классы → чанки — концептуальные вопросы находят правильные классы |
+| **Incremental Metadata** | Повторный запуск не регенерирует уже обработанные классы |

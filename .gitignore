@@ -47,3 +47,4 @@ google-services.json
 /mcp-server/build/
 /rag-server/build/
 /rag-server/rag_index.db
+/rag-server/reports/

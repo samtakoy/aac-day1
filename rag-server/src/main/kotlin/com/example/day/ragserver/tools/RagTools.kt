@@ -2,7 +2,7 @@ package com.example.day.ragserver.tools
 
 import com.example.day.ragserver.db.CodeDatabase
 import com.example.day.ragserver.embedding.EmbeddingProvider
-import com.example.day.ragserver.search.QueryTranslator
+import com.example.day.ragserver.search.QueryOptimizer
 import com.example.day.ragserver.search.SearchService
 import com.example.day.ragserver.search.TwoStageSearchService
 import com.example.day.ragserver.search.context.ContextFormatter
@@ -24,13 +24,13 @@ fun registerRagTools(
     db: CodeDatabase,
     topK: Int,
     embeddingProvider: EmbeddingProvider,
-    queryTranslator: QueryTranslator? = null,
+    queryOptimizer: QueryOptimizer? = null,
 ) {
     val contextPacker = ContextPacker()
     val twoStageSearchService = TwoStageSearchService(db, embeddingProvider)
     //registerSearchCodebase(server, searchService, contextPacker, topK)
     //registerSearchCodebaseFixed(server, searchService, topK)
-    registerSearchCodebaseSmart(server, twoStageSearchService, contextPacker, topK, queryTranslator)
+    registerSearchCodebaseSmart(server, twoStageSearchService, contextPacker, topK, queryOptimizer)
     //registerGetIndexStatus(server, db)
 }
 
@@ -122,7 +122,7 @@ private fun registerSearchCodebaseSmart(
     twoStageSearchService: TwoStageSearchService,
     contextPacker: ContextPacker,
     topK: Int,
-    queryTranslator: QueryTranslator? = null,
+    queryOptimizer: QueryOptimizer? = null,
 ) {
     server.addTool(
         name = RagToolNames.SEARCH_CODEBASE_SMART,
@@ -147,11 +147,11 @@ private fun registerSearchCodebaseSmart(
             isError = true
         )
 
-        log.info("[Search] >>> RAW QUERY: '{}' | translator: {}", query, if (queryTranslator != null) "enabled" else "disabled")
+        log.info("[Search] >>> RAW QUERY: '{}' | optimizer: {}", query, if (queryOptimizer != null) "enabled" else "disabled")
 
         val results = runBlocking {
-            val searchQuery = queryTranslator?.translateIfNeeded(query) ?: query
-            if (searchQuery != query) log.info("[Search] Translated query: '{}'", searchQuery)
+            val searchQuery = queryOptimizer?.optimize(query) ?: query
+            if (searchQuery != query) log.info("[Search] Optimized query: '{}'", searchQuery)
             twoStageSearchService.search(searchQuery, topK * 2)
         }
         if (results.isEmpty()) {

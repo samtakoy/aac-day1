@@ -12,12 +12,16 @@ data class RagConfig(
     val searchTopK: Int,
     val llmModel: String,
     val extractMetadata: Boolean,
-    // Перевод поискового запроса на английский перед поиском.
+    // Query optimization (rewrite + translate) перед поиском.
     // Включать если запросы приходят на русском/другом языке — улучшает
     // как keyword Stage 1, так и embedding similarity с английским кодом.
+    // Также добавляет технические ключевые слова для любых запросов.
     val translateQueries: Boolean,
-    // Модель для перевода запросов. По умолчанию та же что для метаданных.
+    // Модель для query optimization. По умолчанию та же что для метаданных.
     val translateLlmModel: String,
+    // Модель для LLM reranker. По умолчанию та же что llmModel.
+    // Можно задать быструю модель отдельно: RERANKER_LLM_MODEL=qwen2.5:3b
+    val rerankerLlmModel: String,
 ) {
     companion object {
         fun from(): RagConfig {
@@ -38,6 +42,7 @@ data class RagConfig(
                 extractMetadata = System.getenv("EXTRACT_METADATA")?.toBooleanStrictOrNull() ?: false,
                 translateQueries = System.getenv("TRANSLATE_QUERIES")?.toBooleanStrictOrNull() ?: false,
                 translateLlmModel = System.getenv("TRANSLATE_LLM_MODEL") ?: llmModel,
+                rerankerLlmModel = System.getenv("RERANKER_LLM_MODEL") ?: llmModel,
             )
         }
     }
