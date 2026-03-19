@@ -48,11 +48,17 @@ enum class PipelinePreset(val config: PipelineConfig) {
         finalTopK = 5,
     )),
 
-    /** LLM rerank: локальная LLM оценивает релевантность каждого чанка. */
+    /** LLM rerank: локальная LLM оценивает релевантность каждого чанка.
+     * Замечание: за реранкинг отвечает Llm - это ее задача отбросить нерелевантное.
+     * Поэтому [threshold] тут только вредит, можно использовать 0.
+     * Либо режимы:
+     * reranked_strict: threshold=0.66 (для точечных запросов с именами классов)
+     * reranked_recall: threshold=0.45 (для концептуальных/архитектурных вопросов)
+     * */
     RERANKED_LLM(PipelineConfig(
         enableQueryOptimize = true,
         retrievalTopK = 15,
-        threshold = 0.66,
+        threshold = 0.33, // 0.66,
         rerankStrategy = RerankStrategy.LLM,
         finalTopK = 5,
     ));

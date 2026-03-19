@@ -14,7 +14,11 @@ object MetadataValidator {
                 .filter { it.isNotBlank() && it.length < 100 },
             keyMethods = metadata.keyMethods
                 .take(10)
-                .map { it.copy(name = it.name.trim(), description = it.description.trim().take(150)) }
+                .map { it.copy(
+                    name = it.name.trim(),
+                    description = it.description.trim().take(150),
+                    params = it.params?.trim()?.take(200),
+                ) }
                 .filter { it.name.isNotBlank() },
             domainTags = metadata.domainTags
                 .map { it.trim() }

@@ -31,7 +31,7 @@ class MetadataExtractor(
           "class_name": "$className",
           "responsibility": string,
           "dependencies": string[],
-          "key_methods": [{"name": string, "description": string}],
+          "key_methods": [{"name": string, "description": string, "params": string|null}],
           "domain_tags": string[]
         }
 
@@ -42,9 +42,15 @@ class MetadataExtractor(
           If class name is unclear — infer responsibility from the name.
         - dependencies: real class names from constructors, properties, function params
         - key_methods: methods actually present in the primary class, max 5
+          - name: method name only, no parentheses
+          - description: one sentence, max 10 words
+          - params: parameter list as "name: Type, name: Type" or null if no params
         - domain_tags: 1-3 categories, e.g. "Chat", "Auth", "User Management"
         - For empty fields use [] (only for arrays, never for strings)
         - Do NOT invent names
+
+        Example key_methods entry:
+        {"name": "handleRuntest", "description": "runs test questions through RAG pipeline", "params": "agentId: Long, presetArg: String?, chat: Chat"}
 
         Code:
         $code

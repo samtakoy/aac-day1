@@ -16,4 +16,5 @@ data class ClassMetadata(
 data class MethodInfo(
     @SerialName("name") val name: String,
     @SerialName("description") val description: String,
+    @SerialName("params") val params: String? = null,
 )

@@ -1,9 +1,12 @@
 package com.example.day.ragserver.search.context
 
 import com.example.day.ragserver.db.ChunkEntity
+import com.example.day.ragserver.db.CodeDatabase
+import com.example.day.ragserver.db.MethodInfo
 import com.example.day.ragserver.db.SearchResult
 
 class ContextPacker(
+    private val db: CodeDatabase? = null,
     private val tokenLimit: Int = 6000,
 ) {
 
@@ -29,12 +32,16 @@ class ContextPacker(
             // Пропускаем группу если лимит превышен (кроме первой — её берём всегда)
             if (usedTokens + groupTokens > tokenLimit && groups.isNotEmpty()) continue
 
+            val metadata = db?.getClassMetadata(className)
+
             groups.add(
                 ClassGroup(
                     className = className,
                     filePath = uniqueChunks.first().filePath,
                     chunks = uniqueChunks,
                     topScore = chunks.maxOf { it.score },
+                    responsibility = metadata?.responsibility?.takeIf { it.isNotBlank() },
+                    keyMethods = metadata?.keyMethods ?: emptyList(),
                 )
             )
             usedTokens += groupTokens
@@ -60,4 +67,5 @@ data class ClassGroup(
     val chunks: List<ChunkEntity>,
     val topScore: Float,
     val responsibility: String? = null,
+    val keyMethods: List<MethodInfo> = emptyList(),
 )

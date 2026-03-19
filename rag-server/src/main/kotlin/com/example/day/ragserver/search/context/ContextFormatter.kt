@@ -1,5 +1,6 @@
 package com.example.day.ragserver.search.context
 
+import com.example.day.ragserver.db.MethodInfo
 import com.example.day.ragserver.db.SearchResult
 
 object ContextFormatter {
@@ -21,6 +22,12 @@ object ContextFormatter {
 
             group.responsibility?.let {
                 appendLine("Responsibility: $it")
+            }
+            if (group.keyMethods.isNotEmpty()) {
+                val methodsLine = group.keyMethods.joinToString(", ") { m ->
+                    if (m.params != null) "${m.name}(${m.params})" else "${m.name}()"
+                }
+                appendLine("Key methods: $methodsLine")
             }
             appendLine()
 

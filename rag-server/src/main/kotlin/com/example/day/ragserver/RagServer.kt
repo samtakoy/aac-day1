@@ -159,7 +159,7 @@ fun main() {
             add(ThresholdFilterStep(pipelineConfig.threshold))
         add(RerankStep(buildReranker(pipelineConfig.rerankStrategy)))
         add(TopKStep(pipelineConfig.finalTopK))
-        add(ContextPackingStep(ContextPacker()))
+        add(ContextPackingStep(ContextPacker(db = db)))
     })
 
     fun parsePipelineConfig(params: io.ktor.server.request.ApplicationRequest): PipelineConfig {
