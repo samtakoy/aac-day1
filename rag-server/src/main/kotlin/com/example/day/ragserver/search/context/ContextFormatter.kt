@@ -8,6 +8,11 @@ object ContextFormatter {
         appendLine("Found ${packed.groups.size} relevant class(es) | ~${packed.totalTokens * 4} chars")
         appendLine()
 
+        // Сквозной счётчик источников по всем чанкам
+        var sourceIndex = 1
+        // Накапливаем строки для секции ## Источники в конце
+        val sourcesTable = mutableListOf<String>()
+
         packed.groups.forEach { group ->
             appendLine("${"━".repeat(60)}")
             appendLine("[CLASS] ${group.className}")
@@ -17,20 +22,23 @@ object ContextFormatter {
             group.responsibility?.let {
                 appendLine("Responsibility: $it")
             }
-
-            val declarations = group.chunks.mapNotNull { it.declarationName }.distinct()
-            if (declarations.isNotEmpty()) {
-                appendLine("Declarations: ${declarations.joinToString(", ")}")
-            }
             appendLine()
 
             group.chunks.forEach { chunk ->
                 val label = chunk.declarationName ?: "line ${chunk.startLine}"
-                appendLine("--- $label ---")
+                appendLine("--- $label [ИСТОЧНИК $sourceIndex] (line ${chunk.startLine}) ---")
                 appendLine(chunk.content.trim())
                 appendLine()
+
+                val fileName = chunk.filePath.substringAfterLast("/")
+                sourcesTable.add("[ИСТОЧНИК $sourceIndex] $fileName · $label · line ${chunk.startLine} · ${chunk.filePath}")
+                sourceIndex++
             }
         }
+
+        appendLine("${"━".repeat(60)}")
+        appendLine("## Источники")
+        sourcesTable.forEach { appendLine(it) }
     }
 
     fun formatFlat(results: List<SearchResult>): String = buildString {

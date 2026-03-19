@@ -201,7 +201,10 @@ fun main() {
                 val ctx = pipeline.execute(query)
 
                 if (ctx.packed == null || ctx.packed.groups.isEmpty()) {
-                    call.respondText("Ничего не найдено по запросу: $query")
+                    call.respondText(
+                        "НЕДОСТАТОЧНО_КОНТЕКСТА: по запросу \"$query\" ничего не найдено. " +
+                        "Уточните запрос или проверьте что индекс содержит нужный код."
+                    )
                     return@get
                 }
 

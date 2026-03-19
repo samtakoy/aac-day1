@@ -153,15 +153,7 @@ class RagCommandHandler @Inject constructor(
             val prompt = "${item.question}\n\nКонтекст по вопросу:\n${item.ragContext}"
             val result = llmRequestUseCase.exec(
                 modelSettings = chat.settings.model,
-                systemPrompt = """
-Ты — аналитический ассистент. Твоя задача — отвечать на вопросы, используя предоставленный контекст.
-Правила:
-Если в контексте нет прямого ответа, напиши "Недостаточно данных для ответа".
-Для каждого утверждения в ответе укажи источник.
-Если источник - файл, то укажи имя, полный путь, и номер строки в файле если есть.
-Отвечай на русском языке.
-                """.trimMargin(),
-                // systemPrompt = "",
+                systemPrompt = CITATION_SYSTEM_PROMPT,
                 messages = emptyList(),
                 prompt = AContextMessage(AContextMessage.Role.USER, prompt),
             ).getOrElse {
@@ -214,7 +206,7 @@ class RagCommandHandler @Inject constructor(
             val prompt = "${item.question}\n\nКонтекст по вопросу:\n${item.ragContext}"
             val result = llmRequestUseCase.exec(
                 modelSettings = chat.settings.model,
-                systemPrompt = "",
+                systemPrompt = CITATION_SYSTEM_PROMPT,
                 messages = emptyList(),
                 prompt = AContextMessage(AContextMessage.Role.USER, prompt),
             ).getOrElse {
@@ -272,5 +264,25 @@ class RagCommandHandler @Inject constructor(
 
     companion object {
         private const val AGENT_NAME = "talk_agent"
+
+        private val CITATION_SYSTEM_PROMPT = """
+Ты — аналитический ассистент по Kotlin кодовой базе.
+Отвечай развёрнуто и подробно, используя предоставленный контекст как основной источник.
+
+Правила:
+1. Отвечай максимально полно — не сокращай ответ ради формата.
+2. Для каждого утверждения, которое берёшь из контекста, ставь инлайн-сноску [ИСТОЧНИК N].
+   Пример: "Отправка сообщений реализована в ChatRepository [ИСТОЧНИК 3] через sendMessage [ИСТОЧНИК 3]."
+3. В конце ответа добавь раздел:
+   ### Источники
+   [ИСТОЧНИК N] ИмяФайла.kt · имяМетода · line X
+   (только те источники, на которые ссылался)
+4. Если контекст частичный — отвечай на основе того что есть, явно указав что информация неполная.
+5. Если контекст содержит "НЕДОСТАТОЧНО_КОНТЕКСТА" или пустой ("Found 0") — напиши ТОЛЬКО:
+   "Не знаю. Уточните: ..." и задай один конкретный уточняющий вопрос.
+6. Не придумывай имена классов и методов которых нет в контексте.
+
+Отвечай на русском языке.
+        """.trimIndent()
     }
 }
