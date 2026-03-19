@@ -9,6 +9,9 @@ class QueryOptimizeStep(private val optimizer: QueryOptimizer) : PipelineStep {
 
     override suspend fun process(ctx: PipelineContext): PipelineContext {
         val optimized = optimizer.optimize(ctx.query)
-        return ctx.copy(query = optimized)
+        return ctx.copy(
+            query = optimized,
+            metrics = ctx.metrics.copy(optimizedQuery = optimized),
+        )
     }
 }

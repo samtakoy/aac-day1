@@ -15,5 +15,6 @@ data class PipelineMetrics(
     val timings: Map<String, Long> = emptyMap(),    // step name → ms
     val countAfterRetrieval: Int = 0,               // top-K ДО фильтра
     val countAfterFilter: Int = 0,                  // сколько прошло threshold
-    val countAfterRerank: Int = 0,                  // после реранка (кол-во не меняется)
+    // countAfterRerank убран: rerank не меняет количество, поле было равно countAfterFilter
+    val optimizedQuery: String? = null,             // non-null если QueryOptimizeStep отработал
 )

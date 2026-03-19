@@ -133,8 +133,6 @@ class EvaluationService(
     ): String = buildString {
         append("**Metrics:** Retrieved: ${metrics.countAfterRetrieval}")
         if (config.threshold > 0.0) append(" → Filtered: ${metrics.countAfterFilter}")
-        if (config.rerankStrategy != com.example.day.ragserver.pipeline.RerankStrategy.NONE)
-            append(" → Reranked: ${metrics.countAfterRerank}")
         append(" → Final: $finalCount")
         appendLine()
         val timings = metrics.timings.entries.joinToString(", ") { (k, v) -> "$k=${v}ms" }

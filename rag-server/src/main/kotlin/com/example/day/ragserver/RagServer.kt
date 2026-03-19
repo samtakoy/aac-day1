@@ -25,6 +25,7 @@ import com.example.day.ragserver.search.context.ContextFormatter
 import com.example.day.ragserver.search.context.ContextPacker
 import com.example.day.ragserver.search.rerank.HeuristicReranker
 import com.example.day.ragserver.search.rerank.LlmReranker
+import com.example.day.ragserver.search.rerank.NoopReranker
 import com.example.day.ragserver.search.rerank.Reranker
 import com.example.day.ragserver.tools.registerRagTools
 import io.ktor.client.HttpClient
@@ -142,7 +143,7 @@ fun main() {
     fun buildReranker(strategy: RerankStrategy): Reranker = when (strategy) {
         RerankStrategy.HEURISTIC -> HeuristicReranker()
         RerankStrategy.LLM       -> LlmReranker(rerankerLlmProvider)
-        RerankStrategy.NONE      -> error("unreachable: reranker not built for NONE strategy")
+        RerankStrategy.NONE      -> NoopReranker()
     }
 
     fun buildPipeline(pipelineConfig: PipelineConfig): PipelineExecutor = PipelineExecutor(buildList {
@@ -156,8 +157,7 @@ fun main() {
         add(RetrievalStep(twoStageSearchService, searchService, pipelineConfig))
         if (pipelineConfig.threshold > 0.0)
             add(ThresholdFilterStep(pipelineConfig.threshold))
-        if (pipelineConfig.rerankStrategy != RerankStrategy.NONE)
-            add(RerankStep(buildReranker(pipelineConfig.rerankStrategy)))
+        add(RerankStep(buildReranker(pipelineConfig.rerankStrategy)))
         add(TopKStep(pipelineConfig.finalTopK))
         add(ContextPackingStep(ContextPacker()))
     })
@@ -334,9 +334,12 @@ private fun buildDebugHeader(
     val counts = buildString {
         append("Retrieved: ${m.countAfterRetrieval}")
         if (config.threshold > 0.0) append(" → Filtered: ${m.countAfterFilter}")
-        if (config.rerankStrategy != RerankStrategy.NONE) append(" → Reranked: ${m.countAfterRerank}")
         append(" → Final: ${ctx.results.size}")
     }
     val timings = m.timings.entries.joinToString(", ") { (k, v) -> "$k=${v}ms" }
-    return "Pipeline: ${config.rerankStrategy} | $counts\nTimings: $timings\n\n"
+    val queryLine = m.optimizedQuery
+        ?.takeIf { it != ctx.originalQuery }
+        ?.let { "\nQuery: \"${ctx.originalQuery}\" → \"$it\"" }
+        ?: ""
+    return "Pipeline: ${config.rerankStrategy} | $counts$queryLine\nTimings: $timings\n\n"
 }

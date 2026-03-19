@@ -153,7 +153,14 @@ class RagCommandHandler @Inject constructor(
             val prompt = "${item.question}\n\nКонтекст по вопросу:\n${item.ragContext}"
             val result = llmRequestUseCase.exec(
                 modelSettings = chat.settings.model,
-                systemPrompt = "Отвечай по предоставленному контексту. Отвечай на русском языке.",
+                systemPrompt = """
+Ты — аналитический ассистент. Твоя задача — отвечать на вопросы, используя предоставленный контекст.
+Правила:
+Если в контексте нет прямого ответа, напиши "Недостаточно данных для ответа".
+Для каждого утверждения в ответе укажи источник.
+Если источник - файл, то укажи имя, полный путь, и номер строки в файле если есть.
+Отвечай на русском языке.
+                """.trimMargin(),
                 // systemPrompt = "",
                 messages = emptyList(),
                 prompt = AContextMessage(AContextMessage.Role.USER, prompt),

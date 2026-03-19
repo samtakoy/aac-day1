@@ -13,9 +13,6 @@ class RerankStep(private val reranker: Reranker) : PipelineStep {
         // TopKStep отсекает финальный список — не здесь.
         val reranked = reranker.rerank(ctx.query, ctx.results)
         println("[Rerank] ${ctx.results.size} results reranked")
-        return ctx.copy(
-            results = reranked,
-            metrics = ctx.metrics.copy(countAfterRerank = reranked.size),
-        )
+        return ctx.copy(results = reranked)
     }
 }
