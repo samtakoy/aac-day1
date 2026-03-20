@@ -49,14 +49,21 @@ class AIAgent(
         val enrichedPrompt = memoryProvider.appendUserPrompt(prompt)
         val snapshot = strategy.process(config, contextRepository)
 
+        // 2. Get tools and tool-to-server mapping for routing tool calls
+        val tools = toolProvider.getTools(agentId = config.id)
+        val toolToServerMap = toolProvider.getToolToServerMap()
+
         val result = orchestrator.execute(
             initialHistory = snapshot.messages.toModelRequestMessages(),
             memoryMessages = memoryMessages,  // ← НОВОЕ: только для LLM запроса
             prompt = enrichedPrompt,
             systemPrompt = config.systemPrompt,
             modelSettings = config.modelSettings,
-            tools = toolProvider.getTools(agentId = config.id),
-            context = ToolCallContext(agentId = config.id),
+            tools = tools,
+            context = ToolCallContext(
+                agentId = config.id,
+                toolToServer = toolToServerMap
+            ),
             onEvent = onEvent
         )
 

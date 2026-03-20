@@ -144,7 +144,8 @@ class ToolCallOrchestratorImpl @Inject constructor(
                     ModelRequest.Message(
                         role = ModelRequest.Role.Tool,
                         content = content,
-                        toolCallId = call.id  // КРИТИЧНО: tool_call_id
+                        toolCallId = call.id,  // КРИТИЧНО: tool_call_id
+                        // TODO нет имени функции
                     )
                 )
                 toolResults.add(

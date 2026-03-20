@@ -6,7 +6,6 @@ import com.example.day.core.core_features.agent.domain.tools.ToolCallContext
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.ModelResult
-import com.example.day.core.core_features.mcp.domain.McpToolNames
 import com.example.day.core.core_features.mcp.domain.model.McpToolCallContext
 import com.example.day.core.core_features.mcp.domain.model.McpConnectionState
 import com.example.day.core.core_features.mcp.domain.model.McpServerConfig
@@ -22,6 +21,20 @@ import kotlinx.serialization.json.buildJsonObject
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
+/**
+ * Tool provider that integrates with MCP servers.
+ * 
+ * Tool naming with multiple servers:
+ * When multiple MCP servers provide tools with the same name, this provider uses
+ * namespacing to avoid conflicts:
+ * - If only one server has "search_codebase", the tool is named "search_codebase"
+ * - If multiple servers have "search_codebase", they are named "serverId:search_codebase"
+ * 
+ * Tool access control:
+ * - Per-agent restrictions are managed via AgentMemoryRepository
+ * - If no restrictions are set for an agent (allowedTools == null), all tools from 
+ *   connected MCP servers are available
+ */
 internal class McpToolProvider @Inject constructor(
     private val repository: McpRepository,
     private val mcpTools: McpTools,
@@ -36,36 +49,75 @@ internal class McpToolProvider @Inject constructor(
         if (servers.isEmpty()) return emptyList()
 
         toolToServer.clear()
-        // toolToServer map is rebuilt for each tool listing
-
-        // Получаем список разрешенных tools для агента (если задан agentId)
+        
+        // Get per-agent allowed tools (null = all tools allowed)
         val allowedTools = agentId?.let { getAllowedTools(it) }
 
-        val collected = mutableListOf<ModelRequest.Tool>()
+        // Collect all tools grouped by name (for conflict detection)
+        val toolsByName = mutableMapOf<String, MutableList<Pair<McpServerConfig, McpTool>>>()
+        
         servers.forEach { server ->
             val tools = getConnectedTools(server.id)
             tools.forEach { tool ->
-                // Проверка 1: tool в глобальном списке разрешенных
-                if (!McpToolNames.ALLOWED_TOOL_NAMES.contains(tool.name)) return@forEach
-
-                // Проверка 2: tool в списке разрешенных для агента (если задан)
+                // Check: tool in per-agent allowed list (if configured)
                 if (allowedTools != null && !allowedTools.contains(tool.name)) return@forEach
-
-                if (toolToServer.containsKey(tool.name)) return@forEach
-                toolToServer[tool.name] = server.id
-                collected.add(
-                    ModelRequest.Tool(
-                        type = ModelRequest.ToolType.Function,
-                        function = ModelRequest.Function(
-                            name = tool.name,
-                            description = tool.description,
-                            parameters = parseSchema(tool)
-                        )
-                    )
-                )
+                
+                toolsByName.getOrPut(tool.name) { mutableListOf() }.add(server to tool)
             }
         }
+
+        // Build final tool list with namespace prefixes
+        val collected = mutableListOf<ModelRequest.Tool>()
+        
+        toolsByName.forEach { (toolName, serverToolPairs) ->
+            if (serverToolPairs.size == 1) {
+                // Only one server has this tool - use original name
+                val (server, tool) = serverToolPairs.first()
+                toolToServer[toolName] = server.id
+                
+                collected.add(toModelRequestTool(toolName, tool))
+            } else {
+                // Multiple servers have this tool - use namespace prefixes
+                serverToolPairs.forEach { (server, tool) ->
+                    val namespacedName = "${server.id}${ToolCallContext.NAMESPACE_SEPARATOR}$toolName"
+                    toolToServer[namespacedName] = server.id
+                    
+                    // Also map the original name to the first server for backward compatibility
+                    if (!toolToServer.containsKey(toolName)) {
+                        toolToServer[toolName] = server.id
+                    }
+                    
+                    collected.add(toModelRequestTool(namespacedName, tool, server.id))
+                }
+            }
+        }
+        
         return collected
+    }
+
+    private fun toModelRequestTool(
+        toolName: String,
+        tool: McpTool,
+        serverId: String? = null
+    ): ModelRequest.Tool {
+        val description = if (serverId != null) {
+            "[${serverId}] ${tool.description}"
+        } else {
+            tool.description
+        }
+        
+        return ModelRequest.Tool(
+            type = ModelRequest.ToolType.Function,
+            function = ModelRequest.Function(
+                name = toolName,
+                description = description,
+                parameters = parseSchema(tool)
+            )
+        )
+    }
+
+    override suspend fun getToolToServerMap(): Map<String, String> {
+        return toolToServer.toMap()
     }
 
     override suspend fun executeToolCall(
@@ -73,42 +125,72 @@ internal class McpToolProvider @Inject constructor(
         context: ToolCallContext
     ): Result<String> {
         val toolName = toolCall.function.name
-        if (!McpToolNames.ALLOWED_TOOL_NAMES.contains(toolName)) {
+        
+        // Check if the tool name contains namespace separator
+        val (serverId, originalToolName) = parseToolName(toolName)
+        
+        // Verify tool is in allowed list (if restrictions are configured)
+        // Check both namespaced and original name
+        val allowedTools = context.agentId?.let { getAllowedTools(it) }
+        if (allowedTools != null && 
+            !allowedTools.contains(toolName) && 
+            !allowedTools.contains(originalToolName)) {
             return Result.failure(
                 IllegalArgumentException("${ToolCallingConstants.TOOL_NOT_ALLOWED_PREFIX}: $toolName")
             )
         }
 
-        val serverId = resolveServerIdForTool(toolName)
+        // Use server from context map, or resolve from name
+        val resolvedServerId = context.toolToServer[toolName] ?: serverId
             ?: return Result.failure(IllegalStateException(ToolCallingConstants.MCP_NOT_CONFIGURED))
 
         val arguments = parseArguments(toolCall.function.arguments)
             ?: return Result.failure(IllegalArgumentException(ToolCallingConstants.INVALID_TOOL_ARGUMENTS))
 
         return mcpTools.callTool(
-            serverId = serverId,
-            toolName = toolName,
+            serverId = resolvedServerId,
+            toolName = originalToolName,  // Use original name for MCP call
             arguments = arguments,
             context = McpToolCallContext(agentId = context.agentId)
         )
     }
 
     /**
+     * Parse tool name to extract server ID and original tool name.
+     * Format: "serverId:toolName" -> (serverId, toolName)
+     *         "toolName" -> (null, toolName)
+     */
+    private fun parseToolName(toolName: String): Pair<String?, String> {
+        val separator = ToolCallContext.NAMESPACE_SEPARATOR
+        return if (toolName.contains(separator)) {
+            val parts = toolName.split(separator, limit = 2)
+            parts[0] to parts[1]
+        } else {
+            null to toolName
+        }
+    }
+
+    /**
      * Get list of tools allowed for specific agent.
-     * Returns null if no restrictions are set (all tools allowed).
+     * Returns null if no restrictions are set (all tools from MCP servers are allowed).
+     * 
+     * Tools are stored in agent memory with:
+     * - memoryKey: AgentToolsMemoryProvider.MEMORY_KEY
+     * - category: AgentToolsMemoryProvider.CATEGORY
+     * - value: JSON array of tool names, e.g. ["search_codebase", "get_file_content"]
      */
     private suspend fun getAllowedTools(agentId: Long): List<String>? {
         val fact = agentMemoryRepository.getFact(
             agentId = agentId,
             memoryKey = AgentToolsMemoryProvider.MEMORY_KEY,
             category = AgentToolsMemoryProvider.CATEGORY
-        ) ?: return null  // Нет ограничений - все инструменты разрешены
+        ) ?: return null  // No restrictions - all tools allowed
 
         return try {
             val tools = Json.decodeFromString<List<String>>(fact.fact)
             if (tools.isEmpty()) null else tools
         } catch (e: Exception) {
-            null
+            null  // Invalid format - allow all tools
         }
     }
 

@@ -4,7 +4,14 @@ object McpConstants {
     const val COMMAND_PREFIX = "@@mcp"
 }
 
+/**
+ * Tool name constants for reference.
+ * NOTE: These are for documentation/reference only. The actual available tools
+ * are determined dynamically from connected MCP servers.
+ * Access control is managed per-agent via AgentMemoryRepository.
+ */
 object McpToolNames {
+    // Issue tracking tools
     const val GET_ISSUE = "get_issue"
     const val LIST_ISSUES = "list_issues"
     const val GET_ISSUE_COMMENTS = "get_issue_comments"
@@ -13,7 +20,7 @@ object McpToolNames {
     const val CREATE_COMMENT = "create_comment"
     const val SET_REMINDER = "set_reminder"
     
-    // Day 19: Git file investigation tools
+    // Git file investigation tools
     const val INVESTIGATE_GIT_FILE = "investigate_git_file"
     const val GET_FILE_ANALYSIS = "get_file_analysis"
     const val ANALYZE_CODE_CONTENT = "analyze_code_content"
@@ -21,25 +28,13 @@ object McpToolNames {
     const val GET_FILE_CONTENT = "get_file_content"
     const val RESET_GIT_FILE_LIST_CACHE = "reset_git_file_list_cache"
 
-    // TODO это как тут оказалось? это инструменты сервера, мы не должны их хардкодить
-    val ALLOWED_TOOL_NAMES = setOf(
-        "search_codebase",
-        "search_codebase_fixed"
-        /*
-        GET_ISSUE,
-        LIST_ISSUES,
-        GET_ISSUE_COMMENTS,
-        GET_USER,
-        CREATE_ISSUE,
-        CREATE_COMMENT,
-        SET_REMINDER,
-        INVESTIGATE_GIT_FILE,
-        GET_FILE_ANALYSIS,
-        ANALYZE_CODE_CONTENT,
-        GET_GIT_FILE_LIST,
-        GET_FILE_CONTENT,
-        RESET_GIT_FILE_LIST_CACHE*/
-    )
+    // Code search tools
+    const val SEARCH_CODEBASE = "search_codebase"
+    const val SEARCH_CODEBASE_FIXED = "search_codebase_fixed"
+
+    // NOTE: Global ALLOWED_TOOL_NAMES removed - tool access is now controlled
+    // per-agent via AgentMemoryRepository. If no restrictions are set for an agent,
+    // all tools from connected MCP servers are available.
 }
 
 object McpToolDefaults {
