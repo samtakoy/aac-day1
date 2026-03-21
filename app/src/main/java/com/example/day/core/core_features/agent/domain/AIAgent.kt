@@ -110,10 +110,10 @@ class AIAgent(
         }
         memoryMessages.forEach { msg ->
             appendLine("[MEMORY:${msg.role.name}]")
-            appendLine(msg.content.trimEnd())
+            appendLine(msg.content?.trimEnd())
             appendLine()
         }
         appendLine("[${prompt.role.name}]")
-        append(prompt.content.trimEnd())
+        append(prompt.content?.trimEnd())
     }
 }

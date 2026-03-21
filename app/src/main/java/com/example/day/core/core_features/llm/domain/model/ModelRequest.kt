@@ -79,7 +79,7 @@ data class ModelRequest(
 
     data class Message(
         val role: Role,
-        val content: String,
+        val content: String?,
         val thinking: String? = null,
         val cachePrompt: Boolean? = null,
         val toolCalls: List<ToolCall>? = null,

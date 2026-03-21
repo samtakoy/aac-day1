@@ -9,7 +9,7 @@ data class TaskStateMessage(
     @SerialName("role")
     val role: Role,
     @SerialName("content")
-    val content: String
+    val content: String?
 ) {
     enum class Role { SYSTEM, USER, ASSISTANT }
 }

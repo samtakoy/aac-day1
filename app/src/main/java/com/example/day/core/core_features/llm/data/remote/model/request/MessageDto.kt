@@ -16,7 +16,7 @@ class MessageDto(
     @SerialName("role")
     val role: String,
     @SerialName("content")
-    val content: String,
+    val content: String?,
     @SerialName("thinking")
     val thinking: String? = null,
     @SerialName("cache_prompt")

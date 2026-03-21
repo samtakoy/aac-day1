@@ -114,7 +114,7 @@ class ContextBranchingStrategy : ContextStrategy {
             appendLine("=== Сообщения в текущей ветке ${state.currentBranchId} ===")
             val currentMessages = state.branches[state.currentBranchId] ?: persistentListOf()
             currentMessages.forEach { msg ->
-                appendLine("[${msg.role}]: ${msg.content.take(100)}...")
+                appendLine("[${msg.role}]: ${msg.content?.take(100)}...")
             }
         }
     }

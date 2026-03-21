@@ -45,7 +45,7 @@ class AutoRagMemoryProvider @Inject constructor(
             .getFact(agentId, MEMORY_KEY, CATEGORY_URL)?.fact
             ?: DEFAULT_URL
 
-        val ragResult = ragSearchRepository.search(prompt.content, serverUrl)
+        val ragResult = ragSearchRepository.search(prompt.content.orEmpty(), serverUrl)
             .getOrElse { return prompt }
 
         if (ragResult.isBlank()) return prompt

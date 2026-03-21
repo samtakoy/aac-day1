@@ -58,7 +58,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
         newMessages.addAll(initialHistory)
         
         // Добавляем prompt пользователя (сообщение, которое инициировало этот запрос)
-        if (prompt.content.isNotBlank()) {
+        if (prompt.content?.isBlank() == false) {
             messages.add(prompt.toModelRequestMessage())
             newMessages.add(prompt.toModelRequestMessage())
         }
@@ -102,7 +102,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
             // 3. Сохраняем assistant message с tool_calls (спецификация OpenRouter)
             val assistantMessage = ModelRequest.Message(
                 role = ModelRequest.Role.Assistant,
-                content = choice.message.content.orEmpty(),
+                content = choice.message.content,
                 toolCalls = toolCalls.map { call ->
                     ModelRequest.ToolCall(
                         id = call.id,

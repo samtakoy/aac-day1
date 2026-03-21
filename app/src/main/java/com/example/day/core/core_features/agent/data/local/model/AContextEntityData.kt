@@ -80,7 +80,7 @@ sealed interface AContextEntitySettings {
 @Serializable
 data class AContextMessageEntityData(
     val role: String,  // Role enum serialized as String
-    val content: String,
+    val content: String?,
     val toolCallId: String? = null,
     val toolCalls: List<ToolCallRefEntityData>? = null
 )
