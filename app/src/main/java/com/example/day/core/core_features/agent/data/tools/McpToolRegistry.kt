@@ -3,7 +3,7 @@ package com.example.day.core.core_features.agent.data.tools
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.agent.domain.tools.ToolCallingConstants
 import com.example.day.core.core_features.agent.domain.tools.ToolCallContext
-import com.example.day.core.core_features.agent.domain.tools.ToolProvider
+import com.example.day.core.core_features.agent.domain.tools.ToolRegistry
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.ModelResult
 import com.example.day.core.core_features.mcp.domain.model.McpToolCallContext
@@ -22,25 +22,25 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 /**
- * Tool provider that integrates with MCP servers.
+ * Tool registry that integrates with MCP servers.
  * 
  * Tool naming with multiple servers:
- * When multiple MCP servers provide tools with the same name, this provider uses
+ * When multiple MCP servers provide tools with the same name, this registry uses
  * namespacing to avoid conflicts:
  * - If only one server has "search_codebase", the tool is named "search_codebase"
  * - If multiple servers have "search_codebase", they are named "serverId:search_codebase"
  * 
  * Tool access control:
  * - Per-agent restrictions are managed via AgentMemoryRepository
- * - If no restrictions are set for an agent (allowedTools == null), all tools from 
+ * - If no restrictions are set for an agent (allowedTools == null), all tools from
  *   connected MCP servers are available
  */
-internal class McpToolProvider @Inject constructor(
+internal class McpToolRegistry @Inject constructor(
     private val repository: McpRepository,
     private val mcpTools: McpTools,
     private val agentMemoryRepository: AgentMemoryRepository,
     private val json: Json
-) : ToolProvider {
+) : ToolRegistry {
 
     private val toolToServer = ConcurrentHashMap<String, String>()
 

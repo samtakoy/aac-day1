@@ -107,7 +107,7 @@ class PlannerWorker @Inject constructor(
                         category = cmd.category,
                         fact = cmd.fact
                     )
-                    onEvent?.invoke(WorkerEvent.FactSaved(cmd.memoryKey, cmd.category, cmd.fact))
+                    onEvent?.invoke(WorkerEvent.Planner.FactSaved(cmd.memoryKey, cmd.category, cmd.fact))
                 }
 
                 // Handle COMPLETE_STAGE command — only the first occurrence per response
@@ -120,7 +120,7 @@ class PlannerWorker @Inject constructor(
                         parentId = parentId,
                         outcome = completeCmd.outcome
                     ).onSuccess {
-                        onEvent?.invoke(WorkerEvent.StageCompleted(chatId, completeCmd.outcome))
+                        onEvent?.invoke(WorkerEvent.Planner.StageCompleted(chatId, completeCmd.outcome))
                     }.onFailure {
                         it.printStackTrace()
                         // TODO инао сообщение в чат
@@ -131,7 +131,7 @@ class PlannerWorker @Inject constructor(
                 // Handle CREATE_STAGE commands (human-in-the-loop!)
                 if (!isStageChat) {
                     for (cmd in parsedResponse.createStageCommands) {
-                        onEvent?.invoke(WorkerEvent.StageCreationSuggested(
+                        onEvent?.invoke(WorkerEvent.Planner.StageCreationSuggested(
                             stageTitle = cmd.stageTitle,
                             workingSummary = cmd.workingSummary
                         ))

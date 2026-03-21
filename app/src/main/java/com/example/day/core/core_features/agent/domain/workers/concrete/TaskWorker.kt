@@ -15,7 +15,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.TaskResponse
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateData
 import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
-import com.example.day.core.core_features.agent.domain.tools.ToolProvider
+import com.example.day.core.core_features.agent.domain.tools.ToolRegistry
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
@@ -38,7 +38,7 @@ class TaskWorker @Inject constructor(
     private val llmRequestUseCase: LlmRequestUseCase,
     private val strategyFactory: StrategyFactory,
     private val stateStore: StateStore,
-    private val toolProvider: ToolProvider,
+    private val toolRegistry: ToolRegistry,
     private val toolCallOrchestrator: ToolCallOrchestrator
 ) : AWorker {
 
@@ -83,7 +83,7 @@ class TaskWorker @Inject constructor(
             llmProvider = llmRequestUseCase,
             strategy = strategy,
             memoryProvider = compositeProvider,
-            toolProvider = toolProvider,
+            toolRegistry = toolRegistry,
             orchestrator = toolCallOrchestrator
         )
 

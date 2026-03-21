@@ -8,7 +8,7 @@ data class ToolCallContext(
     val agentId: Long,
     /**
      * Map of tool names to server IDs.
-     * This is populated by ToolProvider.getTools() and used to route
+     * This is populated by ToolRegistry.getTools() and used to route
      * tool calls to the correct MCP server.
      * Format: "toolName" -> "serverId" or "serverId:toolName" -> "serverId"
      */

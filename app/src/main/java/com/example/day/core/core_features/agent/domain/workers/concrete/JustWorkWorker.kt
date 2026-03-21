@@ -99,13 +99,13 @@ class JustWorkWorker @Inject constructor(
 
         val eventHandler: suspend (WorkerEvent) -> Unit = { event ->
             when (event) {
-                is WorkerEvent.ToolCallStarted -> {
+                is WorkerEvent.Tool.ToolCallStarted -> {
                     chatTools.addInfoMessage(
                         config.chatId,
                         "${ToolCallingConstants.TOOL_EVENT_START_PREFIX}: ${event.toolName}"
                     )
                 }
-                is WorkerEvent.ToolCallFinished -> {
+                is WorkerEvent.Tool.ToolCallFinished -> {
                     val status = if (event.isError) "error" else "ok"
                     val formattedResult = formatToolResult(event.result)
                     chatTools.addInfoMessage(

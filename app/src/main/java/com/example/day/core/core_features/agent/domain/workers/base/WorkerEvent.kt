@@ -15,46 +15,56 @@ sealed interface WorkerEvent {
 
     // ========== TOOL CALLING EVENTS ==========
 
-    /** Model requested a tool call */
-    class ToolCallStarted(
-        val toolCallId: String,
-        val toolName: String,
-        val arguments: String
-    ) : WorkerEvent
+    /**
+     * Grouped tool-related events.
+     */
+    sealed interface Tool : WorkerEvent {
+        /** Model requested a tool call */
+        class ToolCallStarted(
+            val toolCallId: String,
+            val toolName: String,
+            val arguments: String
+        ) : Tool
 
-    /** Tool call finished */
-    class ToolCallFinished(
-        val toolCallId: String,
-        val toolName: String,
-        val result: String,
-        val isError: Boolean
-    ) : WorkerEvent
+        /** Tool call finished */
+        class ToolCallFinished(
+            val toolCallId: String,
+            val toolName: String,
+            val result: String,
+            val isError: Boolean
+        ) : Tool
+    }
 
     // ========== PLANNER-SPECIFIC EVENTS ==========
-    
+
     /**
-     * Planner suggests creating a new stage chat.
-     * UI should show confirmation button - chat is NOT created automatically.
+     * Grouped planner-specific events.
      */
-    class StageCreationSuggested(
-        val stageTitle: String,
-        val workingSummary: String
-    ) : WorkerEvent
-    
-    /**
-     * A stage has been marked as completed and artifact saved.
-     */
-    class StageCompleted(
-        val chatId: Long,
-        val artifactContent: String
-    ) : WorkerEvent
-    
-    /**
-     * A fact has been saved to long-term memory.
-     */
-    class FactSaved(
-        val memoryKey: String,
-        val category: String,
-        val fact: String
-    ) : WorkerEvent
+    sealed interface Planner : WorkerEvent {
+        /**
+         * Planner suggests creating a new stage chat.
+         * UI should show confirmation button - chat is NOT created automatically.
+         */
+        class StageCreationSuggested(
+            val stageTitle: String,
+            val workingSummary: String
+        ) : Planner
+
+        /**
+         * A stage has been marked as completed and artifact saved.
+         */
+        class StageCompleted(
+            val chatId: Long,
+            val artifactContent: String
+        ) : Planner
+
+        /**
+         * A fact has been saved to long-term memory.
+         */
+        class FactSaved(
+            val memoryKey: String,
+            val category: String,
+            val fact: String
+        ) : Planner
+    }
 }

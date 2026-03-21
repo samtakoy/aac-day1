@@ -7,7 +7,7 @@ import com.example.day.core.core_features.agent.domain.model.toModelRequestMessa
 import com.example.day.core.core_features.agent.domain.strategy.ContextStrategy
 import com.example.day.core.core_features.agent.domain.tools.ToolCallContext
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
-import com.example.day.core.core_features.agent.domain.tools.ToolProvider
+import com.example.day.core.core_features.agent.domain.tools.ToolRegistry
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
@@ -28,7 +28,7 @@ class AIAgent(
     // TODO больше тут не актуально - нужно вынести в AgentContextMemoryProvider или AgentMessageHistoryProvider
     private val strategy: ContextStrategy,
     private val memoryProvider: MemoryProvider,    // Долговременная + Рабочая
-    private val toolProvider: ToolProvider,
+    private val toolRegistry: ToolRegistry,
     private val orchestrator: ToolCallOrchestrator
 ) {
 
@@ -50,8 +50,8 @@ class AIAgent(
         val snapshot = strategy.process(config, contextRepository)
 
         // 2. Get tools and tool-to-server mapping for routing tool calls
-        val tools = toolProvider.getTools(agentId = config.id)
-        val toolToServerMap = toolProvider.getToolToServerMap()
+        val tools = toolRegistry.getTools(agentId = config.id)
+        val toolToServerMap = toolRegistry.getToolToServerMap()
 
         val result = orchestrator.execute(
             initialHistory = snapshot.messages.toModelRequestMessages(),

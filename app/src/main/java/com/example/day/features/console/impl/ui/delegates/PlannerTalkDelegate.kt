@@ -85,7 +85,7 @@ internal class PlannerTalkDelegate @Inject constructor(
 
     private suspend fun handleWorkerEvent(event: WorkerEvent, chatId: Long) {
         when (event) {
-            is WorkerEvent.StageCreationSuggested -> {
+            is WorkerEvent.Planner.StageCreationSuggested -> {
                 _plannerEventsFlow.emit(
                     PlannerUiEvent.StageCreationSuggested(
                         stageTitle = event.stageTitle,
@@ -93,7 +93,7 @@ internal class PlannerTalkDelegate @Inject constructor(
                     )
                 )
             }
-            is WorkerEvent.StageCompleted -> {
+            is WorkerEvent.Planner.StageCompleted -> {
                 _plannerEventsFlow.emit(
                     PlannerUiEvent.StageCompleted(
                         chatId = event.chatId,
@@ -101,7 +101,7 @@ internal class PlannerTalkDelegate @Inject constructor(
                     )
                 )
             }
-            is WorkerEvent.FactSaved -> {
+            is WorkerEvent.Planner.FactSaved -> {
                 _plannerEventsFlow.emit(
                     PlannerUiEvent.FactSaved(
                         memoryKey = event.memoryKey,
@@ -113,13 +113,13 @@ internal class PlannerTalkDelegate @Inject constructor(
             is WorkerEvent.RequestError -> {
                 chatTools.addBotMessage(chatId, "❌ Ошибка: ${event.text}")
             }
-            is WorkerEvent.ToolCallStarted -> {
+            is WorkerEvent.Tool.ToolCallStarted -> {
                 chatTools.addInfoMessage(
                     chatId,
                     "MCP tool: ${event.toolName}"
                 )
             }
-            is WorkerEvent.ToolCallFinished -> {
+            is WorkerEvent.Tool.ToolCallFinished -> {
                 val status = if (event.isError) "error" else "ok"
                 val formattedResult = formatToolResult(event.result)
                 chatTools.addInfoMessage(

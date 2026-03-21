@@ -51,11 +51,11 @@ class ConsumptionCalculator @Inject constructor(
                 chatTools.addInfoMessage(chat.id, infoMessage)
             }
             // Planner-specific events - no consumption tracking needed
-            is WorkerEvent.FactSaved -> Unit
-            is WorkerEvent.StageCompleted -> Unit
-            is WorkerEvent.StageCreationSuggested -> Unit
-            is WorkerEvent.ToolCallStarted -> Unit
-            is WorkerEvent.ToolCallFinished -> Unit
+            is WorkerEvent.Planner.FactSaved -> Unit
+            is WorkerEvent.Planner.StageCompleted -> Unit
+            is WorkerEvent.Planner.StageCreationSuggested -> Unit
+            is WorkerEvent.Tool.ToolCallStarted -> Unit
+            is WorkerEvent.Tool.ToolCallFinished -> Unit
         }
     }
 }

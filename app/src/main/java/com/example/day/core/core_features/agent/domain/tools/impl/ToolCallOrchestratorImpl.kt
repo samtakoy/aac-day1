@@ -4,12 +4,13 @@ import android.util.Log
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.toModelRequestMessage
 import com.example.day.core.core_features.agent.domain.tools.AssistantToolCall
+import com.example.day.core.core_features.agent.domain.tools.LlmExecutionRequest
 import com.example.day.core.core_features.agent.domain.tools.ToolCallContext
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
 import com.example.day.core.core_features.agent.domain.tools.ToolCallSession
 import com.example.day.core.core_features.agent.domain.tools.ToolCallingConstants
 import com.example.day.core.core_features.agent.domain.tools.ToolCallingResult
-import com.example.day.core.core_features.agent.domain.tools.ToolProvider
+import com.example.day.core.core_features.agent.domain.tools.ToolRegistry
 import com.example.day.core.core_features.agent.domain.tools.ToolResult
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.workers.base.askLlm
@@ -27,24 +28,26 @@ import javax.inject.Inject
  */
 class ToolCallOrchestratorImpl @Inject constructor(
     private val llmProvider: LlmRequestUseCase,
-    private val toolProvider: ToolProvider
+    private val toolRegistry: ToolRegistry
 ) : ToolCallOrchestrator {
 
     private companion object {
         private const val TAG = "ToolCallOrchestrator(ktor)"
-        private const val MAX_TOOL_LOOPS = 3
+        private const val MAX_TOOL_LOOPS = ToolCallingConstants.MAX_TOOL_LOOPS
     }
 
     override suspend fun execute(
-        initialHistory: List<ModelRequest.Message>,
-        memoryMessages: List<AContextMessage>,  // ← НОВОЕ: только для LLM запроса
-        prompt: AContextMessage,
-        systemPrompt: String?,
-        modelSettings: ModelSettings,
-        tools: List<ModelRequest.Tool>,
-        context: ToolCallContext,
+        request: LlmExecutionRequest,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ): Result<ToolCallingResult> {
+        val initialHistory = request.initialHistory
+        val memoryMessages = request.memoryMessages
+        val prompt = request.prompt
+        val systemPrompt = request.systemPrompt
+        val modelSettings = request.modelSettings
+        val tools = request.tools
+        val context = request.context
+
         // initialHistory — это история из БД (БЕЗ memoryMessages)
         // memoryMessages добавляются к initialHistory только для LLM запроса
 
@@ -125,7 +128,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
             for (call in toolCalls) {
                 // 4.1. Уведомляем о начале вызова
                 onEvent?.invoke(
-                    WorkerEvent.ToolCallStarted(
+                    WorkerEvent.Tool.ToolCallStarted(
                         toolCallId = call.id,
                         toolName = call.function.name,
                         arguments = call.function.arguments
@@ -134,7 +137,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
 
                 Log.d(TAG, "tool call ${call.function}, ${call.id}")
                 // 4.2. Выполняем инструмент — используем ModelResult.Success.ToolCall
-                val toolResult = toolProvider.executeToolCall(call, context)
+                val toolResult = toolRegistry.executeToolCall(call, context)
                 val content = toolResult.getOrElse { error ->
                     val errorText = error.message ?: ToolCallingConstants.UNKNOWN_TOOL_ERROR
                     "${ToolCallingConstants.MCP_TOOL_ERROR_PREFIX}: $errorText"
@@ -145,7 +148,6 @@ class ToolCallOrchestratorImpl @Inject constructor(
                         role = ModelRequest.Role.Tool,
                         content = content,
                         toolCallId = call.id,  // КРИТИЧНО: tool_call_id
-                        // TODO нет имени функции
                     )
                 )
                 toolResults.add(
@@ -157,7 +159,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
                 )
                 // 4.4. Уведомляем о завершении вызова
                 onEvent?.invoke(
-                    WorkerEvent.ToolCallFinished(
+                    WorkerEvent.Tool.ToolCallFinished(
                         toolCallId = call.id,
                         toolName = call.function.name,
                         result = content,
