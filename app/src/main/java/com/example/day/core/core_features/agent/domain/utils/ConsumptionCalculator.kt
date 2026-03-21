@@ -56,6 +56,8 @@ class ConsumptionCalculator @Inject constructor(
             is WorkerEvent.Planner.StageCreationSuggested -> Unit
             is WorkerEvent.Tool.ToolCallStarted -> Unit
             is WorkerEvent.Tool.ToolCallFinished -> Unit
+            is WorkerEvent.UserConfirmation.ActionConfirmation -> Unit
+            is WorkerEvent.UserConfirmation.ToolConfirmation -> Unit
         }
     }
 }

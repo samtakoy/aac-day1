@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,6 +51,7 @@ internal fun ConsoleScreen(
 ) {
     val state by viewModel.getStateAsFlow().collectAsStateWithLifecycle()
     val stageCreationState by viewModel.getStageCreationState().collectAsStateWithLifecycle()
+    val userConfirmationState by viewModel.getUserConfirmationState().collectAsStateWithLifecycle()
     val memoryInspectorState by viewModel.getMemoryInspectorState().collectAsStateWithLifecycle()
     var showMemoryInspector by remember { mutableStateOf(false) }
 
@@ -69,6 +71,25 @@ internal fun ConsoleScreen(
         onConfirm = { viewModel.onEvent(ConsoleViewModel.Event.ConfirmStageCreation) },
         onDismiss = { viewModel.onEvent(ConsoleViewModel.Event.DeclineStageCreation) }
     )
+
+    // User Confirmation Dialog (for dangerous/expensive operations)
+    userConfirmationState?.let { confirmState ->
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(ConsoleViewModel.Event.DeclineUserConfirmation) },
+            title = { Text(confirmState.title) },
+            text = { Text(confirmState.message) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.onEvent(ConsoleViewModel.Event.ConfirmUserConfirmation) }) {
+                    Text(confirmState.actionLabel)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.onEvent(ConsoleViewModel.Event.DeclineUserConfirmation) }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
 
     // Memory Inspector — full-height dialog with tab navigation for all 3 memory layers
     if (showMemoryInspector) {

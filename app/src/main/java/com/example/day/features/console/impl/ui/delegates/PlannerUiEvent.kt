@@ -33,4 +33,15 @@ sealed class PlannerUiEvent {
         val category: String,
         val fact: String
     ) : PlannerUiEvent()
+
+    /**
+     * User confirmation required before proceeding.
+     * Used for dangerous or expensive operations.
+     */
+    data class UserConfirmation(
+        val id: String,
+        val title: String,
+        val message: String,
+        val actionLabel: String
+    ) : PlannerUiEvent()
 }

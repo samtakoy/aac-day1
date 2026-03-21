@@ -20,6 +20,13 @@ internal interface ConsoleViewModel {
     fun getStageCreationState(): StateFlow<StageCreationSuggestion?>
     
     /**
+     * Returns the current user confirmation request.
+     * Null means no dialog should be shown.
+     * Non-null means show the confirmation dialog with these details.
+     */
+    fun getUserConfirmationState(): StateFlow<UserConfirmationState?>
+    
+    /**
      * Returns the Memory Inspector UI model showing all three memory layers.
      */
     fun getMemoryInspectorState(): StateFlow<MemoryInspectorUiModel>
@@ -43,6 +50,18 @@ internal interface ConsoleViewModel {
         val workingSummary: String
     )
 
+    /**
+     * Data class for user confirmation dialog.
+     * Null = hidden, non-null = show confirmation dialog.
+     */
+    @Immutable
+    data class UserConfirmationState(
+        val id: String,
+        val title: String,
+        val message: String,
+        val actionLabel: String
+    )
+
     sealed interface Event {
         object SubmitButtonClick : Event
         class InputChanged(val text: String) : Event
@@ -54,6 +73,10 @@ internal interface ConsoleViewModel {
         // Stage Creation events (PLANNER groups)
         object ConfirmStageCreation : Event
         object DeclineStageCreation : Event
+
+        // User Confirmation events
+        object ConfirmUserConfirmation : Event
+        object DeclineUserConfirmation : Event
 
         // Memory Inspector
         object OpenMemoryInspector : Event

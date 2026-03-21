@@ -83,6 +83,8 @@ internal class ConsoleViewModelImpl(
 
     private val _stageCreationState = MutableStateFlow<ConsoleViewModel.StageCreationSuggestion?>(null)
 
+    private val _userConfirmationState = MutableStateFlow<ConsoleViewModel.UserConfirmationState?>(null)
+
     private val _memoryInspectorState = MutableStateFlow(MemoryInspectorUiModel())
 
     init {
@@ -99,6 +101,14 @@ internal class ConsoleViewModelImpl(
                     is PlannerUiEvent.FactSaved -> { /* no-op: LTM flow handles the update */ }
                     is PlannerUiEvent.StageCompleted -> {
                         _state.update { it.copy(isStageCompleted = true) }
+                    }
+                    is PlannerUiEvent.UserConfirmation -> {
+                        _userConfirmationState.value = ConsoleViewModel.UserConfirmationState(
+                            id = event.id,
+                            title = event.title,
+                            message = event.message,
+                            actionLabel = event.actionLabel
+                        )
                     }
                 }
             }
@@ -178,6 +188,8 @@ internal class ConsoleViewModelImpl(
     override fun getStateAsFlow(): StateFlow<ConsoleViewModel.State> = _state
 
     override fun getStageCreationState(): StateFlow<ConsoleViewModel.StageCreationSuggestion?> = _stageCreationState
+
+    override fun getUserConfirmationState(): StateFlow<ConsoleViewModel.UserConfirmationState?> = _userConfirmationState
 
     override fun getMemoryInspectorState(): StateFlow<MemoryInspectorUiModel> = _memoryInspectorState
 
@@ -292,6 +304,16 @@ internal class ConsoleViewModelImpl(
 
             ConsoleViewModel.Event.DeclineStageCreation -> {
                 _stageCreationState.value = null
+            }
+
+            ConsoleViewModel.Event.ConfirmUserConfirmation -> {
+                // TODO: When we add true pause/resume, this will signal confirmation
+                _userConfirmationState.value = null
+            }
+
+            ConsoleViewModel.Event.DeclineUserConfirmation -> {
+                // TODO: When we add true pause/resume, this will signal rejection
+                _userConfirmationState.value = null
             }
 
             ConsoleViewModel.Event.OpenMemoryInspector -> {

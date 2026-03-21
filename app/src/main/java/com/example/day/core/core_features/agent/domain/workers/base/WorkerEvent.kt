@@ -67,4 +67,33 @@ sealed interface WorkerEvent {
             val fact: String
         ) : Planner
     }
+
+    // ========== USER CONFIRMATION EVENTS ==========
+
+    /**
+     * User confirmation request - emitted when agent needs user approval before proceeding.
+     * UI should show confirmation dialog and allow user to confirm or deny.
+     * 
+     * Note: This is informational only - worker does NOT pause. 
+     * For true pause/resume, a different mechanism (Channel, suspend callback) is needed.
+     */
+    sealed interface UserConfirmation : WorkerEvent {
+        /**
+         * Confirmation required before executing an action.
+         */
+        class ActionConfirmation(
+            val id: String,
+            val title: String,
+            val message: String,
+            val actionLabel: String
+        ) : UserConfirmation
+        
+        /**
+         * Confirmation required before using a tool.
+         */
+        class ToolConfirmation(
+            val toolName: String,
+            val arguments: String
+        ) : UserConfirmation
+    }
 }

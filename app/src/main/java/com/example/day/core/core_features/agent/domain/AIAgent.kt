@@ -5,6 +5,7 @@ import com.example.day.core.core_features.agent.domain.model.AIAgentResult
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.agent.domain.model.toModelRequestMessages
 import com.example.day.core.core_features.agent.domain.strategy.ContextStrategy
+import com.example.day.core.core_features.agent.domain.tools.LlmExecutionRequest
 import com.example.day.core.core_features.agent.domain.tools.ToolCallContext
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
 import com.example.day.core.core_features.agent.domain.tools.ToolRegistry
@@ -54,17 +55,19 @@ class AIAgent(
         val toolToServerMap = toolRegistry.getToolToServerMap()
 
         val result = orchestrator.execute(
-            initialHistory = snapshot.messages.toModelRequestMessages(),
-            memoryMessages = memoryMessages,  // ← НОВОЕ: только для LLM запроса
-            prompt = enrichedPrompt,
-            systemPrompt = config.systemPrompt,
-            modelSettings = config.modelSettings,
-            tools = tools,
-            context = ToolCallContext(
-                agentId = config.id,
-                toolToServer = toolToServerMap
+            LlmExecutionRequest(
+                initialHistory = snapshot.messages.toModelRequestMessages(),
+                memoryMessages = memoryMessages,
+                prompt = enrichedPrompt,
+                systemPrompt = config.systemPrompt,
+                modelSettings = config.modelSettings,
+                tools = tools,
+                context = ToolCallContext(
+                    agentId = config.id,
+                    toolToServer = toolToServerMap
+                )
             ),
-            onEvent = onEvent
+            onEvent
         )
 
         return result.map { toolCallingResult ->

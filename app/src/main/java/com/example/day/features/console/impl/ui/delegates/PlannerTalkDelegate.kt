@@ -127,6 +127,26 @@ internal class PlannerTalkDelegate @Inject constructor(
                     "MCP result ($status): ${event.toolName}\n$formattedResult"
                 )
             }
+            is WorkerEvent.UserConfirmation.ActionConfirmation -> {
+                _plannerEventsFlow.emit(
+                    PlannerUiEvent.UserConfirmation(
+                        id = event.id,
+                        title = event.title,
+                        message = event.message,
+                        actionLabel = event.actionLabel
+                    )
+                )
+            }
+            is WorkerEvent.UserConfirmation.ToolConfirmation -> {
+                _plannerEventsFlow.emit(
+                    PlannerUiEvent.UserConfirmation(
+                        id = "tool:${event.toolName}",
+                        title = "Подтвердите действие",
+                        message = "Выполнить tool call ${event.toolName}?",
+                        actionLabel = event.toolName
+                    )
+                )
+            }
             else -> { /* Ignore other events */ }
         }
     }
