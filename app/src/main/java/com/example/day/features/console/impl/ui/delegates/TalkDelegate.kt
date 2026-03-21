@@ -3,10 +3,6 @@ package com.example.day.features.console.impl.ui.delegates
 import com.example.day.core.core_features.chat.domain.model.Chat
 import kotlinx.coroutines.flow.SharedFlow
 
-/**
- * Base interface for all TalkDelegates.
- * Provides optional plannerEvents for PLANNER-type delegates.
- */
 interface TalkDelegate {
     suspend fun tryAddUserMessage(
         chat: Chat,
@@ -14,19 +10,21 @@ interface TalkDelegate {
         onSuccess: () -> Unit
     )
 
-    /**
-     * Handle button click action from chat message.
-     */
     suspend fun tryHandleAction(
         chat: Chat,
         messageId: Long,
         action: String
     )
 
-    /**
-     * Optional events stream for PLANNER-type delegates.
-     * Returns null for non-PLANNER delegates.
-     */
+    suspend fun tryHandleConfirmation(
+        chat: Chat,
+        runId: String,
+        confirmationId: String,
+        approved: Boolean
+    ) {
+        // Optional. Not all delegates support resumable tool-calling.
+    }
+
     @Suppress("UNCHECKED_CAST")
     fun <T> getPlannerEvents(): SharedFlow<T>? = null
 }

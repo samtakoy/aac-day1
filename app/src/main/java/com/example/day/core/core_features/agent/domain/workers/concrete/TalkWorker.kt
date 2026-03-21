@@ -1,7 +1,9 @@
 package com.example.day.core.core_features.agent.domain.workers.concrete
 
+import com.example.day.core.core_features.agent.domain.AIAgent
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
+import com.example.day.core.core_features.agent.domain.model.AIAgentResult
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.agent.domain.tools.ToolCallingConstants
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
@@ -15,28 +17,8 @@ import kotlinx.serialization.json.JsonElement
 import javax.inject.Inject
 
 /**
- * Agent with context support and context compression (Context Management).
+ * Agent with context support and context compression.
  * Saves message history between requests to database.
- *
- * Supports commands:
- * - @@talk(info) - display context settings
- * - @@talk(context) - display full context content
- * - @@talk(setup --msg X --extra Y) - configure Summarization strategy
- * - @@talk(setup_sliding --msg X) - configure SlidingWindow strategy
- * - @@talk(setup_sticky --msg X --facts Y) - configure StickyFacts strategy
- * - @@talk(setup_branches --main X) - configure Branching strategy
- * - @@talk(new_branch --id X) - create new branch
- * - @@talk(switch_branch --id X) - switch to branch
- * - @@talk(list_branches) - list all branches
- * - @@talk(delete_branch --id X) - delete branch
- * - @@talk(agent --addrule "текст") - добавить новое правило диалога
- * - @@talk(agent --listrules) - вывести список всех правил диалога
- * - @@talk(agent --clearrules) - удалить все правила диалога
- * - @@talk(rag --on) - включить RAG-обогащение промптов через rag-server
- * - @@talk(rag --off) - выключить RAG
- * - @@talk(rag --state) - показать статус RAG и URL сервера
- * - @@talk(rag --url <url>) - задать URL rag-server (default: http://10.0.2.2:3001)
- * - @@talk <text> - send text to LLM
  */
 class TalkWorker @Inject constructor(
     private val aiAgentFactory: AIAgentFactory,
@@ -44,11 +26,10 @@ class TalkWorker @Inject constructor(
     private val chatTools: ChatTools,
     private val json: Json
 ) : AWorker {
-    private companion object {
+    companion object {
         const val AGENT_NAME = "talk_agent"
     }
 
-    // TODO почему это тут оказалось?
     private val innerCommandParser = InnerCommandParser()
 
     override suspend fun doWork(
@@ -62,10 +43,22 @@ class TalkWorker @Inject constructor(
         processMessage(userPrompt, userRole, chat, onEvent)
     }
 
-    /**
-     * Process a command if present in input.
-     * @return true if command was handled
-     */
+    suspend fun handleConfirmation(
+        chat: Chat,
+        runId: String,
+        confirmationId: String,
+        approved: Boolean,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ) {
+        val result = getAgent(chat).resume(
+            runId = runId,
+            confirmationId = confirmationId,
+            approved = approved,
+            onEvent = createEventHandler(chat.id, onEvent)
+        )
+        handleAgentResult(chat.id, result)
+    }
+
     private suspend fun processCommand(task: String, chat: Chat): Boolean {
         val parseResult = innerCommandParser.tryExtractCommand(task)
 
@@ -82,54 +75,67 @@ class TalkWorker @Inject constructor(
         }
     }
 
-    /**
-     * Process a regular message (non-command) through the AI agent.
-     */
     private suspend fun processMessage(
         userPrompt: String,
         userRole: AContextMessage.Role,
         chat: Chat,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
-        val agent = aiAgentFactory.getOrCreate(
+        val result = getAgent(chat).process(
+            AContextMessage(userRole, userPrompt),
+            createEventHandler(chat.id, onEvent)
+        )
+        handleAgentResult(chat.id, result)
+    }
+
+    private suspend fun getAgent(chat: Chat): AIAgent {
+        return aiAgentFactory.getOrCreate(
             AGENT_NAME,
             chat.id,
             chat.settings.systemPromt,
             defaultModel = { chat.settings.model },
             defaultContext = { AContextDefaultFactory.createFull() }
         )
-        val eventHandler: suspend (WorkerEvent) -> Unit = { event ->
-            when (event) {
-                is WorkerEvent.Tool.ToolCallStarted -> {
-                    chatTools.addInfoMessage(
-                        chat.id,
-                        "${ToolCallingConstants.TOOL_EVENT_START_PREFIX}: ${event.toolName}"
-                    )
-                }
-                is WorkerEvent.Tool.ToolCallFinished -> {
-                    val status = if (event.isError) "error" else "ok"
-                    val formattedResult = formatToolResult(event.result)
-                    chatTools.addInfoMessage(
-                        chat.id,
-                        "${ToolCallingConstants.TOOL_EVENT_RESULT_PREFIX} ($status): ${event.toolName}\n$formattedResult"
-                    )
-                }
-                else -> Unit
-            }
-            onEvent?.invoke(event)
-        }
+    }
 
-        agent.process(AContextMessage(userRole, userPrompt), eventHandler)
-            .onSuccess { result ->
-                result.requestDebugInfo?.let { chatTools.addInfoMessage(chat.id, it) }
-                result.reportMessage?.let { chatTools.addInfoMessage(chat.id, it) }
-                if (result.responseText.isNotBlank()) {
-                    chatTools.addBotMessage(chat.id, result.responseText)
-                }
+    private fun createEventHandler(
+        chatId: Long,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ): suspend (WorkerEvent) -> Unit = { event ->
+        when (event) {
+            is WorkerEvent.Tool.ToolCallStarted -> {
+                chatTools.addInfoMessage(
+                    chatId,
+                    "${ToolCallingConstants.TOOL_EVENT_START_PREFIX}: ${event.toolName}"
+                )
             }
-            .onFailure { exception ->
-                chatTools.addBotMessage(chat.id, exception.stackTraceToString())
+            is WorkerEvent.Tool.ToolCallFinished -> {
+                val status = if (event.isError) "error" else "ok"
+                val formattedResult = formatToolResult(event.result)
+                chatTools.addInfoMessage(
+                    chatId,
+                    "${ToolCallingConstants.TOOL_EVENT_RESULT_PREFIX} ($status): ${event.toolName}\n$formattedResult"
+                )
             }
+            else -> Unit
+        }
+        onEvent?.invoke(event)
+    }
+
+    private suspend fun handleAgentResult(chatId: Long, result: Result<AIAgentResult>) {
+        result.onSuccess { agentResult ->
+            agentResult.requestDebugInfo?.let { chatTools.addInfoMessage(chatId, it) }
+            agentResult.reportMessage?.let { chatTools.addInfoMessage(chatId, it) }
+            if (agentResult.isPaused) {
+                chatTools.addInfoMessage(chatId, ToolCallingConstants.WAITING_CONFIRMATION_MESSAGE)
+                return@onSuccess
+            }
+            if (agentResult.responseText.isNotBlank()) {
+                chatTools.addBotMessage(chatId, agentResult.responseText)
+            }
+        }.onFailure { exception ->
+            chatTools.addBotMessage(chatId, exception.stackTraceToString())
+        }
     }
 
     private fun formatToolResult(raw: String): String {

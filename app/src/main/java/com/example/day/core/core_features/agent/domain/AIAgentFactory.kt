@@ -2,19 +2,18 @@ package com.example.day.core.core_features.agent.domain
 
 import com.example.day.core.core_features.agent.domain.model.AContext
 import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
+import com.example.day.core.core_features.agent.domain.tools.ExecutionSessionManager
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
 import com.example.day.core.core_features.agent.domain.tools.ToolRegistry
 import com.example.day.core.core_features.agent.domain.usecase.GetOrCreateAgentUseCase
-import com.example.day.core.core_features.chat.domain.model.Chat
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProviderFactory
+import java.util.UUID
 import javax.inject.Inject
 
 /**
  * Factory for creating [AIAgent] instances.
- * Resolves AgentConfig, selects the appropriate ContextStrategy, and wires all dependencies.
  */
 class AIAgentFactory @Inject constructor(
     private val getOrCreateAgentUseCase: GetOrCreateAgentUseCase,
@@ -23,6 +22,7 @@ class AIAgentFactory @Inject constructor(
     private val contextRepository: AgentContextRepository,
     private val llmRequestUseCase: LlmRequestUseCase,
     private val toolRegistry: ToolRegistry,
+    private val executionSessionManager: ExecutionSessionManager,
     private val toolCallOrchestrator: ToolCallOrchestrator
 ) {
     suspend fun getOrCreate(
@@ -47,13 +47,15 @@ class AIAgentFactory @Inject constructor(
             agentId = config.id
         )
         return AIAgent(
-            config,
-            contextRepository,
-            llmRequestUseCase,
-            strategy,
-            memoryProvider,
-            toolRegistry,
-            toolCallOrchestrator
+            config = config,
+            contextRepository = contextRepository,
+            llmProvider = llmRequestUseCase,
+            strategy = strategy,
+            memoryProvider = memoryProvider,
+            toolRegistry = toolRegistry,
+            executionSessionManager = executionSessionManager,
+            runIdProvider = { "${config.id}:${UUID.randomUUID()}" },
+            orchestrator = toolCallOrchestrator
         )
     }
 }

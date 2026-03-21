@@ -8,14 +8,15 @@ import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.TaskLlmResponse
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
+import com.example.day.core.core_features.agent.domain.tools.ExecutionSessionManager
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
+import com.example.day.core.core_features.agent.domain.tools.ToolRegistry
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.workers.task.TaskResponseParser
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateData
 import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
-import com.example.day.core.core_features.agent.domain.tools.ToolRegistry
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
@@ -23,11 +24,12 @@ import com.example.day.core.core_features.memory.domain.provider.CompositeMemory
 import com.example.day.core.core_features.memory.domain.provider.TaskStateMemoryProviderFactory
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProviderFactory
 import com.example.day.core.core_features.state_machine.domain.StateStore
+import java.util.UUID
 import javax.inject.Inject
 
 /**
  * Worker for task state machine.
- * Manages task lifecycle: INIT → PLANNING → EXECUTION → VERIFICATION → DONE
+ * Manages task lifecycle: INIT -> PLANNING -> EXECUTION -> VERIFICATION -> DONE
  */
 class TaskWorker @Inject constructor(
     private val aiAgentFactory: AIAgentFactory,
@@ -39,6 +41,7 @@ class TaskWorker @Inject constructor(
     private val strategyFactory: StrategyFactory,
     private val stateStore: StateStore,
     private val toolRegistry: ToolRegistry,
+    private val executionSessionManager: ExecutionSessionManager,
     private val toolCallOrchestrator: ToolCallOrchestrator
 ) : AWorker {
 
@@ -46,16 +49,12 @@ class TaskWorker @Inject constructor(
         const val AGENT_NAME = "task_state_agent"
     }
 
-    /**
-     * TODO синхронизировать взаимодействие с воркерами через каналы.
-     * */
     override suspend fun doWork(
         userPrompt: String,
         chat: Chat,
         userRole: AContextMessage.Role,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
-        // Get or create agent. System prompt is empty — TaskStateMemoryProvider manages it dynamically.
         val agent = aiAgentFactory.getOrCreate(
             AGENT_NAME,
             chat.id,
@@ -76,7 +75,6 @@ class TaskWorker @Inject constructor(
         val strategy = strategyFactory.create(agent.config.contextStrategyType)
 
         Log.e("ktor", "init agent: ${agent.config.id}")
-        // Create new agent instance with composite memory provider
         val agentWithTaskState = AIAgent(
             config = agent.config,
             contextRepository = contextRepository,
@@ -84,36 +82,67 @@ class TaskWorker @Inject constructor(
             strategy = strategy,
             memoryProvider = compositeProvider,
             toolRegistry = toolRegistry,
+            executionSessionManager = executionSessionManager,
+            runIdProvider = { "${agent.config.id}:${UUID.randomUUID()}" },
             orchestrator = toolCallOrchestrator
         )
 
-        //  current state to chat before LLM call
         reportCurrentState(chat.id, taskContext)
 
-        // Call agent.process() for automatic context management
         val result = agentWithTaskState.process(
             prompt = AContextMessage(AContextMessage.Role.USER, userPrompt),
             onEvent = onEvent
         )
 
-        // debug message
         result.getOrNull()?.requestDebugInfo?.let { debugString ->
             chatTools.addInfoMessage(chat.id, debugString)
         }
 
-        // process result
-        result.fold(
-            onSuccess = { agentResult ->
-                val llmResponse = TaskResponseParser.parse(agentResult.responseText)
-                if (llmResponse != null) {
-                    processSuccessResponse(taskContext, userPrompt, llmResponse, agentResult.responseText, onEvent)
-                } else {
-                    handleParseError(chat.id, agentResult.responseText)
-                }
-            },
-            onFailure = { error ->
-                handleLlmError(chat.id, error)
-            }
+        handleAgentResult(
+            chat = chat,
+            taskContext = taskContext,
+            userInput = userPrompt,
+            result = result,
+            onEvent = onEvent
+        )
+    }
+
+    suspend fun handleConfirmation(
+        chat: Chat,
+        runId: String,
+        confirmationId: String,
+        approved: Boolean,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ) {
+        val session = executionSessionManager.get(runId)
+        if (session == null) {
+            chatTools.addInfoMessage(chat.id, "Confirmation session not found", emptyList())
+            return
+        }
+
+        val agent = aiAgentFactory.getOrCreate(
+            AGENT_NAME,
+            chat.id,
+            "",
+            defaultModel = { chat.settings.model.copy(jsonFormat = true) },
+            defaultContext = { AContextDefaultFactory.createEmpty() }
+        )
+        val taskContext = TaskContext(chat = chat, agentId = agent.config.id, store = stateStore)
+        val userInput = session.requestSnapshot.prompt.content.orEmpty()
+
+        val result = agent.resume(
+            runId = runId,
+            confirmationId = confirmationId,
+            approved = approved,
+            onEvent = onEvent
+        )
+
+        handleAgentResult(
+            chat = chat,
+            taskContext = taskContext,
+            userInput = userInput,
+            result = result,
+            onEvent = onEvent
         )
     }
 
@@ -134,9 +163,8 @@ class TaskWorker @Inject constructor(
             else chatTools.addBotMessage(chat.id, msg.message, msg.buttons)
         }
 
-        // Если handler не найден - покажем Info сообщение
         if (result == null) {
-            chatTools.addInfoMessage(chat.id, "Обработчик не найден", emptyList())
+            chatTools.addInfoMessage(chat.id, "Handler not found", emptyList())
             return
         }
 
@@ -145,25 +173,45 @@ class TaskWorker @Inject constructor(
         }
     }
 
-    /** Все MemoryProvider для агента: стандартные + для выдачи промптов текущего стейта */
+    private suspend fun handleAgentResult(
+        chat: Chat,
+        taskContext: TaskContext,
+        userInput: String,
+        result: Result<com.example.day.core.core_features.agent.domain.model.AIAgentResult>,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ) {
+        result.fold(
+            onSuccess = { agentResult ->
+                if (agentResult.isPaused) {
+                    return@fold
+                }
+                val llmResponse = TaskResponseParser.parse(agentResult.responseText)
+                if (llmResponse != null) {
+                    processSuccessResponse(taskContext, userInput, llmResponse, agentResult.responseText, onEvent)
+                } else {
+                    handleParseError(chat.id, agentResult.responseText)
+                }
+            },
+            onFailure = { error ->
+                handleLlmError(chat.id, error)
+            }
+        )
+    }
+
     private fun buildMemoryProvider(
         chat: Chat,
         agent: AIAgent
     ): CompositeMemoryProvider {
-        // Create TaskStateMemoryProvider using factory (injects TaskStateStore + Json)
         val taskStateProvider = taskStateMemoryProviderFactory.create(
             chat = chat,
             agentId = agent.config.id
         )
 
-        // Base memory from agent config (e.g. UserProfile if configured)
         val baseMemoryProvider = memoryProviderFactory.create(agent.config.memoryTypes)
 
-        // Create composite provider: task state prompt + base memory
-        val compositeProvider = CompositeMemoryProvider(
+        return CompositeMemoryProvider(
             listOf(taskStateProvider, baseMemoryProvider)
         )
-        return compositeProvider
     }
 
     private suspend fun reportCurrentState(
@@ -172,23 +220,20 @@ class TaskWorker @Inject constructor(
     ) {
         val step = taskContext.getCurStepNum()
         val totalStages = taskContext.getTotalSteps()
-        val stageName = taskContext.getCurStepNum()
 
         val stateDescription = when (taskContext.getState()) {
-            TaskStateConfig.INIT -> "Сбор требований и определение задачи"
-            TaskStateConfig.PLANNING -> "Декомпозиция задачи на этапы"
+            TaskStateConfig.INIT -> "Collecting requirements and defining the task"
+            TaskStateConfig.PLANNING -> "Decomposing task into steps"
             TaskStateConfig.EXECUTION -> buildString {
-                append("Выполнение этапа $step")
-                if (totalStages > 0) append(" из $totalStages")
+                append("Executing step $step")
+                if (totalStages > 0) append(" of $totalStages")
             }
-            TaskStateConfig.VERIFICATION -> buildString {
-                append("Проверка задачи")
-            }
-            TaskStateConfig.DONE -> "Формирование итогового отчёта"
-            else -> "Неизвестно"
+            TaskStateConfig.VERIFICATION -> "Verifying task result"
+            TaskStateConfig.DONE -> "Preparing final report"
+            else -> "Unknown"
         }
 
-        chatTools.addInfoMessage(chatId, "📍 Было Состояние: ${taskContext.getState()?.value} — $stateDescription")
+        chatTools.addInfoMessage(chatId, "Current state: ${taskContext.getState()?.value} - $stateDescription")
     }
 
     private suspend fun processSuccessResponse(
@@ -200,25 +245,21 @@ class TaskWorker @Inject constructor(
     ) {
         val stateConfig = TaskStateConfig.config
         val currentState = context.getState()!!
-        val handler =  stateConfig.handlers[currentState]!!
+        val handler = stateConfig.handlers[currentState]!!
 
-        // Handle state logic
         val result = handler.handle(context, userInput, llmResponse)
 
-        // 1. Сообщения в чат
         result.messages.forEach { msg ->
             when {
-                msg.isTitle -> chatTools.addTitleMessage(context.   chat.id, msg.message, msg.buttons)
+                msg.isTitle -> chatTools.addTitleMessage(context.chat.id, msg.message, msg.buttons)
                 msg.isInfo -> chatTools.addInfoMessage(context.chat.id, msg.message, msg.buttons)
                 else -> chatTools.addBotMessage(context.chat.id, msg.message, msg.buttons)
             }
         }
-        // Отладочное при ошибке
         if (result.errorMessage != null) {
-            chatTools.addBotMessage(context.chat.id, "Что-то пошло не так: ${result.errorMessage}\n$rawResponse")
+            chatTools.addBotMessage(context.chat.id, "Something went wrong: ${result.errorMessage}\n$rawResponse")
         }
 
-        // Loop back
         if (result.llmRequest != null) {
             doWork(
                 userPrompt = result.llmRequest.userPrompt.orEmpty(),
@@ -254,7 +295,7 @@ class TaskWorker @Inject constructor(
     ) {
         chatTools.addInfoMessage(
             chatId,
-            "⚠️ Не удалось обработать ответ от LLM. Пожалуйста, попробуйте переформулировать запрос.\n\nrawResponse: $rawResponse"
+            "Could not parse LLM response. Please try to reformulate the request.\n\nrawResponse: $rawResponse"
         )
     }
 
@@ -262,7 +303,7 @@ class TaskWorker @Inject constructor(
         chatId: Long,
         error: Throwable,
     ) {
-        val errorMessage = "❌ Ошибка при обращении к LLM: ${error.message}"
+        val errorMessage = "LLM request error: ${error.message}"
         chatTools.addBotMessage(chatId, errorMessage)
     }
 }

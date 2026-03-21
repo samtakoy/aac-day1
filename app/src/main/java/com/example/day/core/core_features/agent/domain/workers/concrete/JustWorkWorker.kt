@@ -1,8 +1,10 @@
 package com.example.day.core.core_features.agent.domain.workers.concrete
 
+import com.example.day.core.core_features.agent.domain.AIAgent
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
 import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
+import com.example.day.core.core_features.agent.domain.model.AIAgentResult
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.agent.domain.tools.ToolCallingConstants
@@ -17,20 +19,6 @@ import javax.inject.Inject
 
 /**
  * Worker for creating and using agents with custom settings from anywhere in the code.
- * Unlike TalkWorker, it is not bound to chat commands and accepts agent configuration directly.
- *
- * Usage:
- * ```
- * val config = JustWorkConfig(
- *     agentName = "git_file_investigator",
- *     chatId = chatId,
- *     systemPrompt = "...",
- *     allowedTools = listOf("get_git_file_list", "get_file_analysis"),
- *     defaultModel = { ... },
- *     defaultContext = { AContextDefaultFactory.createFull() }
- * )
- * val result = justWorkWorker.doWork(config, userPrompt)
- * ```
  */
 class JustWorkWorker @Inject constructor(
     private val aiAgentFactory: AIAgentFactory,
@@ -40,17 +28,6 @@ class JustWorkWorker @Inject constructor(
     private val json: Json
 ) {
 
-    /**
-     * Process a message using an agent with custom configuration.
-     * Returns the agent's final response text.
-     * Progress notifications (tool events, debug info) are still sent to chat as info messages.
-     *
-     * @param config Agent configuration
-     * @param userPrompt User message to process
-     * @param userRole Role of the user message (default: USER)
-     * @param onEvent Callback for worker events (optional)
-     * @return Result with the agent's final response text
-     */
     suspend fun doWork(
         config: JustWorkConfig,
         userPrompt: String,
@@ -58,23 +35,47 @@ class JustWorkWorker @Inject constructor(
         onEvent: (suspend (WorkerEvent) -> Unit)? = null
     ): Result<String> {
         if (config.recreateAgent) {
-            // TODO пока так, но нужно переделать на очистку историй сообщений агента
-            //  Пока он используется с чистой историей на старте
             agentRepository.deleteAgent(
                 systemName = config.agentName,
                 chatId = config.chatId
             )
         }
 
-        val agent = aiAgentFactory.getOrCreate(
+        return processAgentResult(
+            config = config,
+            result = getAgent(config).process(
+                AContextMessage(userRole, userPrompt),
+                createEventHandler(config, onEvent)
+            )
+        )
+    }
+
+    suspend fun resume(
+        config: JustWorkConfig,
+        runId: String,
+        confirmationId: String,
+        approved: Boolean,
+        onEvent: (suspend (WorkerEvent) -> Unit)? = null
+    ): Result<String> {
+        return processAgentResult(
+            config = config,
+            result = getAgent(config).resume(
+                runId = runId,
+                confirmationId = confirmationId,
+                approved = approved,
+                onEvent = createEventHandler(config, onEvent)
+            )
+        )
+    }
+
+    private suspend fun getAgent(config: JustWorkConfig): AIAgent {
+        return aiAgentFactory.getOrCreate(
             systemName = config.agentName,
             chatId = config.chatId,
-            systemPrompt = "",  // ПУСТО! systemPrompt настраивается через onCreateCallback
+            systemPrompt = "",
             defaultModel = config.defaultModel,
             defaultContext = { AContextDefaultFactory.createFull() },
             onCreateCallback = { agentId ->
-                // Настройка systemPrompt и allowedTools при первом создании агента
-                // Сохраняем системный промпт
                 if (config.systemPrompt.isNotBlank()) {
                     agentMemoryRepository.upsertFact(
                         agentId = agentId,
@@ -83,8 +84,7 @@ class JustWorkWorker @Inject constructor(
                         fact = config.systemPrompt
                     )
                 }
-                
-                // Сохраняем список разрешенных tools (если не пустой)
+
                 if (config.allowedTools.isNotEmpty()) {
                     val toolsJson = json.encodeToString(config.allowedTools)
                     agentMemoryRepository.upsertFact(
@@ -96,34 +96,45 @@ class JustWorkWorker @Inject constructor(
                 }
             }
         )
+    }
 
-        val eventHandler: suspend (WorkerEvent) -> Unit = { event ->
-            when (event) {
-                is WorkerEvent.Tool.ToolCallStarted -> {
-                    chatTools.addInfoMessage(
-                        config.chatId,
-                        "${ToolCallingConstants.TOOL_EVENT_START_PREFIX}: ${event.toolName}"
-                    )
-                }
-                is WorkerEvent.Tool.ToolCallFinished -> {
-                    val status = if (event.isError) "error" else "ok"
-                    val formattedResult = formatToolResult(event.result)
-                    chatTools.addInfoMessage(
-                        config.chatId,
-                        "${ToolCallingConstants.TOOL_EVENT_RESULT_PREFIX} ($status): ${event.toolName}\n$formattedResult"
-                    )
-                }
-                else -> Unit
+    private fun createEventHandler(
+        config: JustWorkConfig,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ): suspend (WorkerEvent) -> Unit = { event ->
+        when (event) {
+            is WorkerEvent.Tool.ToolCallStarted -> {
+                chatTools.addInfoMessage(
+                    config.chatId,
+                    "${ToolCallingConstants.TOOL_EVENT_START_PREFIX}: ${event.toolName}"
+                )
             }
-            onEvent?.invoke(event)
+            is WorkerEvent.Tool.ToolCallFinished -> {
+                val status = if (event.isError) "error" else "ok"
+                val formattedResult = formatToolResult(event.result)
+                chatTools.addInfoMessage(
+                    config.chatId,
+                    "${ToolCallingConstants.TOOL_EVENT_RESULT_PREFIX} ($status): ${event.toolName}\n$formattedResult"
+                )
+            }
+            else -> Unit
         }
+        onEvent?.invoke(event)
+    }
 
-        return agent.process(AContextMessage(userRole, userPrompt), eventHandler)
-            .mapCatching { result ->
-                result.requestDebugInfo?.let { chatTools.addInfoMessage(config.chatId, it) }
-                result.reportMessage?.let { chatTools.addInfoMessage(config.chatId, it) }
-                result.responseText
+    private suspend fun processAgentResult(
+        config: JustWorkConfig,
+        result: Result<AIAgentResult>
+    ): Result<String> {
+        return result.mapCatching { agentResult ->
+            agentResult.requestDebugInfo?.let { chatTools.addInfoMessage(config.chatId, it) }
+            agentResult.reportMessage?.let { chatTools.addInfoMessage(config.chatId, it) }
+            if (agentResult.isPaused) {
+                chatTools.addInfoMessage(config.chatId, ToolCallingConstants.WAITING_CONFIRMATION_MESSAGE)
+                error("${ToolCallingConstants.CONFIRMATION_REQUIRED_PREFIX}: ${agentResult.runId}")
             }
+            agentResult.responseText
+        }
     }
 
     private fun formatToolResult(raw: String): String {
@@ -133,3 +144,4 @@ class JustWorkWorker @Inject constructor(
         return runCatching { json.encodeToString(JsonElement.serializer(), element) }.getOrDefault(raw)
     }
 }
+

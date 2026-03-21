@@ -1,83 +1,250 @@
 package com.example.day.core.core_features.agent.domain.tools.impl
 
 import android.util.Log
-import com.example.day.core.core_features.agent.domain.model.AContextMessage
-import com.example.day.core.core_features.agent.domain.model.toModelRequestMessage
 import com.example.day.core.core_features.agent.domain.tools.AssistantToolCall
+import com.example.day.core.core_features.agent.domain.tools.ExecutionSession
+import com.example.day.core.core_features.agent.domain.tools.ExecutionSessionManager
+import com.example.day.core.core_features.agent.domain.tools.ExecutionSessionStatus
 import com.example.day.core.core_features.agent.domain.tools.LlmExecutionRequest
-import com.example.day.core.core_features.agent.domain.tools.ToolCallContext
+import com.example.day.core.core_features.agent.domain.tools.PendingToolCall
+import com.example.day.core.core_features.agent.domain.tools.ToolCallManager
+import com.example.day.core.core_features.agent.domain.tools.ToolCallManagerResult
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
 import com.example.day.core.core_features.agent.domain.tools.ToolCallSession
 import com.example.day.core.core_features.agent.domain.tools.ToolCallingConstants
 import com.example.day.core.core_features.agent.domain.tools.ToolCallingResult
-import com.example.day.core.core_features.agent.domain.tools.ToolRegistry
+import com.example.day.core.core_features.agent.domain.tools.ToolExecutionResult
 import com.example.day.core.core_features.agent.domain.tools.ToolResult
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.workers.base.askLlm
+import com.example.day.core.core_features.agent.domain.model.AContextMessage
+import com.example.day.core.core_features.agent.domain.model.toModelRequestMessage
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.ModelResult
-import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.llm.domain.model.getContent
-import kotlinx.collections.immutable.toPersistentList
 import javax.inject.Inject
 
-/**
- * Реализация ToolCallOrchestrator.
- * Управляет циклом tool calling согласно спецификации OpenRouter.
- */
 class ToolCallOrchestratorImpl @Inject constructor(
     private val llmProvider: LlmRequestUseCase,
-    private val toolRegistry: ToolRegistry
+    private val executionSessionManager: ExecutionSessionManager,
+    private val toolCallManager: ToolCallManager
 ) : ToolCallOrchestrator {
 
     private companion object {
         private const val TAG = "ToolCallOrchestrator(ktor)"
         private const val MAX_TOOL_LOOPS = ToolCallingConstants.MAX_TOOL_LOOPS
+        private const val USER_DENIED_TOOL = "Tool execution denied by user"
     }
 
     override suspend fun execute(
         request: LlmExecutionRequest,
+        runId: String,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ): Result<ToolCallingResult> {
-        val initialHistory = request.initialHistory
-        val memoryMessages = request.memoryMessages
-        val prompt = request.prompt
-        val systemPrompt = request.systemPrompt
-        val modelSettings = request.modelSettings
-        val tools = request.tools
-        val context = request.context
+        var session = executionSessionManager.get(runId)
+            ?: return Result.failure(IllegalStateException("Execution session not found: $runId"))
 
-        // initialHistory — это история из БД (БЕЗ memoryMessages)
-        // memoryMessages добавляются к initialHistory только для LLM запроса
+        val messages = if (session.llmMessages.isNotEmpty()) {
+            session.llmMessages.toMutableList()
+        } else {
+            buildInitialMessages(request)
+        }
+        val newMessages = if (session.newMessages.isNotEmpty()) {
+            session.newMessages.toMutableList()
+        } else {
+            buildInitialNewMessages(request)
+        }
+        val toolCallSessions = session.toolCallSessions.toMutableList()
 
-        // messages — полная история для LLM (memoryMessages + initialHistory + новые)
-        val messages = (memoryMessages.map { it.toModelRequestMessage() } + initialHistory).toMutableList()
+        session = session.copy(
+            status = ExecutionSessionStatus.Running,
+            llmMessages = messages.toList(),
+            newMessages = newMessages.toList(),
+            toolCallSessions = toolCallSessions.toList()
+        )
+        executionSessionManager.update(session)
 
-        // newMessages — сообщения для сохранения в БД (initialHistory + prompt + новые)
-        val newMessages = mutableListOf<ModelRequest.Message>()
-        
-        // Добавляем initialHistory — это старая история из БД, которую нужно сохранить
-        newMessages.addAll(initialHistory)
-        
-        // Добавляем prompt пользователя (сообщение, которое инициировало этот запрос)
-        if (prompt.content?.isBlank() == false) {
-            messages.add(prompt.toModelRequestMessage())
-            newMessages.add(prompt.toModelRequestMessage())
+        return continueExecution(
+            runId = runId,
+            session = session,
+            request = request,
+            messages = messages,
+            newMessages = newMessages,
+            toolCallSessions = toolCallSessions,
+            onEvent = onEvent
+        )
+    }
+
+    override suspend fun resume(
+        runId: String,
+        confirmationId: String,
+        approved: Boolean,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ): Result<ToolCallingResult> {
+        var session = executionSessionManager.get(runId)
+            ?: return Result.failure(IllegalStateException("Execution session not found: $runId"))
+
+        val pendingToolCall = session.pendingToolCall
+        if (pendingToolCall == null) {
+            return if (session.resolvedConfirmationId == confirmationId) {
+                Result.success(buildResultFromSession(session))
+            } else {
+                Result.failure(IllegalStateException("No pending confirmation for runId: $runId"))
+            }
         }
 
-        val sessions = mutableListOf<ToolCallSession>()
+        if (pendingToolCall.confirmationId != confirmationId) {
+            return Result.failure(IllegalStateException("Stale confirmationId for runId: $runId"))
+        }
+
+        val request = session.requestSnapshot
+        val messages = session.llmMessages.toMutableList()
+        val newMessages = session.newMessages.toMutableList()
+        val toolCallSessions = session.toolCallSessions.toMutableList()
+        val assistantToolCall = session.currentAssistantToolCall
+            ?: return Result.failure(IllegalStateException("Missing assistant tool call session for runId: $runId"))
+        val toolResults = session.currentToolResults.toMutableList()
+        val toolMessages = toolResults.map(::toToolMessage).toMutableList()
+
+        val pendingResult = if (approved) {
+            toolCallManager.executePendingToolCall(pendingToolCall, request.context)
+        } else {
+            ToolExecutionResult.Denied(USER_DENIED_TOOL)
+        }
+
+        val resolvedToolResult = toToolResult(pendingToolCall, pendingResult)
+        toolResults.add(resolvedToolResult)
+        toolMessages.add(toToolMessage(resolvedToolResult))
+        onEvent?.invoke(
+            WorkerEvent.Tool.ToolCallFinished(
+                toolCallId = pendingToolCall.toolCallId,
+                toolName = pendingToolCall.toolName,
+                result = resolvedToolResult.content,
+                isError = resolvedToolResult.isError
+            )
+        )
+
+        for (index in (session.currentToolIndex + 1) until assistantToolCall.toolCalls.size) {
+            val call = assistantToolCall.toolCalls[index]
+            onEvent?.invoke(
+                WorkerEvent.Tool.ToolCallStarted(
+                    toolCallId = call.id,
+                    toolName = call.function.name,
+                    arguments = call.function.arguments
+                )
+            )
+
+            when (val managedCall = toolCallManager.handleToolCall(call, request.context)) {
+                is ToolCallManagerResult.Executed -> {
+                    val toolResult = toToolResult(
+                        pendingToolCall = PendingToolCall(
+                            toolCallId = call.id,
+                            toolName = call.function.name,
+                            arguments = call.function.arguments,
+                            type = call.type,
+                            confirmationId = ""
+                        ),
+                        executionResult = managedCall.result
+                    )
+                    toolResults.add(toolResult)
+                    toolMessages.add(toToolMessage(toolResult))
+                    onEvent?.invoke(
+                        WorkerEvent.Tool.ToolCallFinished(
+                            toolCallId = call.id,
+                            toolName = call.function.name,
+                            result = toolResult.content,
+                            isError = toolResult.isError
+                        )
+                    )
+                }
+
+                is ToolCallManagerResult.ConfirmationRequired -> {
+                    session = session.copy(
+                        status = ExecutionSessionStatus.WaitingUserConfirmation,
+                        pendingToolCall = managedCall.pending,
+                        currentAssistantToolCall = assistantToolCall,
+                        currentToolResults = toolResults.toList(),
+                        currentToolIndex = index,
+                        resolvedConfirmationId = confirmationId
+                    )
+                    executionSessionManager.update(session)
+                    onEvent?.invoke(
+                        WorkerEvent.UserConfirmation.Requested(
+                            confirmationId = managedCall.request.confirmationId,
+                            runId = runId,
+                            title = managedCall.request.title,
+                            message = managedCall.request.message,
+                            actionLabel = managedCall.request.actionLabel
+                        )
+                    )
+                    return Result.success(
+                        ToolCallingResult(
+                            finalResponseText = session.finalResponseText,
+                            toolCallSessions = toolCallSessions,
+                            allMessages = newMessages.toAContextMessages(),
+                            isPaused = true,
+                            pendingConfirmationId = managedCall.request.confirmationId,
+                            runId = runId
+                        )
+                    )
+                }
+            }
+        }
+
+        messages.addAll(toolMessages)
+        newMessages.addAll(toolMessages)
+        toolCallSessions.add(
+            ToolCallSession(
+                assistantMessage = assistantToolCall,
+                toolResults = toolResults.toList()
+            )
+        )
+
+        session = session.copy(
+            status = ExecutionSessionStatus.Running,
+            pendingToolCall = null,
+            currentAssistantToolCall = null,
+            currentToolResults = emptyList(),
+            currentToolIndex = 0,
+            llmMessages = messages.toList(),
+            newMessages = newMessages.toList(),
+            toolCallSessions = toolCallSessions.toList(),
+            resolvedConfirmationId = confirmationId
+        )
+        executionSessionManager.update(session)
+
+        return continueExecution(
+            runId = runId,
+            session = session,
+            request = request,
+            messages = messages,
+            newMessages = newMessages,
+            toolCallSessions = toolCallSessions,
+            onEvent = onEvent
+        )
+    }
+
+    private suspend fun continueExecution(
+        runId: String,
+        session: ExecutionSession,
+        request: LlmExecutionRequest,
+        messages: MutableList<ModelRequest.Message>,
+        newMessages: MutableList<ModelRequest.Message>,
+        toolCallSessions: MutableList<ToolCallSession>,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ): Result<ToolCallingResult> {
+        var currentSession = session
         var loopIndex = 0
         var lastLlmResult: ModelResult.Success? = null
 
         while (loopIndex < MAX_TOOL_LOOPS) {
-            // 1. Запрос к LLM
             val llmResult = llmProvider.askLlm(
-                model = modelSettings,
+                model = request.modelSettings,
                 prompt = null,
-                systemPrompt = systemPrompt,
+                systemPrompt = request.systemPrompt,
                 history = messages,
-                tools = tools.ifEmpty { null },
+                tools = request.tools.ifEmpty { null },
                 onEvent = onEvent
             ).getOrElse { error ->
                 Log.e(TAG, "LLM request failed on iteration $loopIndex", error)
@@ -88,21 +255,22 @@ class ToolCallOrchestratorImpl @Inject constructor(
             val choice = llmResult.choices.firstOrNull()
             val toolCalls = choice?.message?.toolCalls
 
-            // 2. Если нет tool calls — это финальный ответ
             if (toolCalls.isNullOrEmpty()) {
-                Log.d(TAG, "Tool loop: нет tool calls, возвращаем ответ (итерация $loopIndex)")
-                return Result.success(
-                    ToolCallingResult(
-                        finalResponseText = llmResult.getContent(),
-                        toolCallSessions = sessions,
-                        allMessages = newMessages.toAContextMessages()  // ← ТОЛЬКО новые сообщения
-                    )
+                currentSession = currentSession.copy(
+                    status = ExecutionSessionStatus.Completed,
+                    llmMessages = messages.toList(),
+                    newMessages = newMessages.toList(),
+                    toolCallSessions = toolCallSessions.toList(),
+                    pendingToolCall = null,
+                    currentAssistantToolCall = null,
+                    currentToolResults = emptyList(),
+                    currentToolIndex = 0,
+                    finalResponseText = llmResult.getContent()
                 )
+                executionSessionManager.update(currentSession)
+                return Result.success(buildResultFromSession(currentSession))
             }
 
-            Log.d(TAG, "Tool loop: получено ${toolCalls.size} tool calls (итерация $loopIndex)")
-
-            // 3. Сохраняем assistant message с tool_calls (спецификация OpenRouter)
             val assistantMessage = ModelRequest.Message(
                 role = ModelRequest.Role.Assistant,
                 content = choice.message.content,
@@ -117,16 +285,17 @@ class ToolCallOrchestratorImpl @Inject constructor(
                     )
                 }
             )
+            val assistantToolCall = AssistantToolCall(
+                content = choice.message.content,
+                toolCalls = toolCalls.toList()
+            )
             messages.add(assistantMessage)
-            newMessages.add(assistantMessage)  // ← Синхронно добавляем в оба массива
+            newMessages.add(assistantMessage)
 
-            // 4. Выполняем tool calls и собираем результаты
             val toolResults = mutableListOf<ToolResult>()
             val toolMessages = mutableListOf<ModelRequest.Message>()
-            var hasError = false
 
-            for (call in toolCalls) {
-                // 4.1. Уведомляем о начале вызова
+            for ((index, call) in toolCalls.withIndex()) {
                 onEvent?.invoke(
                     WorkerEvent.Tool.ToolCallStarted(
                         toolCallId = call.id,
@@ -135,87 +304,156 @@ class ToolCallOrchestratorImpl @Inject constructor(
                     )
                 )
 
-                Log.d(TAG, "tool call ${call.function}, ${call.id}")
-                // 4.2. Выполняем инструмент — используем ModelResult.Success.ToolCall
-                val toolResult = toolRegistry.executeToolCall(call, context)
-                val content = toolResult.getOrElse { error ->
-                    val errorText = error.message ?: ToolCallingConstants.UNKNOWN_TOOL_ERROR
-                    "${ToolCallingConstants.MCP_TOOL_ERROR_PREFIX}: $errorText"
-                }
+                when (val managedCall = toolCallManager.handleToolCall(call, request.context)) {
+                    is ToolCallManagerResult.Executed -> {
+                        val toolResult = toToolResult(
+                            pendingToolCall = PendingToolCall(
+                                toolCallId = call.id,
+                                toolName = call.function.name,
+                                arguments = call.function.arguments,
+                                type = call.type,
+                                confirmationId = ""
+                            ),
+                            executionResult = managedCall.result
+                        )
+                        toolResults.add(toolResult)
+                        toolMessages.add(toToolMessage(toolResult))
+                        onEvent?.invoke(
+                            WorkerEvent.Tool.ToolCallFinished(
+                                toolCallId = call.id,
+                                toolName = call.function.name,
+                                result = toolResult.content,
+                                isError = toolResult.isError
+                            )
+                        )
+                    }
 
-                toolMessages.add(
-                    ModelRequest.Message(
-                        role = ModelRequest.Role.Tool,
-                        content = content,
-                        toolCallId = call.id,  // КРИТИЧНО: tool_call_id
-                    )
-                )
-                toolResults.add(
-                    ToolResult(
-                        toolCallId = call.id,
-                        content = content,
-                        isError = toolResult.isFailure
-                    )
-                )
-                // 4.4. Уведомляем о завершении вызова
-                onEvent?.invoke(
-                    WorkerEvent.Tool.ToolCallFinished(
-                        toolCallId = call.id,
-                        toolName = call.function.name,
-                        result = content,
-                        isError = toolResult.isFailure
-                    )
-                )
-
-                Log.d(
-                    TAG,
-                    "Tool call '${call.function.name}': ${if (toolResult.isFailure) "ERROR" else "OK"}"
-                )
-
-                // 4.5. Остановка при ошибке (не прерываем сразу, добавляем в результаты)
-                if (toolResult.isFailure) {
-                    hasError = true
+                    is ToolCallManagerResult.ConfirmationRequired -> {
+                        currentSession = currentSession.copy(
+                            status = ExecutionSessionStatus.WaitingUserConfirmation,
+                            pendingToolCall = managedCall.pending,
+                            llmMessages = messages.toList(),
+                            newMessages = newMessages.toList(),
+                            toolCallSessions = toolCallSessions.toList(),
+                            currentAssistantToolCall = assistantToolCall,
+                            currentToolResults = toolResults.toList(),
+                            currentToolIndex = index,
+                            finalResponseText = lastLlmResult?.getContent().orEmpty()
+                        )
+                        executionSessionManager.update(currentSession)
+                        onEvent?.invoke(
+                            WorkerEvent.UserConfirmation.Requested(
+                            confirmationId = managedCall.request.confirmationId,
+                            runId = runId,
+                            title = managedCall.request.title,
+                                message = managedCall.request.message,
+                                actionLabel = managedCall.request.actionLabel
+                            )
+                        )
+                        return Result.success(
+                            ToolCallingResult(
+                                finalResponseText = currentSession.finalResponseText,
+                                toolCallSessions = toolCallSessions,
+                                allMessages = newMessages.toAContextMessages(),
+                                isPaused = true,
+                                pendingConfirmationId = managedCall.request.confirmationId,
+                                runId = runId
+                            )
+                        )
+                    }
                 }
             }
 
-            // Добавляем tool messages в историю
             messages.addAll(toolMessages)
-            newMessages.addAll(toolMessages)  // ← Синхронно добавляем в оба массива
-
-            // Сохраняем сессию
-            sessions.add(
+            newMessages.addAll(toolMessages)
+            toolCallSessions.add(
                 ToolCallSession(
-                    assistantMessage = AssistantToolCall(
-                        content = choice.message.content,
-                        toolCalls = toolCalls
-                    ),
-                    toolResults = toolResults
+                    assistantMessage = assistantToolCall,
+                    toolResults = toolResults.toList()
                 )
             )
 
-            // При ошибке инструмента — НЕ прерываем цикл досрочно.
-            // Следующая итерация даёт LLM возможность сформировать финальный ответ с объяснением ошибки.
-            if (hasError) {
-                Log.w(TAG, "Tool loop: ошибка инструмента на итерации $loopIndex, продолжаем для получения финального ответа")
-            }
-
+            currentSession = currentSession.copy(
+                status = ExecutionSessionStatus.Running,
+                llmMessages = messages.toList(),
+                newMessages = newMessages.toList(),
+                toolCallSessions = toolCallSessions.toList(),
+                pendingToolCall = null,
+                currentAssistantToolCall = null,
+                currentToolResults = emptyList(),
+                currentToolIndex = 0,
+                finalResponseText = lastLlmResult.getContent()
+            )
+            executionSessionManager.update(currentSession)
             loopIndex++
         }
 
-        // Достигнут лимит итераций
-        Log.d(TAG, "Tool loop: достигнут лимит итераций ($MAX_TOOL_LOOPS)")
-        return Result.success(
-            ToolCallingResult(
-                finalResponseText = lastLlmResult?.getContent().orEmpty(),
-                toolCallSessions = sessions,
-                allMessages = newMessages.toAContextMessages()  // ← ТОЛЬКО новые сообщения
-            )
+        currentSession = currentSession.copy(
+            status = ExecutionSessionStatus.Completed,
+            llmMessages = messages.toList(),
+            newMessages = newMessages.toList(),
+            toolCallSessions = toolCallSessions.toList(),
+            finalResponseText = lastLlmResult?.getContent().orEmpty()
+        )
+        executionSessionManager.update(currentSession)
+        return Result.success(buildResultFromSession(currentSession))
+    }
+
+    private fun buildInitialMessages(request: LlmExecutionRequest): MutableList<ModelRequest.Message> {
+        return (request.memoryMessages.map { it.toModelRequestMessage() } + request.initialHistory).toMutableList().apply {
+            if (request.prompt.content?.isBlank() == false) {
+                add(request.prompt.toModelRequestMessage())
+            }
+        }
+    }
+
+    private fun buildInitialNewMessages(request: LlmExecutionRequest): MutableList<ModelRequest.Message> {
+        return buildList {
+            addAll(request.initialHistory)
+            if (request.prompt.content?.isBlank() == false) {
+                add(request.prompt.toModelRequestMessage())
+            }
+        }.toMutableList()
+    }
+
+    private fun toToolResult(
+        pendingToolCall: PendingToolCall,
+        executionResult: ToolExecutionResult
+    ): ToolResult {
+        val content = when (executionResult) {
+            is ToolExecutionResult.Success -> executionResult.payload
+            is ToolExecutionResult.Denied -> executionResult.reason
+            is ToolExecutionResult.Failed -> {
+                "${ToolCallingConstants.MCP_TOOL_ERROR_PREFIX}: ${executionResult.error}"
+            }
+        }
+        val isError = executionResult is ToolExecutionResult.Failed
+        return ToolResult(
+            toolCallId = pendingToolCall.toolCallId,
+            content = content,
+            isError = isError
         )
     }
 
-    /**
-     * Маппинг ModelRequest.Message → AContextMessage
-     */
+    private fun toToolMessage(toolResult: ToolResult): ModelRequest.Message {
+        return ModelRequest.Message(
+            role = ModelRequest.Role.Tool,
+            content = toolResult.content,
+            toolCallId = toolResult.toolCallId
+        )
+    }
+
+    private fun buildResultFromSession(session: ExecutionSession): ToolCallingResult {
+        return ToolCallingResult(
+            finalResponseText = session.finalResponseText,
+            toolCallSessions = session.toolCallSessions,
+            allMessages = session.newMessages.toAContextMessages(),
+            isPaused = session.status == ExecutionSessionStatus.WaitingUserConfirmation,
+            pendingConfirmationId = session.pendingToolCall?.confirmationId,
+            runId = session.runId
+        )
+    }
+
     private fun List<ModelRequest.Message>.toAContextMessages(): List<AContextMessage> {
         return map { msg ->
             AContextMessage(
@@ -239,3 +477,6 @@ class ToolCallOrchestratorImpl @Inject constructor(
         }
     }
 }
+
+
+

@@ -1,7 +1,7 @@
 package com.example.day.features.console.impl.ui.delegates
 
-import com.example.day.core.core_features.agent.domain.workers.concrete.TaskWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
+import com.example.day.core.core_features.agent.domain.workers.concrete.TaskWorker
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
@@ -15,21 +15,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import javax.inject.Inject
 
-/**
- * Делегат для PLANNER-типа групп чатов.
- * В отличие от AgentsTalkDelegate, не требует команд (@@talk, @@simple).
- * Все сообщения отправляются напрямую в PlannerWorker для обработки
- * с учётом трёхуровневой архитектуры памяти.
- */
 internal class PlannerTalkDelegate @Inject constructor(
     private val addChatMessageUseCase: AddChatMessageUseCase,
-    // private val plannerWorker: PlannerWorker,
     private val taskWorker: TaskWorker,
     private val chatTools: ChatTools,
     private val json: Json
 ) : TalkDelegate {
 
-    // Events for UI (stage creation suggestions, etc.)
     private val _plannerEventsFlow = MutableSharedFlow<PlannerUiEvent>()
     val plannerEventsFlow: SharedFlow<PlannerUiEvent> = _plannerEventsFlow.asSharedFlow()
 
@@ -38,7 +30,6 @@ internal class PlannerTalkDelegate @Inject constructor(
         inputText: String,
         onSuccess: () -> Unit
     ) {
-        // добавить сообщение пользователя в чат
         addChatMessageUseCase.invoke(
             chatId = chat.id,
             timestamp = System.currentTimeMillis(),
@@ -50,7 +41,6 @@ internal class PlannerTalkDelegate @Inject constructor(
 
         onSuccess.invoke()
 
-        // Отправляем сообщение напрямую в taskWorker без проверки команд
         try {
             taskWorker.doWork(
                 userPrompt = inputText,
@@ -75,6 +65,27 @@ internal class PlannerTalkDelegate @Inject constructor(
             }
         } catch (e: Throwable) {
             chatTools.addInfoMessage(chat.id, "Action error: ${e.message}", emptyList())
+        }
+    }
+
+    override suspend fun tryHandleConfirmation(
+        chat: Chat,
+        runId: String,
+        confirmationId: String,
+        approved: Boolean
+    ) {
+        try {
+            taskWorker.handleConfirmation(
+                chat = chat,
+                runId = runId,
+                confirmationId = confirmationId,
+                approved = approved,
+                onEvent = { event ->
+                    handleWorkerEvent(event, chat.id)
+                }
+            )
+        } catch (e: Throwable) {
+            chatTools.addInfoMessage(chat.id, "Confirmation error: ${e.message}", emptyList())
         }
     }
 
@@ -111,7 +122,7 @@ internal class PlannerTalkDelegate @Inject constructor(
                 )
             }
             is WorkerEvent.RequestError -> {
-                chatTools.addBotMessage(chatId, "❌ Ошибка: ${event.text}")
+                chatTools.addBotMessage(chatId, "Error: ${event.text}")
             }
             is WorkerEvent.Tool.ToolCallStarted -> {
                 chatTools.addInfoMessage(
@@ -127,27 +138,18 @@ internal class PlannerTalkDelegate @Inject constructor(
                     "MCP result ($status): ${event.toolName}\n$formattedResult"
                 )
             }
-            is WorkerEvent.UserConfirmation.ActionConfirmation -> {
+            is WorkerEvent.UserConfirmation.Requested -> {
                 _plannerEventsFlow.emit(
                     PlannerUiEvent.UserConfirmation(
-                        id = event.id,
+                        id = event.confirmationId,
+                        runId = event.runId,
                         title = event.title,
                         message = event.message,
                         actionLabel = event.actionLabel
                     )
                 )
             }
-            is WorkerEvent.UserConfirmation.ToolConfirmation -> {
-                _plannerEventsFlow.emit(
-                    PlannerUiEvent.UserConfirmation(
-                        id = "tool:${event.toolName}",
-                        title = "Подтвердите действие",
-                        message = "Выполнить tool call ${event.toolName}?",
-                        actionLabel = event.toolName
-                    )
-                )
-            }
-            else -> { /* Ignore other events */ }
+            else -> Unit
         }
     }
 
@@ -158,3 +160,5 @@ internal class PlannerTalkDelegate @Inject constructor(
         return runCatching { json.encodeToString(JsonElement.serializer(), element) }.getOrDefault(raw)
     }
 }
+
+

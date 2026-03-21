@@ -80,15 +80,11 @@ internal class ConsoleViewModelImpl(
     private var currentLtmFacts: List<LongTermMemoryFact> = emptyList()
 
     private val _expandedStates = MutableStateFlow(persistentMapOf<Long, Boolean>())
-
     private val _stageCreationState = MutableStateFlow<ConsoleViewModel.StageCreationSuggestion?>(null)
-
     private val _userConfirmationState = MutableStateFlow<ConsoleViewModel.UserConfirmationState?>(null)
-
     private val _memoryInspectorState = MutableStateFlow(MemoryInspectorUiModel())
 
     init {
-        // Subscribe to Planner events (stage creation suggestions)
         talkDelegate.getPlannerEvents<PlannerUiEvent>()
             ?.onEach { event ->
                 when (event) {
@@ -98,13 +94,14 @@ internal class ConsoleViewModelImpl(
                             workingSummary = event.workingSummary
                         )
                     }
-                    is PlannerUiEvent.FactSaved -> { /* no-op: LTM flow handles the update */ }
+                    is PlannerUiEvent.FactSaved -> Unit
                     is PlannerUiEvent.StageCompleted -> {
                         _state.update { it.copy(isStageCompleted = true) }
                     }
                     is PlannerUiEvent.UserConfirmation -> {
                         _userConfirmationState.value = ConsoleViewModel.UserConfirmationState(
                             id = event.id,
+                            runId = event.runId,
                             title = event.title,
                             message = event.message,
                             actionLabel = event.actionLabel
@@ -114,7 +111,6 @@ internal class ConsoleViewModelImpl(
             }
             ?.launchIn(viewModelScope)
 
-        // Subscribe to chat data
         getChatByIdAsFlowUseCase(chatId)
             .onEach { chatData ->
                 chat = chatData
@@ -123,7 +119,6 @@ internal class ConsoleViewModelImpl(
             }
             .launchIn(viewModelScope)
 
-        // Subscribe to messages
         getMessagesUseCase(chatId)
             .onEach { messages ->
                 val expandedStates = _expandedStates.value
@@ -147,10 +142,18 @@ internal class ConsoleViewModelImpl(
                                         ChatMessageStatus.Viewed -> UiMessageStatus.Viewed
                                     },
                                     avatarUrl = msg.user.avatar,
-                                    isExpanded = expandedStates[msg.id] ?: (msg.type == ChatMessage.Type.Buttons || msg.type == ChatMessage.Type.Title),
+                                    isExpanded = expandedStates[msg.id]
+                                        ?: (msg.type == ChatMessage.Type.Buttons || msg.type == ChatMessage.Type.Title),
                                     buttons = msg.buttons?.let { b ->
                                         ChatMessageUiModel.Buttons(
-                                            list = b.list.map { ChatMessageUiModel.Button(it.actionId, it.title, it.description, it.isPressed) },
+                                            list = b.list.map {
+                                                ChatMessageUiModel.Button(
+                                                    it.actionId,
+                                                    it.title,
+                                                    it.description,
+                                                    it.isPressed
+                                                )
+                                            },
                                             isEnabled = b.isEnabled
                                         )
                                     }
@@ -163,7 +166,6 @@ internal class ConsoleViewModelImpl(
             }
             .launchIn(viewModelScope)
 
-        // Subscribe to LTM reactively (only for PLANNER chats where UseCase is provided)
         getLtmByGroupUseCase?.let { ltmUseCase ->
             getChatByIdAsFlowUseCase(chatId)
                 .filterNotNull()
@@ -175,7 +177,6 @@ internal class ConsoleViewModelImpl(
                 .launchIn(viewModelScope)
         }
 
-        // Subscribe to artifacts — marks stage as completed when artifact is saved
         artifactRepository?.getArtifactsForChat(chatId)
             ?.onEach { artifacts ->
                 if (artifacts.isNotEmpty()) {
@@ -186,11 +187,8 @@ internal class ConsoleViewModelImpl(
     }
 
     override fun getStateAsFlow(): StateFlow<ConsoleViewModel.State> = _state
-
     override fun getStageCreationState(): StateFlow<ConsoleViewModel.StageCreationSuggestion?> = _stageCreationState
-
     override fun getUserConfirmationState(): StateFlow<ConsoleViewModel.UserConfirmationState?> = _userConfirmationState
-
     override fun getMemoryInspectorState(): StateFlow<MemoryInspectorUiModel> = _memoryInspectorState
 
     private fun refreshMemoryInspector() {
@@ -256,11 +254,10 @@ internal class ConsoleViewModelImpl(
             ConsoleViewModel.Event.OpenSettingsClick -> {
                 chatSettings?.let { settings ->
                     _state.update {
-                        it.copy(settings = ChatSettingsUiModel("Настройки", chat?.title.orEmpty(), settings))
+                        it.copy(settings = ChatSettingsUiModel("Settings", chat?.title.orEmpty(), settings))
                     }
                 }
             }
-
             ConsoleViewModel.Event.SettingsCancelClick -> {
                 _state.update { it.copy(settings = null) }
             }
@@ -283,7 +280,6 @@ internal class ConsoleViewModelImpl(
                     state.copy(chatList = state.chatList.copy(messages = updatedMessages))
                 }
             }
-
             ConsoleViewModel.Event.ConfirmStageCreation -> {
                 val currentState = _stageCreationState.value ?: return
                 val mainChat = chat ?: return
@@ -294,34 +290,53 @@ internal class ConsoleViewModelImpl(
                             stageTitle = currentState.stageTitle,
                             workingSummary = currentState.workingSummary
                         )
-                    } catch (e: Exception) {
-                        // Keep state so user can retry
+                    } catch (_: Exception) {
                         return@launch
                     }
                     _stageCreationState.value = null
                 }
             }
-
             ConsoleViewModel.Event.DeclineStageCreation -> {
                 _stageCreationState.value = null
             }
-
             ConsoleViewModel.Event.ConfirmUserConfirmation -> {
-                // TODO: When we add true pause/resume, this will signal confirmation
-                _userConfirmationState.value = null
+                val confirmationState = _userConfirmationState.value ?: return
+                val currentChat = chat ?: return
+                viewModelScope.launch {
+                    try {
+                        talkDelegate.tryHandleConfirmation(
+                            chat = currentChat,
+                            runId = confirmationState.runId,
+                            confirmationId = confirmationState.id,
+                            approved = true
+                        )
+                        _userConfirmationState.value = null
+                    } catch (_: Throwable) {
+                        // keep dialog state for retry
+                    }
+                }
             }
-
             ConsoleViewModel.Event.DeclineUserConfirmation -> {
-                // TODO: When we add true pause/resume, this will signal rejection
-                _userConfirmationState.value = null
+                val confirmationState = _userConfirmationState.value ?: return
+                val currentChat = chat ?: return
+                viewModelScope.launch {
+                    try {
+                        talkDelegate.tryHandleConfirmation(
+                            chat = currentChat,
+                            runId = confirmationState.runId,
+                            confirmationId = confirmationState.id,
+                            approved = false
+                        )
+                        _userConfirmationState.value = null
+                    } catch (_: Throwable) {
+                        // keep dialog state for retry
+                    }
+                }
             }
-
             ConsoleViewModel.Event.OpenMemoryInspector -> {
                 refreshMemoryInspector()
             }
-
-            ConsoleViewModel.Event.ToggleMemoryInspector -> { /* tab-based UI — no-op */ }
-
+            ConsoleViewModel.Event.ToggleMemoryInspector -> Unit
             is ConsoleViewModel.Event.ChatButtonClick -> {
                 val currentChat = chat ?: return
                 viewModelScope.launch {
