@@ -24,9 +24,18 @@ interface RagSearchRepository {
      * Search codebase via rag-server REST endpoint.
      * @param query user query text
      * @param serverUrl base URL, e.g. "http://10.0.2.2:3001"
+     * @param taskStateJson JSON строка TaskState (опционально, для QueryOptimizer)
+     * @param shortHistory сжатая история диалога (опционально, для QueryOptimizer)
+     * @param preset pipeline preset, по умолчанию "reranked_llm"
      * @return formatted search results or failure
      */
-    suspend fun search(query: String, serverUrl: String): Result<String>
+    suspend fun search(
+        query: String,
+        serverUrl: String,
+        taskStateJson: String? = null,
+        shortHistory: String? = null,
+        preset: String = "reranked_llm",
+    ): Result<String>
 
     /**
      * Run evaluation: send questions through multiple pipeline presets.
@@ -52,6 +61,17 @@ interface RagSearchRepository {
         items: List<RuntestResultItem>,
         serverUrl: String,
     ): Result<RuntestSaveResponse>
+
+    /**
+     * Отправляет ответ LLM на rag-server для логирования в session-файл.
+     * Fire-and-forget: ошибки не критичны, только логируются.
+     */
+    suspend fun logLlmResponse(
+        userMessage: String,
+        assistantResponse: String,
+        taskStateJson: String?,
+        serverUrl: String,
+    ): Result<Unit>
 }
 
 data class RagEvalItem(

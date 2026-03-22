@@ -12,7 +12,6 @@ import com.example.day.core.core_features.agent.data.local.model.AgentToMemoryTy
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.model.AContext
-import com.example.day.core.core_features.agent.domain.model.AContextParams
 import com.example.day.core.core_features.agent.domain.model.AContextState
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.chat.domain.ChatRepository
@@ -69,9 +68,8 @@ internal class AgentRepositoryImpl @Inject constructor(
     }
 
     private suspend fun createDefaultAgentContext(agentId: Long, strategyContext: AContext) {
-        // Create proper context for FULL_CONTEXT strategy
         val context = AContext(
-            params = AContextParams.Full,
+            params = strategyContext.params,
             data = AContextState.Full(messages = persistentListOf())
         )
         agentContextRepository.saveContext(agentId, context)

@@ -9,14 +9,15 @@ object ContextFormatter {
         appendLine("Found ${packed.groups.size} relevant class(es) | ~${packed.totalTokens * 4} chars")
         appendLine()
 
-        // Сквозной счётчик источников по всем чанкам
+        // Сквозные счётчики: [КЛАСС N] для метаданных класса, [ИСТОЧНИК N] для чанков кода
         var sourceIndex = 1
+        var classIndex = 1
         // Накапливаем строки для секции ## Источники в конце
         val sourcesTable = mutableListOf<String>()
 
         packed.groups.forEach { group ->
             appendLine("${"━".repeat(60)}")
-            appendLine("[CLASS] ${group.className}")
+            appendLine("[CLASS] ${group.className} [КЛАСС $classIndex]")
             appendLine("File: ${group.filePath}")
             appendLine("Score: ${"%.3f".format(group.topScore)}")
 
@@ -31,6 +32,10 @@ object ContextFormatter {
             }
             appendLine()
 
+            val classFileName = group.filePath.substringAfterLast("/")
+            sourcesTable.add("[КЛАСС $classIndex] ${group.className} · $classFileName · ${group.filePath}")
+            classIndex++
+
             group.chunks.forEach { chunk ->
                 val label = chunk.declarationName ?: "line ${chunk.startLine}"
                 appendLine("--- $label [ИСТОЧНИК $sourceIndex] (line ${chunk.startLine}) ---")
@@ -38,7 +43,8 @@ object ContextFormatter {
                 appendLine()
 
                 val fileName = chunk.filePath.substringAfterLast("/")
-                sourcesTable.add("[ИСТОЧНИК $sourceIndex] $fileName · $label · line ${chunk.startLine} · ${chunk.filePath}")
+                val labelPart = if (label == fileName.removeSuffix(".kt")) "" else " · $label"
+                sourcesTable.add("[ИСТОЧНИК $sourceIndex] $fileName$labelPart · line ${chunk.startLine} · ${chunk.filePath}")
                 sourceIndex++
             }
         }

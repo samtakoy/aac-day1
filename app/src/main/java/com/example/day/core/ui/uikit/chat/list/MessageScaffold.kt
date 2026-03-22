@@ -1,6 +1,7 @@
 package com.example.day.core.ui.uikit.chat.list
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -86,10 +87,12 @@ fun MessageScaffold(
                 Row(
                     verticalAlignment = Alignment.Top
                 ) {
-                    // Пузырёк сообщения
-                    content()
-                    
-                    // Copy кнопка справа от пузырька
+                    // Пузырёк сообщения — weight(1f) гарантирует, что trailing всегда виден
+                    Box(modifier = Modifier.weight(1f, fill = false)) {
+                        content()
+                    }
+
+                    // Copy кнопка справа от пузырька — всегда имеет место
                     if (trailing != null) {
                         trailing()
                     }

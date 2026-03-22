@@ -27,6 +27,10 @@ import com.example.day.ragserver.search.rerank.HeuristicReranker
 import com.example.day.ragserver.search.rerank.LlmReranker
 import com.example.day.ragserver.search.rerank.NoopReranker
 import com.example.day.ragserver.search.rerank.Reranker
+import com.example.day.ragserver.agent_context.TaskStateUpdateRequest
+import com.example.day.ragserver.agent_context.TaskStateUpdateResponse
+import com.example.day.ragserver.agent_context.TaskStateUpdaterService
+import com.example.day.ragserver.logging.SessionLogger
 import com.example.day.ragserver.tools.registerRagTools
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -82,7 +86,10 @@ fun main() {
     val httpClient = HttpClient(OkHttp) {
         install(ContentNegotiation) { json(json) }
         install(Logging) { level = LogLevel.INFO }
-        install(HttpTimeout) { requestTimeoutMillis = 120_000 }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 120_000
+            socketTimeoutMillis = 120_000
+        }
     }
 
     val db = CodeDatabase(config.dbPath)
@@ -94,6 +101,9 @@ fun main() {
     } else null
     val indexingService = IndexingService(db, embeddingProvider, llmProvider)
 
+    val sessionLogger = SessionLogger()
+    println("Session logging: ./logs/session_<date>.md")
+
     // QueryOptimizer (query rewrite + translate) — создаётся только если TRANSLATE_QUERIES=true.
     // Если env=false и enable_query_optimize=true в запросе — шаг пропускается с логом.
     val queryOptimizer = if (config.translateQueries) {
@@ -102,7 +112,7 @@ fun main() {
             model = config.translateLlmModel,
             httpClient = httpClient,
         )
-        QueryOptimizer(optimizerLlm).also {
+        QueryOptimizer(optimizerLlm, sessionLogger = sessionLogger).also {
             println("Query optimization: enabled (model: ${config.translateLlmModel})")
         }
     } else {
@@ -136,20 +146,24 @@ fun main() {
 
     val searchService = SearchService(db, embeddingProvider)
     val twoStageSearchService = TwoStageSearchService(db, embeddingProvider)
-    registerRagTools(mcpServer, searchService, db, config.searchTopK, embeddingProvider, queryOptimizer)
+    registerRagTools(mcpServer, searchService, db, config.searchTopK, embeddingProvider, queryOptimizer, sessionLogger)
 
     // --- Pipeline helpers ---
 
     fun buildReranker(strategy: RerankStrategy): Reranker = when (strategy) {
         RerankStrategy.HEURISTIC -> HeuristicReranker()
-        RerankStrategy.LLM       -> LlmReranker(rerankerLlmProvider)
+        RerankStrategy.LLM       -> LlmReranker(rerankerLlmProvider, sessionLogger = sessionLogger)
         RerankStrategy.NONE      -> NoopReranker()
     }
 
-    fun buildPipeline(pipelineConfig: PipelineConfig): PipelineExecutor = PipelineExecutor(buildList {
+    fun buildPipeline(
+        pipelineConfig: PipelineConfig,
+        taskState: String? = null,
+        history: String? = null,
+    ): PipelineExecutor = PipelineExecutor(buildList {
         if (pipelineConfig.enableQueryOptimize) {
             if (queryOptimizer != null) {
-                add(QueryOptimizeStep(queryOptimizer))
+                add(QueryOptimizeStep(queryOptimizer, taskState = taskState, history = history))
             } else {
                 println("[Pipeline] enable_query_optimize=true but TRANSLATE_QUERIES=false — skipping QueryOptimizeStep")
             }
@@ -158,6 +172,8 @@ fun main() {
         if (pipelineConfig.threshold > 0.0)
             add(ThresholdFilterStep(pipelineConfig.threshold))
         add(RerankStep(buildReranker(pipelineConfig.rerankStrategy)))
+        if (pipelineConfig.postRerankThreshold > 0.0)
+            add(ThresholdFilterStep(pipelineConfig.postRerankThreshold))
         add(TopKStep(pipelineConfig.finalTopK))
         add(ContextPackingStep(ContextPacker(db = db)))
     })
@@ -177,10 +193,23 @@ fun main() {
                 RerankStrategy.entries.firstOrNull { it.name.equals(s, ignoreCase = true) }
             } ?: base.rerankStrategy,
             finalTopK           = p["final_topK"]?.toIntOrNull() ?: base.finalTopK,
+            postRerankThreshold = p["post_rerank_threshold"]?.toDoubleOrNull() ?: base.postRerankThreshold,
         )
     }
 
     val evaluationService = EvaluationService(buildPipeline = { buildPipeline(it) })
+
+    // TODO: Кандидат на переезд в отдельный AgentServer.
+    // Вся логика изолирована в agent_context/ пакете — в RagServer.kt только регистрация маршрута.
+    val taskStateUpdaterService = TaskStateUpdaterService(
+        llmProvider = OllamaLlmProvider(
+            baseUrl = config.ollamaBaseUrl,
+            model = System.getenv("TASK_STATE_LLM_MODEL") ?: config.translateLlmModel,
+            httpClient = httpClient,
+        ),
+        sessionLogger = sessionLogger,
+    )
+    println("TaskState LLM:   ${System.getenv("TASK_STATE_LLM_MODEL") ?: config.translateLlmModel}")
 
     println("RAG MCP Server started on port ${config.serverPort}")
 
@@ -192,13 +221,57 @@ fun main() {
                 call.respondRedirect("/mcp", permanent = false)
             }
 
+            // TODO: Кандидат на переезд в отдельный AgentServer.
+            // Логика — в agent_context/TaskStateUpdaterService.kt (изолирована от rag-server).
+            post("/task-state/update") {
+                val request = runCatching { call.receive<TaskStateUpdateRequest>() }.getOrElse {
+                    return@post call.respond(HttpStatusCode.BadRequest, "Invalid request body: ${it.message}")
+                }
+                val response = taskStateUpdaterService.update(request)
+                call.respond(response)
+            }
+
+            post("/session/log-response") {
+                val request = runCatching { call.receive<LogResponseRequest>() }.getOrElse {
+                    return@post call.respond(HttpStatusCode.BadRequest, "Invalid request body")
+                }
+                sessionLogger.logLlmResponse(
+                    userMessage = request.userMessage,
+                    assistantResponse = request.assistantResponse,
+                    taskStateJson = request.taskStateJson,
+                )
+                call.respond(HttpStatusCode.OK)
+            }
+
             get("/search") {
                 val query = call.request.queryParameters["query"]
                     ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing 'query' parameter")
 
+                val taskState = call.request.queryParameters["task_state"]
+                val history = call.request.queryParameters["history"]
+
+                println("[rag][ktor][/search] query='${query.take(80)}', hasTaskState=${!taskState.isNullOrBlank()}, hasHistory=${!history.isNullOrBlank()}")
+                sessionLogger.logSearchStart(query, taskState, history)
+
                 val pipelineConfig = parsePipelineConfig(call.request)
-                val pipeline = buildPipeline(pipelineConfig)
-                val ctx = pipeline.execute(query)
+                val pipeline = buildPipeline(pipelineConfig, taskState = taskState, history = history)
+                var ctx = pipeline.execute(query)
+
+                // Fallback: if post-rerank threshold filtered everything out,
+                // retry without context-aware optimization (avoids wrong focus injection).
+                if (ctx.results.isEmpty() && pipelineConfig.postRerankThreshold > 0.0) {
+                    println("[search] Post-rerank threshold wiped results, fallback to base query: '${ctx.originalQuery}'")
+                    val fallbackPipeline = buildPipeline(
+                        pipelineConfig.copy(enableQueryOptimize = false),
+                        taskState = null,
+                        history = null,
+                    )
+                    val fallbackCtx = fallbackPipeline.execute(ctx.originalQuery)
+                    if (fallbackCtx.results.isNotEmpty()) {
+                        println("[search] Fallback succeeded: ${fallbackCtx.results.size} results")
+                        ctx = fallbackCtx
+                    }
+                }
 
                 if (ctx.packed == null || ctx.packed.groups.isEmpty()) {
                     call.respondText(
@@ -208,8 +281,15 @@ fun main() {
                     return@get
                 }
 
+                // Определяем KEPT/DROPPED: resultsAfterRerank — полный список после реранка до TopK
+                val droppedResults = if (ctx.resultsAfterRerank.isNotEmpty()) {
+                    ctx.resultsAfterRerank.drop(ctx.results.size)
+                } else emptyList()
+                val contextText = ContextFormatter.format(ctx.packed)
+                sessionLogger.logSearchFinish(ctx.results, droppedResults, contextText)
+
                 val debugHeader = buildDebugHeader(ctx, pipelineConfig)
-                call.respondText(debugHeader + ContextFormatter.format(ctx.packed))
+                call.respondText(debugHeader + contextText)
             }
 
             post("/runtest/save") {
@@ -251,6 +331,13 @@ fun main() {
         }
     }.start(wait = true)
 }
+
+@Serializable
+private data class LogResponseRequest(
+    val userMessage: String,
+    val assistantResponse: String,
+    val taskStateJson: String? = null,
+)
 
 @Serializable
 private data class RuntestItemDto(

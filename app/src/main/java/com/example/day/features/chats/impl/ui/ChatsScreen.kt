@@ -82,6 +82,7 @@ private fun ChatsScreenInternal(
     val agentsChatEntry = appComponent.getAgentsConsoleFeatureEntry()
     val historyChatEntry = appComponent.getConsoleFeatureEntry()
     val plannerChatEntry = appComponent.getPlannerConsoleFeatureEntry()
+    val ragChatEntry = appComponent.getRagConsoleFeatureEntry()
     val userSettingsEntry = appComponent.getUserSettingsFeatureEntry()
 
     // Create pager state at the top level to share between chips and pager
@@ -149,6 +150,10 @@ private fun ChatsScreenInternal(
                             ChatType.PLANNER -> {
                                 // PLANNER groups use PlannerTalkDelegate with PlannerWorker
                                 plannerChatEntry.EntryPoint(chatId = chip.id, modifier = Modifier.fillMaxSize())
+                            }
+                            ChatType.RAG_CONTEXT -> {
+                                // RAG_CONTEXT groups use RagTalkDelegate with RagWorker (AutoRag + ContextSummaryStrategy)
+                                ragChatEntry.EntryPoint(chatId = chip.id, modifier = Modifier.fillMaxSize())
                             }
                         }
                     }

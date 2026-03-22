@@ -66,6 +66,9 @@ fun ChatListView(
                             item = message,
                             colors = colors,
                             onInfoMessageExpand = onInfoMessageExpand,
+                            onMarkdownToggle = { id, isEnabled ->
+                                onEvent(ChatListUiEvent.MarkdownToggle(id, isEnabled))
+                            },
                             onMessageButtonClick = { messageId, actionId ->
                                 onEvent(ChatListUiEvent.ChatButtonClick(messageId, actionId))
                             }

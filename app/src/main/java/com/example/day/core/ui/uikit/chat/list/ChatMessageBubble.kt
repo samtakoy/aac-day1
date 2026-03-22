@@ -16,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,16 +24,24 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.text.font.FontWeight
+
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.markdown.m3.markdownTypography
 
 /**
  * Типы пузырьков сообщений с различными формами
@@ -75,6 +84,7 @@ sealed class BubbleType {
  * @param bubbleColor Цвет фона пузырька
  * @param isExpanded Состояние раскрытия (для Info/Buttons/Title типов)
  * @param onExpandChange Callback изменения состояния раскрытия
+ * @param isMarkdownEnabled Рендерить текст как Markdown (для Bot/Info)
  * @param textSize Размер текста (для Info/Buttons/Title)
  * @param horizontalPadding Горизонтальный отступ
  * @param verticalPadding Вертикальный отступ
@@ -88,13 +98,12 @@ fun ChatMessageBubble(
     bubbleColor: Color,
     isExpanded: Boolean = false,
     onExpandChange: ((Boolean) -> Unit)? = null,
+    isMarkdownEnabled: Boolean = false,
     textSize: TextUnit = 14.sp,
     horizontalPadding: Dp = 12.dp,
     verticalPadding: Dp = 8.dp,
     modifier: Modifier = Modifier
 ) {
-    val contentColor = LocalContentColor.current
-
     Box(
         modifier = modifier
             .background(
@@ -116,8 +125,7 @@ fun ChatMessageBubble(
             )
     ) {
         when (bubbleType) {
-            is BubbleType.User, is BubbleType.Bot -> {
-                // Простой текст для User/Bot сообщений
+            is BubbleType.User -> {
                 Text(
                     text = text,
                     color = textColor,
@@ -127,15 +135,32 @@ fun ChatMessageBubble(
                 )
             }
 
+            is BubbleType.Bot -> {
+                if (isMarkdownEnabled) {
+                    ChatBubbleMarkdown(text = text, textColor = textColor)
+                } else {
+                    Text(
+                        text = text,
+                        color = textColor,
+                        fontSize = textSize,
+                        maxLines = Int.MAX_VALUE,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
             is BubbleType.Info, is BubbleType.Buttons, is BubbleType.Title -> {
-                // Текст с expand/collapse для Info/Buttons/Title
-                ExpandableMessageContent(
-                    text = text,
-                    textColor = textColor,
-                    isExpanded = isExpanded,
-                    onExpandChange = onExpandChange,
-                    textSize = textSize
-                )
+                if (isMarkdownEnabled && isExpanded) {
+                    ChatBubbleMarkdown(text = text, textColor = textColor)
+                } else {
+                    ExpandableMessageContent(
+                        text = text,
+                        textColor = textColor,
+                        isExpanded = isExpanded,
+                        onExpandChange = onExpandChange,
+                        textSize = textSize
+                    )
+                }
             }
         }
     }
@@ -155,9 +180,10 @@ private fun ExpandableMessageContent(
     Row(
         verticalAlignment = Alignment.Top
     ) {
-        // Раскрытый текст с анимацией
+        // Раскрытый текст — weight(1f) прямо на AnimatedVisibility в RowScope
         AnimatedVisibility(
             visible = isExpanded,
+            modifier = Modifier.weight(1f, fill = false),
             enter = expandVertically(
                 animationSpec = spring(
                     dampingRatio = 0.7f,
@@ -173,17 +199,15 @@ private fun ExpandableMessageContent(
                 color = textColor,
                 fontSize = textSize,
                 maxLines = Int.MAX_VALUE,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
+                overflow = TextOverflow.Ellipsis
             )
         }
 
-        // Свёрнутый текст с иконкой раскрытия
+        // Свёрнутый текст с иконкой — weight(1f) прямо в RowScope
         if (!isExpanded) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .weight(1f, fill = false)
+                modifier = Modifier.weight(1f, fill = false),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = text,
@@ -193,13 +217,11 @@ private fun ExpandableMessageContent(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
-                IconExpandMore(
-                    tint = textColor.copy(alpha = 0.4f)
-                )
+                IconExpandMore(tint = textColor.copy(alpha = 0.4f))
             }
         }
 
-        // Иконка сворачивания (видна только в раскрытом состоянии)
+        // Иконка сворачивания — прямой дочерний элемент Row, всегда виден
         AnimatedVisibility(
             visible = isExpanded,
             enter = scaleIn(
@@ -259,6 +281,36 @@ private fun IconExpandLess(
             contentDescription = null,
             modifier = Modifier.size(18.dp),
             tint = tint
+        )
+    }
+}
+
+/**
+ * Markdown в чат-пузырьке с уменьшенными заголовками и тёмным фоном кода.
+ *
+ * Дефолты библиотеки — displayLarge/displayMedium/displaySmall — слишком крупные для чата.
+ * Переопределяем через markdownTypography() до title/body размеров.
+ */
+@Composable
+private fun ChatBubbleMarkdown(
+    text: String,
+    textColor: Color,
+) {
+    CompositionLocalProvider(LocalContentColor provides textColor) {
+        Markdown(
+            content = text,
+            colors = markdownColor(
+                codeBackground = lerp(MaterialTheme.colorScheme.surfaceContainerHighest, Color.Black, 0.1f),
+            ),
+            typography = markdownTypography(
+                h1 = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                h2 = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                h3 = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                h4 = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                h5 = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                h6 = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+            ),
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }

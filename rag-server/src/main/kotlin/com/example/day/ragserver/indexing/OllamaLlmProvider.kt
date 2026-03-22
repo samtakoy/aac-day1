@@ -14,6 +14,8 @@ class OllamaLlmProvider(
     private val model: String,
     private val httpClient: HttpClient,
 ) : LlmProvider {
+    override val modelName: String get() = model
+
     private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun generate(prompt: String): String {

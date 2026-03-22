@@ -5,9 +5,10 @@ import com.example.day.ragserver.search.context.PackedContext
 
 data class PipelineContext(
     val originalQuery: String,
-    val query: String = originalQuery,      // обновляется QueryOptimizeStep
+    val query: String = originalQuery,                          // обновляется QueryOptimizeStep
     val results: List<SearchResult> = emptyList(),
-    val packed: PackedContext? = null,      // заполняется ContextPackingStep
+    val resultsAfterRerank: List<SearchResult> = emptyList(),   // все после реранка (до TopK), заполняется RerankStep
+    val packed: PackedContext? = null,                          // заполняется ContextPackingStep
     val metrics: PipelineMetrics = PipelineMetrics(),
 )
 

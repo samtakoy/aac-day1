@@ -22,9 +22,22 @@ class RagSearchRepositoryImpl @Inject constructor(
     private val httpClient: HttpClient
 ) : RagSearchRepository {
 
-    override suspend fun search(query: String, serverUrl: String): Result<String> = runCatching {
+    override suspend fun search(
+        query: String,
+        serverUrl: String,
+        taskStateJson: String?,
+        shortHistory: String?,
+        preset: String,
+    ): Result<String> = runCatching {
         val response = httpClient.get("${serverUrl.trimEnd('/')}/search") {
             parameter("query", query)
+            parameter("preset", preset)
+            if (!taskStateJson.isNullOrBlank() && taskStateJson != "{}") {
+                parameter("task_state", taskStateJson)
+            }
+            if (!shortHistory.isNullOrBlank()) {
+                parameter("history", shortHistory)
+            }
         }
         response.bodyAsText()
     }
@@ -63,6 +76,19 @@ class RagSearchRepositoryImpl @Inject constructor(
         }.body<EvaluateResponseDto>().toDomain()
     }
 
+    override suspend fun logLlmResponse(
+        userMessage: String,
+        assistantResponse: String,
+        taskStateJson: String?,
+        serverUrl: String,
+    ): Result<Unit> = runCatching {
+        httpClient.post("${serverUrl.trimEnd('/')}/session/log-response") {
+            contentType(ContentType.Application.Json)
+            setBody(LogLlmResponseDto(userMessage, assistantResponse, taskStateJson))
+        }
+        Unit
+    }
+
     override suspend fun saveRuntestResults(
         preset: String,
         items: List<RuntestResultItem>,
@@ -76,6 +102,13 @@ class RagSearchRepositoryImpl @Inject constructor(
             ))
         }.body<RuntestSaveResponseDto>().toDomain()
     }
+
+    @Serializable
+    private data class LogLlmResponseDto(
+        val userMessage: String,
+        val assistantResponse: String,
+        val taskStateJson: String? = null,
+    )
 
     @Serializable
     private data class RuntestItemDto(

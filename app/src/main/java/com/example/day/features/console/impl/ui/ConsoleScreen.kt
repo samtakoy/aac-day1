@@ -120,7 +120,7 @@ private fun ConsoleScreenInternal(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
         ) {
             if (state.isStageCompleted) {
                 StageCompletedBanner()
@@ -132,6 +132,9 @@ private fun ConsoleScreenInternal(
                         is ChatListUiEvent.ItemLongClick -> {}
                         is ChatListUiEvent.ChatButtonClick -> {
                             onEvent(ConsoleViewModel.Event.ChatButtonClick(listEvent.messageId, listEvent.actionId))
+                        }
+                        is ChatListUiEvent.MarkdownToggle -> {
+                            onEvent(ConsoleViewModel.Event.MessageMarkdownToggle(listEvent.messageId, listEvent.isEnabled))
                         }
                     }
                 },

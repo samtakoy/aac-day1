@@ -90,6 +90,14 @@ curl http://localhost:11434/api/embeddings \
 
 > Reranker LLM создаётся всегда при старте (cheap операция). Сетевые вызовы только при активном реранке.
 
+### TaskState (память задачи)
+
+| Переменная | Обязательная | По умолчанию | Описание |
+|-----------|:---:|---|---|
+| `TASK_STATE_LLM_MODEL` | нет | значение `TRANSLATE_LLM_MODEL` | Модель для обновления TaskState (`POST /task-state/update`). Рекомендуется быстрая: `qwen2.5:3b` |
+
+> TaskState обновляется при каждом сообщении в RAG-чате. Отслеживает текущий файл/класс/метод, intent и историю решений.
+
 ---
 
 ## 3. Сборка
@@ -120,7 +128,7 @@ export LLM_MODEL=qwen2.5-coder:7b-instruct
 java -jar rag-server/build/libs/rag-server.jar
 ```
 
-### Полный (метаданные + query optimization + reranking)
+### Полный (метаданные + query optimization + reranking + TaskState)
 
 ```bash
 export CODE_PATH="/path/to/your/kotlin/project/src"
@@ -129,6 +137,7 @@ export LLM_MODEL=qwen2.5-coder:7b-instruct
 export TRANSLATE_QUERIES=true
 export TRANSLATE_LLM_MODEL=qwen2.5:3b   # быстрая модель для оптимизации
 export RERANKER_LLM_MODEL=qwen2.5:3b    # быстрая модель для reranker
+export TASK_STATE_LLM_MODEL=qwen2.5:3b  # быстрая модель для TaskState
 java -jar rag-server/build/libs/rag-server.jar
 ```
 
@@ -161,6 +170,8 @@ GET /search?query=<текст>&[параметры pipeline]
 | `rerank_strategy` | String | `none` | `none`, `heuristic`, `llm` |
 | `final_topK` | Int | `5` | Top-K ПОСЛЕ фильтра и реранка — сколько передаём в LLM |
 | `enable_query_optimize` | Boolean | `false` | Включить query rewrite + translation (требует `TRANSLATE_QUERIES=true`) |
+| `task_state` | String | — | JSON TaskState из Android-клиента — используется QueryOptimizer для точного rewrite абстрактных запросов |
+| `history` | String | — | Краткая история диалога (до 3 пар USER/ASSISTANT) — передаётся в QueryOptimizer для контекстного rewrite |
 
 #### Именованные пресеты
 
@@ -202,6 +213,36 @@ File: search/context/ContextPacker.kt
 Score: 0.841
 ...
 ```
+
+---
+
+### POST /task-state/update — Обновление памяти задачи
+
+Используется Android-клиентом при каждом сообщении в RAG-чате. Обновляет TaskState через Ollama LLM.
+
+```bash
+curl -X POST http://localhost:3001/task-state/update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "currentState": "{\"current_focus\":{\"file\":\"\",\"class\":\"\",\"method\":\"\"},\"tech_stack\":\"\",\"intent\":\"general\",\"context_switched\":false,\"confirmed_decisions\":[],\"open_questions\":[]}",
+    "lastMessages": [
+      {"role": "user", "content": "Как работает AuthService?"},
+      {"role": "assistant", "content": "AuthService использует JWT токены..."}
+    ]
+  }'
+```
+
+#### Ответ
+
+```json
+{
+  "updatedState": "{\"current_focus\":{\"file\":\"AuthService.kt\",\"class\":\"AuthService\",\"method\":\"\"},\"tech_stack\":\"\",\"intent\":\"general\",\"context_switched\":false,\"confirmed_decisions\":[],\"open_questions\":[]}",
+  "lastResponseSummary": "AuthService uses JWT tokens for authentication and stores them in SharedPreferences."
+}
+```
+
+> `lastResponseSummary` — краткое резюме последнего ответа ассистента. Используется клиентом как short history entry.
+> Модель задаётся через `TASK_STATE_LLM_MODEL` (по умолчанию — `TRANSLATE_LLM_MODEL`).
 
 ---
 
@@ -350,6 +391,8 @@ rm rag_index.db
 | **Heuristic Reranker** | Keyword overlap boost — поднимает точные совпадения выше |
 | **LLM Reranker** | Локальная модель оценивает релевантность каждого чанка — самый точный реранк |
 | **Query Optimizer** | Rewrite + translation: запросы становятся самодостаточными, добавляются технические ключевые слова |
+| **Context-Aware QueryOptimizer** | `task_state` + `history` → абстрактные запросы ("как это работает?") rewrite-ятся с учётом текущего класса/intent |
+| **TaskState endpoint** | `POST /task-state/update` — отслеживает фокус диалога (файл/класс/intent), возвращает резюме ответа для short history |
 | **Top-K управление** | `retrieval_topK` (до фильтра) и `final_topK` (после) — видны в debug-заголовке ответа |
 | **Evaluation endpoint** | `/evaluate` прогоняет вопросы через все пресеты, сохраняет MD-отчёты для сравнения |
 | **@@talk(rag --gentest)** | Автоматизированный запуск тестов из Android-приложения |

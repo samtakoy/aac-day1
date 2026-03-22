@@ -2,6 +2,7 @@ package com.example.day.ragserver.search.rerank
 
 import com.example.day.ragserver.db.SearchResult
 import com.example.day.ragserver.indexing.LlmProvider
+import com.example.day.ragserver.logging.SessionLogger
 
 /**
  * LLM-based reranker: локальная модель оценивает релевантность каждого чанка запросу.
@@ -10,8 +11,12 @@ import com.example.day.ragserver.indexing.LlmProvider
  * Парсинг через regex — не ломается если LLM добавляет пояснения.
  *
  * Чанки обрезаются до MAX_CHUNK_CHARS чтобы не превысить контекст модели.
+ * [sessionLogger] — если задан, логирует промпт, ответ LLM и итоговые скоры в session-файл.
  */
-class LlmReranker(private val llmProvider: LlmProvider) : Reranker {
+class LlmReranker(
+    private val llmProvider: LlmProvider,
+    private val sessionLogger: SessionLogger? = null,
+) : Reranker {
 
     companion object {
         private const val MAX_CHUNK_CHARS = 400
@@ -26,16 +31,28 @@ class LlmReranker(private val llmProvider: LlmProvider) : Reranker {
 
         val scores = parseScores(response, results.size)
         if (scores.isEmpty()) {
-            println("[LlmReranker] Failed to parse scores, returning original order")
+            println("[LlmReranker][${llmProvider.modelName}] Failed to parse scores, returning original order")
             return results
         }
 
-        return results
+        val reranked = results
             .mapIndexed { index, result ->
-                val llmScore = scores[index + 1]  // chunks are 1-indexed in prompt
+                val llmScore = scores[index + 1]
                 if (llmScore != null) result.copy(score = llmScore.toFloat()) else result
             }
             .sortedByDescending { it.score }
+
+        println("[LlmReranker][${llmProvider.modelName}] reranked ${reranked.size} results")
+
+        sessionLogger?.logRerank(
+            query = query,
+            prompt = prompt,
+            rawResponse = response,
+            scoredResults = reranked,
+            model = llmProvider.modelName,
+        )
+
+        return reranked
     }
 
     private fun buildPrompt(query: String, results: List<SearchResult>): String = buildString {
@@ -52,7 +69,6 @@ class LlmReranker(private val llmProvider: LlmProvider) : Reranker {
         appendLine("Scores:")
     }
 
-    /** Парсит строки "Chunk N: X.XX" → Map<chunkIndex, score>. */
     private fun parseScores(response: String, count: Int): Map<Int, Double> {
         val scores = mutableMapOf<Int, Double>()
         SCORE_REGEX.findAll(response).forEach { match ->

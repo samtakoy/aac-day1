@@ -10,6 +10,7 @@ data class ChatMessageUiModel(
     val status: UiMessageStatus,
     val avatarUrl: String? = null,
     val isExpanded: Boolean = false,
+    val isMarkdownEnabled: Boolean = false,
     val buttons: Buttons? = null
 ) {
     data class Buttons(

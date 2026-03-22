@@ -1,8 +1,11 @@
 package com.example.day.core.core_features.memory.domain.provider
 
+import android.util.Log
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
+import com.example.day.core.core_features.agent.domain.model.PromptMessages
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProvider
+import com.example.day.core.core_features.memory.domain.provider.rag.RagLog
 import com.example.day.core.core_features.memory.domain.provider.rag.RagSearchRepository
 import javax.inject.Inject
 
@@ -15,15 +18,10 @@ import javax.inject.Inject
  * Server URL is stored in AgentMemoryRepository (key=[MEMORY_KEY], category=[CATEGORY_URL]).
  * Falls back to [DEFAULT_URL] if not configured.
  *
+ * [setContext] — вызывается из RagContextMemoryProvider перед appendUserPrompt()
+ * для передачи TaskState и Short History в QueryOptimizer на сервере.
+ *
  * On error (server unavailable, index not ready) silently returns the original prompt unchanged.
- *
- * Appended format:
- * ```
- * <original prompt>
- *
- * Контекстная информация по запросу:
- * <rag results>
- * ```
  */
 class AutoRagMemoryProvider @Inject constructor(
     private val agentMemoryRepository: AgentMemoryRepository,
@@ -31,31 +29,50 @@ class AutoRagMemoryProvider @Inject constructor(
 ) : MemoryProvider {
 
     private var agentId: Long? = null
+    private var taskStateJson: String? = null
+    private var shortHistory: String? = null
 
     fun bindAgentId(agentId: Long) {
         this.agentId = agentId
     }
 
+    /** Устанавливается из RagContextMemoryProvider перед вызовом appendUserPrompt(). */
+    fun setContext(taskStateJson: String?, shortHistory: String?) {
+        this.taskStateJson = taskStateJson
+        this.shortHistory = shortHistory
+    }
+
     override suspend fun getMemoryContext(): List<AContextMessage> = emptyList()
 
-    override suspend fun appendUserPrompt(prompt: AContextMessage): AContextMessage {
-        val agentId = agentId ?: return prompt
+    override suspend fun appendUserPrompt(prompt: AContextMessage): PromptMessages {
+        val agentId = agentId ?: return PromptMessages(prompt = prompt)
 
         val serverUrl = agentMemoryRepository
             .getFact(agentId, MEMORY_KEY, CATEGORY_URL)?.fact
             ?: DEFAULT_URL
 
-        val ragResult = ragSearchRepository.search(prompt.content, serverUrl)
-            .getOrElse { return prompt }
+        Log.d(RagLog.TAG, "RAG search: query='${prompt.content.take(80)}', preset=reranked_llm, hasTaskState=${!taskStateJson.isNullOrBlank()}, hasHistory=${!shortHistory.isNullOrBlank()}")
 
-        if (ragResult.isBlank()) return prompt
-
-        val enrichedContent = buildString {
-            append(prompt.content)
-            append("\n\nКонтекстная информация по запросу:\n")
-            append(ragResult)
+        val ragResult = ragSearchRepository.search(
+            query = prompt.content,
+            serverUrl = serverUrl,
+            taskStateJson = taskStateJson,
+            shortHistory = shortHistory,
+            preset = "reranked_llm",
+        ).getOrElse { e ->
+            Log.w(RagLog.TAG, "RAG search failed: ${e.message}")
+            return PromptMessages(prompt = prompt)
         }
-        return prompt.copy(content = enrichedContent)
+
+        if (ragResult.isBlank()) return PromptMessages(prompt = prompt)
+
+        Log.d(RagLog.TAG, "RAG search ok: result length=${ragResult.length}")
+
+        val contextMessage = AContextMessage(
+            role = AContextMessage.Role.USER,
+            content = "Контекстная информация по запросу:\n$ragResult",
+        )
+        return PromptMessages(context = listOf(contextMessage), prompt = prompt)
     }
 
     companion object {

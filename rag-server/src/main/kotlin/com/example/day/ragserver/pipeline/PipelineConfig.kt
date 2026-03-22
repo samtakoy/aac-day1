@@ -5,9 +5,10 @@ data class PipelineConfig(
     val retrievalStrategy: RetrievalStrategy = RetrievalStrategy.TWO_STAGE,
     val chunkingStrategy: String = "structural",    // "structural"|"fixed", только для HYBRID
     val retrievalTopK: Int = 10,                    // top-K ДО фильтрации
-    val threshold: Double = 0.0,                    // 0.0 = фильтр выключен
+    val threshold: Double = 0.0,                    // 0.0 = фильтр выключен (до реранка, по vector score)
     val rerankStrategy: RerankStrategy = RerankStrategy.NONE,
     val finalTopK: Int = 5,                         // top-K ПОСЛЕ реранка → в LLM
+    val postRerankThreshold: Double = 0.0,          // 0.0 = фильтр выключен (после реранка, по LLM score)
 )
 
 enum class RetrievalStrategy { TWO_STAGE, HYBRID }
@@ -58,9 +59,9 @@ enum class PipelinePreset(val config: PipelineConfig) {
     RERANKED_LLM(PipelineConfig(
         enableQueryOptimize = true,
         retrievalTopK = 15,
-        threshold = 0.33, // 0.66,
         rerankStrategy = RerankStrategy.LLM,
         finalTopK = 5,
+        postRerankThreshold = 0.35,  // LLM reranker scores < 0.35 → нерелевантно
     ));
 
     companion object {

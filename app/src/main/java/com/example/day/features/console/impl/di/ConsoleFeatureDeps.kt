@@ -5,6 +5,7 @@ import com.example.day.core.core_features.memory.domain.repository.LongTermMemor
 import com.example.day.core.core_features.agent.domain.utils.ConsumptionCalculator
 import com.example.day.core.core_features.agent.domain.workers.concrete.CompareWorker
 import com.example.day.core.core_features.agent.domain.workers.concrete.PromptWorker
+import com.example.day.core.core_features.agent.domain.workers.concrete.RagWorker
 import com.example.day.core.core_features.agent.domain.workers.concrete.TaskWorker
 import com.example.day.core.core_features.agent.domain.workers.concrete.RejectWorker
 import com.example.day.core.core_features.agent.domain.workers.concrete.SimpleWorker
@@ -54,6 +55,8 @@ interface ConsoleFeatureDeps {
     
     // Task state machine dependencies
     val taskWorker: TaskWorker
+    // RAG context chat dependencies
+    val ragWorker: RagWorker
     val longTermMemoryRepository: LongTermMemoryRepository
     val artifactRepository: ArtifactRepository
     val chatTools: ChatTools

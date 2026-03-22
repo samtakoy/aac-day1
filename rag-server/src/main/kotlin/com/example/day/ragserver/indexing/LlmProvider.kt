@@ -1,5 +1,6 @@
 package com.example.day.ragserver.indexing
 
-fun interface LlmProvider {
+interface LlmProvider {
+    val modelName: String
     suspend fun generate(prompt: String): String
 }

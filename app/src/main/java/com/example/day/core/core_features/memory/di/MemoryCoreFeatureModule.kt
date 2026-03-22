@@ -8,8 +8,12 @@ import com.example.day.core.core_features.memory.data.repository.ArtifactReposit
 import com.example.day.core.core_features.memory.data.repository.LTMGroupRepositoryImpl
 import com.example.day.core.core_features.memory.data.repository.LongTermMemoryRepositoryImpl
 import com.example.day.core.core_features.memory.data.repository.RagSearchRepositoryImpl
+import com.example.day.core.core_features.memory.data.repository.ShortHistoryRepositoryImpl
+import com.example.day.core.core_features.memory.data.repository.TaskStateRepositoryImpl
 import com.example.day.core.core_features.memory.data.repository.UserProfileRepositoryImpl
 import com.example.day.core.core_features.memory.domain.provider.rag.RagSearchRepository
+import com.example.day.core.core_features.memory.domain.provider.rag.ShortHistoryRepository
+import com.example.day.core.core_features.memory.domain.provider.rag.TaskStateRepository
 import com.example.day.core.core_features.memory.domain.repository.ArtifactRepository
 import com.example.day.core.core_features.memory.domain.repository.LTMGroupRepository
 import com.example.day.core.core_features.memory.domain.repository.LongTermMemoryRepository
@@ -34,6 +38,12 @@ internal interface MemoryCoreFeatureModule {
 
     @Binds
     fun bindsRagSearchRepository(impl: RagSearchRepositoryImpl): RagSearchRepository
+
+    @Binds
+    fun bindsTaskStateRepository(impl: TaskStateRepositoryImpl): TaskStateRepository
+
+    @Binds
+    fun bindsShortHistoryRepository(impl: ShortHistoryRepositoryImpl): ShortHistoryRepository
 
     companion object {
         @Provides

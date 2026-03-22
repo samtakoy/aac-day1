@@ -13,7 +13,7 @@ data class AContextMessage(
     val role: Role,
     val content: String,
     val toolCallId: String? = null,
-    val toolCalls: List<ToolCallRef>? = null
+    val toolCalls: List<ToolCallRef>? = null,
 ) {
     enum class Role {
         SYSTEM,

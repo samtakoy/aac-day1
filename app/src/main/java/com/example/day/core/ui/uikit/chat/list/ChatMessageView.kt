@@ -6,8 +6,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -15,8 +16,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.day.core.ui.theme.Day1Theme
 import com.example.day.core.ui.uikit.chat.ChatColorScheme
-import com.example.day.core.ui.uikit.chat.DarkChatColorScheme
-import com.example.day.core.ui.uikit.chat.LightChatColorScheme
 import com.example.day.core.ui.uikit.chat.LocalChatColorScheme
 import com.example.day.core.ui.uikit.chat.list.model.ChatMessageUiModel
 import com.example.day.core.ui.uikit.chat.list.model.ChatMessageUiType
@@ -24,17 +23,18 @@ import com.example.day.core.ui.uikit.chat.list.model.UiMessageStatus
 
 /**
  * Composable для отображения одного сообщения чата
- * 
+ *
  * Поддерживает 4 типа сообщений:
  * - [ChatMessageUiType.User]: аватар справа, пузырёк слева
  * - [ChatMessageUiType.Bot]: аватар слева, пузырёк справа
  * - [ChatMessageUiType.Info]: аватар слева, текст с expand/collapse
  * - [ChatMessageUiType.Buttons]: кнопки действий
- * 
+ *
  * @param item Модель сообщения
  * @param modifier Модификатор
  * @param colors Схема цветов
  * @param onInfoMessageExpand Callback изменения состояния раскрытия
+ * @param onMarkdownToggle Callback переключения Markdown-рендеринга
  * @param onMessageButtonClick Callback клика кнопки
  */
 @Composable
@@ -43,6 +43,7 @@ fun ChatMessageView(
     modifier: Modifier = Modifier,
     colors: ChatColorScheme = LocalChatColorScheme.current,
     onInfoMessageExpand: (id: Long, isExpanded: Boolean) -> Unit = { _, _ -> },
+    onMarkdownToggle: (id: Long, isEnabled: Boolean) -> Unit = { _, _ -> },
     onMessageButtonClick: (messageId: Long, actionId: String) -> Unit = { _, _ -> }
 ) {
     when (item.userType) {
@@ -55,6 +56,7 @@ fun ChatMessageView(
         ChatMessageUiType.Bot -> BotMessageContent(
             item = item,
             colors = colors,
+            onMarkdownToggle = onMarkdownToggle,
             modifier = modifier
         )
 
@@ -62,6 +64,7 @@ fun ChatMessageView(
             item = item,
             colors = colors,
             onInfoMessageExpand = onInfoMessageExpand,
+            onMarkdownToggle = onMarkdownToggle,
             modifier = modifier
         )
 
@@ -135,6 +138,7 @@ private fun UserMessageContent(
 private fun BotMessageContent(
     item: ChatMessageUiModel,
     colors: ChatColorScheme,
+    onMarkdownToggle: (id: Long, isEnabled: Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     MessageScaffold(
@@ -152,6 +156,7 @@ private fun BotMessageContent(
                 bubbleType = BubbleType.Bot,
                 textColor = colors.botText,
                 bubbleColor = colors.botBubble,
+                isMarkdownEnabled = item.isMarkdownEnabled,
                 modifier = Modifier.padding(start = 4.dp)
             )
         },
@@ -159,6 +164,12 @@ private fun BotMessageContent(
             MessageCopyButton(
                 text = item.text,
                 contentDescription = "Copy bot message"
+            )
+        },
+        supporting = {
+            MarkdownToggle(
+                isEnabled = item.isMarkdownEnabled,
+                onToggle = { onMarkdownToggle(item.id, !item.isMarkdownEnabled) }
             )
         },
         isUserMessage = false,
@@ -174,12 +185,13 @@ private fun InfoMessageContent(
     item: ChatMessageUiModel,
     colors: ChatColorScheme,
     onInfoMessageExpand: (id: Long, isExpanded: Boolean) -> Unit,
+    onMarkdownToggle: (id: Long, isEnabled: Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val textSize = if (item.isExpanded) colors.infoExpandedTextSize else colors.infoCollapsedTextSize
     val horizontalPadding = if (item.isExpanded) colors.infoExpandedPadding else colors.infoCollapsedPadding
     val verticalPadding = if (item.isExpanded) 8.dp else 6.dp
-    
+
     MessageScaffold(
         leading = {
             if (item.isExpanded) {
@@ -201,6 +213,7 @@ private fun InfoMessageContent(
                 onExpandChange = { isExpanded ->
                     onInfoMessageExpand(item.id, isExpanded)
                 },
+                isMarkdownEnabled = item.isMarkdownEnabled,
                 textSize = textSize,
                 horizontalPadding = horizontalPadding,
                 verticalPadding = verticalPadding,
@@ -211,6 +224,12 @@ private fun InfoMessageContent(
             MessageCopyButton(
                 text = item.text,
                 contentDescription = "Copy info message"
+            )
+        },
+        supporting = {
+            MarkdownToggle(
+                isEnabled = item.isMarkdownEnabled,
+                onToggle = { onMarkdownToggle(item.id, !item.isMarkdownEnabled) }
             )
         },
         isUserMessage = false,
@@ -284,7 +303,7 @@ private fun ButtonsMessageContent(
     val textSize = if (item.isExpanded) 14.sp else 12.sp
     val horizontalPadding = if (item.isExpanded) 12.dp else 8.dp
     val verticalPadding = if (item.isExpanded) 8.dp else 6.dp
-    
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -310,14 +329,14 @@ private fun ButtonsMessageContent(
                     verticalPadding = verticalPadding,
                     modifier = Modifier.weight(1f, fill = false)
                 )
-                
+
                 MessageCopyButton(
                     text = item.text,
                     contentDescription = "Copy buttons message"
                 )
             }
         }
-        
+
         // Кнопки
         if (item.buttons != null && item.buttons.list.isNotEmpty()) {
             ButtonGroup(
@@ -336,6 +355,23 @@ private fun ButtonsMessageContent(
             )
         }
     }
+}
+
+/**
+ * Мини-тоггл для включения/выключения Markdown-рендеринга
+ */
+@Composable
+private fun MarkdownToggle(
+    isEnabled: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FilterChip(
+        selected = isEnabled,
+        onClick = onToggle,
+        label = { Text("MD", fontSize = 11.sp) },
+        modifier = modifier.padding(top = 2.dp)
+    )
 }
 
 // region Previews
@@ -378,6 +414,19 @@ fun ChatMessageViewPreview() = Day1Theme {
                     text = "Привет! Я бот.",
                     userType = ChatMessageUiType.Bot,
                     status = UiMessageStatus.Delivered,
+                    isMarkdownEnabled = true,
+                    avatarUrl = "https://cdnstatic.rg.ru/uploads/images/2023/02/17/bender_7b5.jpg"
+                )
+            )
+
+            // Bot message - markdown
+            ChatMessageView(
+                item = ChatMessageUiModel(
+                    id = 4,
+                    text = "## Заголовок\n\nТекст с **жирным** и _курсивом_.\n\n- пункт 1\n- пункт 2",
+                    userType = ChatMessageUiType.Bot,
+                    status = UiMessageStatus.Delivered,
+                    isMarkdownEnabled = true,
                     avatarUrl = "https://cdnstatic.rg.ru/uploads/images/2023/02/17/bender_7b5.jpg"
                 )
             )
@@ -390,17 +439,6 @@ fun ChatMessageViewPreview() = Day1Theme {
                     userType = ChatMessageUiType.Info,
                     status = UiMessageStatus.Delivered,
                     isExpanded = false
-                )
-            )
-
-            // Info message - expanded
-            ChatMessageView(
-                item = ChatMessageUiModel(
-                    id = 6,
-                    text = "Это длинное информационное сообщение в развернутом состоянии.",
-                    userType = ChatMessageUiType.Info,
-                    status = UiMessageStatus.Delivered,
-                    isExpanded = true
                 )
             )
 

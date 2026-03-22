@@ -32,6 +32,7 @@ import com.example.day.features.console.impl.ui.delegates.AgentsTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.LlmTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.PlannerTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.PlannerUiEvent
+import com.example.day.features.console.impl.ui.delegates.RagTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.TalkDelegate
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toImmutableList
@@ -80,6 +81,7 @@ internal class ConsoleViewModelImpl(
     private var currentLtmFacts: List<LongTermMemoryFact> = emptyList()
 
     private val _expandedStates = MutableStateFlow(persistentMapOf<Long, Boolean>())
+    private val _markdownStates = MutableStateFlow(persistentMapOf<Long, Boolean>())
 
     private val _stageCreationState = MutableStateFlow<ConsoleViewModel.StageCreationSuggestion?>(null)
 
@@ -117,6 +119,7 @@ internal class ConsoleViewModelImpl(
         getMessagesUseCase(chatId)
             .onEach { messages ->
                 val expandedStates = _expandedStates.value
+                val markdownStates = _markdownStates.value
                 _state.update { state ->
                     state.copy(
                         chatList = state.chatList.copy(
@@ -138,6 +141,7 @@ internal class ConsoleViewModelImpl(
                                     },
                                     avatarUrl = msg.user.avatar,
                                     isExpanded = expandedStates[msg.id] ?: (msg.type == ChatMessage.Type.Buttons || msg.type == ChatMessage.Type.Title),
+                                    isMarkdownEnabled = markdownStates[msg.id] ?: (msg.type == ChatMessage.Type.Bot),
                                     buttons = msg.buttons?.let { b ->
                                         ChatMessageUiModel.Buttons(
                                             list = b.list.map { ChatMessageUiModel.Button(it.actionId, it.title, it.description, it.isPressed) },
@@ -267,6 +271,18 @@ internal class ConsoleViewModelImpl(
                 _state.update { state ->
                     val updatedMessages = state.chatList.messages.map { msg ->
                         if (msg.id == event.messageId) msg.copy(isExpanded = event.isExpanded) else msg
+                    }.toPersistentList()
+                    state.copy(chatList = state.chatList.copy(messages = updatedMessages))
+                }
+            }
+
+            is ConsoleViewModel.Event.MessageMarkdownToggle -> {
+                _markdownStates.update { currentStates ->
+                    currentStates.toPersistentMap().put(event.messageId, event.isEnabled)
+                }
+                _state.update { state ->
+                    val updatedMessages = state.chatList.messages.map { msg ->
+                        if (msg.id == event.messageId) msg.copy(isMarkdownEnabled = event.isEnabled) else msg
                     }.toPersistentList()
                     state.copy(chatList = state.chatList.copy(messages = updatedMessages))
                 }
@@ -441,6 +457,34 @@ internal class ConsoleViewModelImpl(
                 handleMessageButtonClickUseCase,
                 getLtmByGroupUseCase = getLtmByGroupUseCase,
                 artifactRepository = artifactRepository,
+                chatId = chatId
+            ) as T
+        }
+    }
+
+    class RagFactory @Inject constructor(
+        private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
+        private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
+        private val talkDelegate: RagTalkDelegate,
+        private val getChatByIdAsFlowUseCase: GetChatByIdAsFlowUseCase,
+        private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
+        private val updateChatTitleUseCase: UpdateChatTitleUseCase,
+        private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
+        private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
+    ) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+            val chatId = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
+            return ConsoleViewModelImpl(
+                getMessagesUseCase,
+                clearUnviewedUseCase,
+                talkDelegate,
+                getChatByIdAsFlowUseCase,
+                updateChatSettingsUseCase,
+                updateChatTitleUseCase,
+                createPlannerStageChatUseCase,
+                handleMessageButtonClickUseCase,
+                getLtmByGroupUseCase = null,
+                artifactRepository = null,
                 chatId = chatId
             ) as T
         }

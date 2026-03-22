@@ -2,6 +2,7 @@ package com.example.day.ragserver.tools
 
 import com.example.day.ragserver.db.CodeDatabase
 import com.example.day.ragserver.embedding.EmbeddingProvider
+import com.example.day.ragserver.logging.SessionLogger
 import com.example.day.ragserver.search.QueryOptimizer
 import com.example.day.ragserver.search.SearchService
 import com.example.day.ragserver.search.TwoStageSearchService
@@ -25,12 +26,13 @@ fun registerRagTools(
     topK: Int,
     embeddingProvider: EmbeddingProvider,
     queryOptimizer: QueryOptimizer? = null,
+    sessionLogger: SessionLogger? = null,
 ) {
     val contextPacker = ContextPacker()
     val twoStageSearchService = TwoStageSearchService(db, embeddingProvider)
     //registerSearchCodebase(server, searchService, contextPacker, topK)
     //registerSearchCodebaseFixed(server, searchService, topK)
-    registerSearchCodebaseSmart(server, twoStageSearchService, contextPacker, topK, queryOptimizer)
+    registerSearchCodebaseSmart(server, twoStageSearchService, contextPacker, topK, queryOptimizer, sessionLogger)
     //registerGetIndexStatus(server, db)
 }
 
@@ -123,6 +125,7 @@ private fun registerSearchCodebaseSmart(
     contextPacker: ContextPacker,
     topK: Int,
     queryOptimizer: QueryOptimizer? = null,
+    sessionLogger: SessionLogger? = null,
 ) {
     server.addTool(
         name = RagToolNames.SEARCH_CODEBASE_SMART,
@@ -148,11 +151,12 @@ private fun registerSearchCodebaseSmart(
         )
 
         log.info("[Search] >>> RAW QUERY: '{}' | optimizer: {}", query, if (queryOptimizer != null) "enabled" else "disabled")
+        sessionLogger?.logSearchStart(originalQuery = query, taskStateJson = null, history = null)
 
-        val results = runBlocking {
-            val searchQuery = queryOptimizer?.optimize(query) ?: query
-            if (searchQuery != query) log.info("[Search] Optimized query: '{}'", searchQuery)
-            twoStageSearchService.search(searchQuery, topK * 2)
+        val (results, searchQuery) = runBlocking {
+            val sq = queryOptimizer?.optimize(query) ?: query
+            if (sq != query) log.info("[Search] Optimized query: '{}'", sq)
+            twoStageSearchService.search(sq, topK * 2) to sq
         }
         if (results.isEmpty()) {
             return@addTool CallToolResult(
@@ -163,8 +167,13 @@ private fun registerSearchCodebaseSmart(
         }
 
         val packed = contextPacker.pack(results)
-        val text = ContextFormatter.format(packed)
-        CallToolResult(content = listOf(TextContent(text = text)))
+        val contextText = ContextFormatter.format(packed)
+        sessionLogger?.logSearchFinish(
+            finalResults = results.take(topK),
+            droppedResults = results.drop(topK),
+            contextText = contextText,
+        )
+        CallToolResult(content = listOf(TextContent(text = contextText)))
     }
 }
 

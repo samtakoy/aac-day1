@@ -50,6 +50,7 @@ internal interface ConsoleViewModel {
         class SettingsSubmitClick(val chatTitle: String, val settings: ChatSettings) : Event
         object SettingsCancelClick : Event
         class MessageExpandedChange(val messageId: Long, val isExpanded: Boolean) : Event
+        class MessageMarkdownToggle(val messageId: Long, val isEnabled: Boolean) : Event
 
         // Stage Creation events (PLANNER groups)
         object ConfirmStageCreation : Event

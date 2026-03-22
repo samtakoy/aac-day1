@@ -38,6 +38,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
     override suspend fun execute(
         initialHistory: List<ModelRequest.Message>,
         memoryMessages: List<AContextMessage>,  // ← НОВОЕ: только для LLM запроса
+        contextMessages: List<AContextMessage>,
         prompt: AContextMessage,
         systemPrompt: String?,
         modelSettings: ModelSettings,
@@ -45,19 +46,14 @@ class ToolCallOrchestratorImpl @Inject constructor(
         context: ToolCallContext,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ): Result<ToolCallingResult> {
-        // initialHistory — это история из БД (БЕЗ memoryMessages)
-        // memoryMessages добавляются к initialHistory только для LLM запроса
-
-        // messages — полная история для LLM (memoryMessages + initialHistory + новые)
+        // messages — полная история для LLM: memoryMessages + contextMessages (эфемерные) не сохраняются
         val messages = (memoryMessages.map { it.toModelRequestMessage() } + initialHistory).toMutableList()
+        contextMessages.forEach { if (it.content.isNotBlank()) messages.add(it.toModelRequestMessage()) }
 
-        // newMessages — сообщения для сохранения в БД (initialHistory + prompt + новые)
+        // newMessages — сохраняется в БД: только initialHistory + prompt (и tool calls далее)
         val newMessages = mutableListOf<ModelRequest.Message>()
-        
-        // Добавляем initialHistory — это старая история из БД, которую нужно сохранить
         newMessages.addAll(initialHistory)
-        
-        // Добавляем prompt пользователя (сообщение, которое инициировало этот запрос)
+
         if (prompt.content.isNotBlank()) {
             messages.add(prompt.toModelRequestMessage())
             newMessages.add(prompt.toModelRequestMessage())
@@ -88,11 +84,15 @@ class ToolCallOrchestratorImpl @Inject constructor(
             // 2. Если нет tool calls — это финальный ответ
             if (toolCalls.isNullOrEmpty()) {
                 Log.d(TAG, "Tool loop: нет tool calls, возвращаем ответ (итерация $loopIndex)")
+                val finalText = llmResult.getContent()
+                if (finalText.isNotBlank()) {
+                    newMessages.add(ModelRequest.Message(role = ModelRequest.Role.Assistant, content = finalText))
+                }
                 return Result.success(
                     ToolCallingResult(
-                        finalResponseText = llmResult.getContent(),
+                        finalResponseText = finalText,
                         toolCallSessions = sessions,
-                        allMessages = newMessages.toAContextMessages()  // ← ТОЛЬКО новые сообщения
+                        allMessages = newMessages.toAContextMessages()
                     )
                 )
             }
@@ -201,11 +201,15 @@ class ToolCallOrchestratorImpl @Inject constructor(
 
         // Достигнут лимит итераций
         Log.d(TAG, "Tool loop: достигнут лимит итераций ($MAX_TOOL_LOOPS)")
+        val finalText = lastLlmResult?.getContent().orEmpty()
+        if (finalText.isNotBlank()) {
+            newMessages.add(ModelRequest.Message(role = ModelRequest.Role.Assistant, content = finalText))
+        }
         return Result.success(
             ToolCallingResult(
-                finalResponseText = lastLlmResult?.getContent().orEmpty(),
+                finalResponseText = finalText,
                 toolCallSessions = sessions,
-                allMessages = newMessages.toAContextMessages()  // ← ТОЛЬКО новые сообщения
+                allMessages = newMessages.toAContextMessages()
             )
         )
     }

@@ -19,19 +19,21 @@ interface ToolCallOrchestrator {
     /**
      * Выполняет цикл tool calling.
      *
-     * @param initialHistory История сообщений из БД (БЕЗ memoryMessages)
-     * @param memoryMessages Сообщения от MemoryProvider (только для LLM запроса, НЕ сохраняются)
-     * @param userPrompt Исходный запрос пользователя
-     * @param systemPrompt Системный промпт (одинаковый для всех итераций)
-     * @param modelSettings Настройки модели для LLM запросов
-     * @param tools Список доступных инструментов
-     * @param context Контекст выполнения инструментов
-     * @param onEvent Callback для событий (ToolCallStarted, ToolCallFinished, etc.)
+     * @param initialHistory   История сообщений из БД (БЕЗ memoryMessages и contextMessages)
+     * @param memoryMessages   Сообщения от MemoryProvider.getMemoryContext() — только для LLM, НЕ сохраняются
+     * @param contextMessages  Эфемерный контекст от MemoryProvider.appendUserPrompt() — только для LLM, НЕ сохраняются
+     * @param prompt           Запрос пользователя — сохраняется в историю
+     * @param systemPrompt     Системный промпт (одинаковый для всех итераций)
+     * @param modelSettings    Настройки модели для LLM запросов
+     * @param tools            Список доступных инструментов
+     * @param context          Контекст выполнения инструментов
+     * @param onEvent          Callback для событий (ToolCallStarted, ToolCallFinished, etc.)
      * @return Результат с полной историей сообщений для сохранения в контекст
      */
     suspend fun execute(
         initialHistory: List<ModelRequest.Message>,
-        memoryMessages: List<AContextMessage>,  // ← НОВОЕ
+        memoryMessages: List<AContextMessage>,
+        contextMessages: List<AContextMessage>,
         prompt: AContextMessage,
         systemPrompt: String?,
         modelSettings: ModelSettings,

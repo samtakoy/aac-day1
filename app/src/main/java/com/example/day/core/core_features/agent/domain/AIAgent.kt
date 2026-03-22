@@ -2,6 +2,7 @@
 
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.AIAgentResult
+import com.example.day.core.core_features.agent.domain.model.PromptMessages
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
 import com.example.day.core.core_features.agent.domain.model.toModelRequestMessages
 import com.example.day.core.core_features.agent.domain.strategy.ContextStrategy
@@ -46,13 +47,14 @@ class AIAgent(
     ): Result<AIAgentResult> {
         // 1. Получаем "знания" (LTM + Working Memory) в виде промптов
         val memoryMessages = memoryProvider.getMemoryContext()
-        val enrichedPrompt = memoryProvider.appendUserPrompt(prompt)
+        val promptMessages = memoryProvider.appendUserPrompt(prompt)
         val snapshot = strategy.process(config, contextRepository)
 
         val result = orchestrator.execute(
             initialHistory = snapshot.messages.toModelRequestMessages(),
-            memoryMessages = memoryMessages,  // ← НОВОЕ: только для LLM запроса
-            prompt = enrichedPrompt,
+            memoryMessages = memoryMessages,
+            contextMessages = promptMessages.context,
+            prompt = promptMessages.prompt,
             systemPrompt = config.systemPrompt,
             modelSettings = config.modelSettings,
             tools = toolProvider.getTools(agentId = config.id),
@@ -72,7 +74,7 @@ class AIAgent(
                 fullContext = extendedSnapshot
             )
 
-            val requestDebugInfo = buildRequestDebugInfo(config.systemPrompt, memoryMessages, enrichedPrompt)
+            val requestDebugInfo = buildRequestDebugInfo(config.systemPrompt, memoryMessages, promptMessages)
             AIAgentResult(toolCallingResult.finalResponseText, strategyResult.reportMessage, requestDebugInfo)
         }
     }
@@ -93,7 +95,7 @@ class AIAgent(
     private fun buildRequestDebugInfo(
         systemPrompt: String?,
         memoryMessages: List<AContextMessage>,
-        prompt: AContextMessage
+        promptMessages: PromptMessages,
     ): String = buildString {
         appendLine("=== LLM запрос (без истории) ===")
         if (!systemPrompt.isNullOrBlank()) {
@@ -106,7 +108,12 @@ class AIAgent(
             appendLine(msg.content.trimEnd())
             appendLine()
         }
-        appendLine("[${prompt.role.name}]")
-        append(prompt.content.trimEnd())
+        promptMessages.context.forEach { msg ->
+            appendLine("[${msg.role.name}:context]")
+            appendLine(msg.content.trimEnd())
+            appendLine()
+        }
+        appendLine("[${promptMessages.prompt.role.name}]")
+        append(promptMessages.prompt.content.trimEnd())
     }
 }

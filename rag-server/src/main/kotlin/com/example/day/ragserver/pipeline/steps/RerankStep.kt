@@ -9,10 +9,9 @@ class RerankStep(private val reranker: Reranker) : PipelineStep {
 
     override suspend fun process(ctx: PipelineContext): PipelineContext {
         if (ctx.results.isEmpty()) return ctx
-        // Реранкер получает ВСЕ результаты после фильтра и переранжирует их.
-        // TopKStep отсекает финальный список — не здесь.
         val reranked = reranker.rerank(ctx.query, ctx.results)
         println("[Rerank] ${ctx.results.size} results reranked")
-        return ctx.copy(results = reranked)
+        // Сохраняем полный список до TopK — чтобы search handler мог определить что было отброшено
+        return ctx.copy(results = reranked, resultsAfterRerank = reranked)
     }
 }
