@@ -30,9 +30,4 @@ data class MessageDto(
 data class TaskStateUpdateResponse(
     /** Обновлённый TaskState в виде JSON строки. */
     val updatedState: String,
-    /**
-     * Краткое резюме последнего ответа ассистента (1-2 предложения).
-     * Вариант B (Short History): используется в QueryOptimizer как history-контекст.
-     */
-    val lastResponseSummary: String,
 )

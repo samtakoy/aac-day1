@@ -22,9 +22,8 @@ class TaskStateUpdaterService(
 ) {
     companion object {
         // Максимальная длина ответа ассистента, передаваемого в промпт task-state.
-        // Полный ответ (до 8000+ символов) перегружает контекст модели — она перестаёт
-        // заполнять last_response_summary и возвращает пустую строку.
-        // Для задачи "написать 1-2 предложения о чём ответил ассистент" достаточно начала ответа.
+        // Полный ответ (до 8000+ символов) перегружает контекст модели и снижает качество
+        // извлечения intent/focus. Для навигации по коду достаточно начала ответа.
         private const val MAX_ASSISTANT_CONTENT_FOR_SUMMARY = 600
     }
 
@@ -56,8 +55,6 @@ class TaskStateUpdaterService(
         val rawResponse = llmProvider.generate(prompt)
 
         return parseResponse(rawResponse).also { response ->
-            println("[rag][ktor][task-state][${llmProvider.modelName}] done, summary='${response.lastResponseSummary.take(60)}'")
-
             // Парсим итоговый state для лога (best-effort)
             val parsedState = runCatching {
                 json.decodeFromString<LlmResponseDto>(
@@ -68,13 +65,15 @@ class TaskStateUpdaterService(
                 ).updatedState
             }.getOrNull()
 
+            println("[rag][ktor][task-state][${llmProvider.modelName}] done, intent=${parsedState?.intent}, focus=${parsedState?.currentFocus?.className}")
+
             sessionLogger?.logTaskStateUpdate(
                 historyForLog = historyTextForLog,
                 rawResponse = rawResponse,
                 intent = parsedState?.intent ?: "?",
                 focusClass = parsedState?.currentFocus?.className ?: "?",
                 switched = parsedState?.contextSwitched ?: false,
-                summary = response.lastResponseSummary,
+                summary = "",
                 model = llmProvider.modelName,
             )
         }
@@ -113,11 +112,6 @@ class TaskStateUpdaterService(
         6. tech_stack: Do not change unless explicitly mentioned.
         7. Do NOT clear fields without reason.
 
-        ### LAST_RESPONSE_SUMMARY RULES
-        - Write 1-2 sentences summarizing what the ASSISTANT said last.
-        - Be specific: mention class/file/method names if relevant.
-        - Leave empty string "" if there is no assistant message in LAST_MESSAGES.
-
         ### OUTPUT FORMAT
         Return ONLY valid JSON, no explanation, no markdown fences:
         {
@@ -128,8 +122,7 @@ class TaskStateUpdaterService(
             "context_switched": false,
             "confirmed_decisions": [],
             "open_questions": []
-          },
-          "last_response_summary": ""
+          }
         }
 
         ### CURRENT_STATE
@@ -156,7 +149,6 @@ class TaskStateUpdaterService(
             val dto = json.decodeFromString<LlmResponseDto>(raw.substring(jsonStart, jsonEnd + 1))
             TaskStateUpdateResponse(
                 updatedState = json.encodeToString(TaskStateDto.serializer(), dto.updatedState),
-                lastResponseSummary = dto.lastResponseSummary,
             )
         }.getOrElse { e ->
             println("[rag][ktor][task-state] ERROR: failed to parse LLM response: ${e.message}")
@@ -164,7 +156,7 @@ class TaskStateUpdaterService(
         }
     }
 
-    private fun defaultResponse() = TaskStateUpdateResponse(updatedState = "{}", lastResponseSummary = "")
+    private fun defaultResponse() = TaskStateUpdateResponse(updatedState = "{}")
 }
 
 // --- Internal DTOs for LLM response deserialization ---
@@ -172,7 +164,6 @@ class TaskStateUpdaterService(
 @Serializable
 private data class LlmResponseDto(
     @SerialName("updated_state") val updatedState: TaskStateDto,
-    @SerialName("last_response_summary") val lastResponseSummary: String = "",
 )
 
 @Serializable

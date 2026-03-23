@@ -52,7 +52,7 @@ class TaskStateRepositoryImpl @Inject constructor(
             }.body<TaskStateUpdateResponseDto>()
         }.getOrElse { e ->
             Log.w(TAG, "TaskState update failed (${System.currentTimeMillis() - httpStart}ms): ${e.message}, using cached state")
-            return TaskStateUpdateResult(getCurrent(agentId), "")
+            return TaskStateUpdateResult(getCurrent(agentId))
         }
         Log.d(TAG, "TaskState HTTP done: ${System.currentTimeMillis() - httpStart}ms")
 
@@ -61,11 +61,10 @@ class TaskStateRepositoryImpl @Inject constructor(
 
         val updatedState = parseState(response.updatedState)
 
-        Log.d(TAG, "TaskState updated: intent=${updatedState.intent}, focus=${updatedState.currentFocus.className}, switched=${updatedState.contextSwitched}, summary='${response.lastResponseSummary.take(60)}'")
+        Log.d(TAG, "TaskState updated: intent=${updatedState.intent}, focus=${updatedState.currentFocus.className}, switched=${updatedState.contextSwitched}")
 
         return TaskStateUpdateResult(
             updatedState = updatedState,
-            lastResponseSummary = response.lastResponseSummary,
         )
     }
 
@@ -102,6 +101,5 @@ class TaskStateRepositoryImpl @Inject constructor(
     @Serializable
     private data class TaskStateUpdateResponseDto(
         val updatedState: String,
-        val lastResponseSummary: String,
     )
 }

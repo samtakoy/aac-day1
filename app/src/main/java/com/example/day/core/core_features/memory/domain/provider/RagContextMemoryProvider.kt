@@ -19,7 +19,9 @@ import com.example.day.core.core_features.memory.domain.provider.rag.TaskStateRe
  * 2. Делегирует обогащение промпта в AutoRagMemoryProvider
  *
  * В postProcess() (после успешного ответа LLM):
- * 3. Сохраняет запись в short history (userMessage + lastResponseSummary)
+ * 3. Берёт фактический ответ ассистента из AgentContextRepository,
+ *    обрезает до MAX_ASSISTANT_SUMMARY_LENGTH и сохраняет в ShortHistory.
+ *    Это даёт QueryOptimizer реальный контекст без зависимости от LLM-суммаризации.
  *
  * Хранение в AgentMemoryRepository:
  * - TaskState: category="task_state", key="current"
@@ -37,13 +39,17 @@ class RagContextMemoryProvider(
     private companion object {
         val TAG = RagLog.TAG
         private val MAX_RECENT_MESSAGES = 2
+
+        // Максимальная длина ответа ассистента сохраняемого в ShortHistory.
+        // Полный ответ (до 8000+ символов) не нужен QueryOptimizer — ему достаточно начала
+        // чтобы понять о чём шла речь и обогатить следующий поисковый запрос.
+        private const val MAX_ASSISTANT_SUMMARY_LENGTH = 400
     }
 
     private var agentId: Long? = null
 
-    // Хранит данные между appendUserPrompt() и postProcess()
+    // Хранит сообщение пользователя между appendUserPrompt() и postProcess()
     private var pendingUserMessage: String = ""
-    private var pendingLastResponseSummary: String = ""
 
     fun bindAgentId(agentId: Long) {
         this.agentId = agentId
@@ -92,7 +98,6 @@ class RagContextMemoryProvider(
         Log.d(TAG, "taskState updated (${System.currentTimeMillis() - taskStateStart}ms): intent=${taskStateResult?.updatedState?.intent}, focus=${taskStateResult?.updatedState?.currentFocus?.className}, switched=${taskStateResult?.updatedState?.contextSwitched}")
 
         pendingUserMessage = prompt.content
-        pendingLastResponseSummary = taskStateResult?.lastResponseSummary ?: ""
 
         // Передать TaskState и Short History в AutoRag для QueryOptimizer на сервере
         val taskStateJson = taskStateRepository.getCurrentJson(agentId)
@@ -114,21 +119,26 @@ class RagContextMemoryProvider(
 
     /**
      * Вызывается после успешного ответа LLM.
-     * Сохраняет запись в short history.
+     * Берёт фактический ответ ассистента из AgentContextRepository и сохраняет в ShortHistory.
      */
     suspend fun postProcess() {
         val agentId = agentId ?: return
         if (pendingUserMessage.isBlank()) return
 
+        val assistantSummary = getRecentMessages(agentId)
+            .lastOrNull { it.role == AContextMessage.Role.ASSISTANT }
+            ?.content
+            ?.take(MAX_ASSISTANT_SUMMARY_LENGTH)
+            ?: ""
+
         shortHistoryRepository.append(
             agentId = agentId,
             userMessage = pendingUserMessage,
-            assistantSummary = pendingLastResponseSummary,
+            assistantSummary = assistantSummary,
         )
-        Log.d(TAG, "postProcess: saved short history entry (summary length=${pendingLastResponseSummary.length})")
+        Log.d(TAG, "postProcess: saved short history entry (summary length=${assistantSummary.length})")
 
         pendingUserMessage = ""
-        pendingLastResponseSummary = ""
     }
 
     /**

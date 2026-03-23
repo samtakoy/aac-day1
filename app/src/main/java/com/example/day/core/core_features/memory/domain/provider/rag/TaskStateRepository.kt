@@ -34,6 +34,4 @@ interface TaskStateRepository {
 
 data class TaskStateUpdateResult(
     val updatedState: TaskState,
-    /** Краткое резюме последнего ответа ассистента. Пустая строка если ответа ещё не было. */
-    val lastResponseSummary: String,
 )
