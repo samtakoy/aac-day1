@@ -26,7 +26,8 @@ internal class ModelSettingsMapper @Inject constructor() {
             presencePenalty = entity.presencePenalty,
             frequencyPenalty = entity.frequencyPenalty,
             seed = entity.seed,
-            reasoningEffort = entity.reasoningEffort
+            reasoningEffort = entity.reasoningEffort,
+            isLocal = entity.isLocal
         )
     }
 
@@ -43,7 +44,8 @@ internal class ModelSettingsMapper @Inject constructor() {
             presencePenalty = model.presencePenalty,
             frequencyPenalty = model.frequencyPenalty,
             seed = model.seed,
-            reasoningEffort = model.reasoningEffort
+            reasoningEffort = model.reasoningEffort,
+            isLocal = model.isLocal
         )
     }
 

@@ -1,6 +1,8 @@
 package com.example.day.core.core_features.llm.di
 
 import com.example.day.core.core_features.llm.data.LlmRepositoryImpl
+import com.example.day.core.core_features.llm.data.remote.LocalLlmApi
+import com.example.day.core.core_features.llm.data.remote.LocalLlmApiImpl
 import com.example.day.core.core_features.llm.data.remote.RemoteLlmApi
 import com.example.day.core.core_features.llm.data.remote.RemoteLlmApiImpl
 import com.example.day.core.core_features.llm.data.remote.mappers.ModelRequestMapper
@@ -22,6 +24,8 @@ internal interface LlmCoreFeatureModule {
     fun bindsResponseMapper(impl: ModelResponseMapperImpl): ModelResponseMapper
     @Binds
     fun bindsApi(impl: RemoteLlmApiImpl): RemoteLlmApi
+    @Binds
+    fun bindsLocalApi(impl: LocalLlmApiImpl): LocalLlmApi
     @Binds
     fun bindsRepository(impl: LlmRepositoryImpl): LlmRepository
     @Binds

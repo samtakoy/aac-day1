@@ -17,7 +17,8 @@ data class ModelSettings(
     val presencePenalty: Double? = null,
     val frequencyPenalty: Double? = null,
     val seed: Int? = null,
-    val reasoningEffort: String? = null
+    val reasoningEffort: String? = null,
+    val isLocal: Boolean = false
 ) {
     companion object {
         fun default(): ModelSettings = ModelSettings(ModelConst.DEFAULT_MODEL)

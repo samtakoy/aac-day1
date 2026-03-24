@@ -93,8 +93,8 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.markdown.renderer.m3)
 
-    /*
     testImplementation(libs.junit)
+    /*
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
@@ -102,4 +102,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)*/
     debugImplementation(libs.androidx.compose.ui.tooling)
+    implementation(project(":shared:simple-chat-api"))
 }

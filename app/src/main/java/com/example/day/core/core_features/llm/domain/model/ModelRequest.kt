@@ -38,6 +38,7 @@ data class ModelRequest(
     val frequencyPenalty: Double? = null,
     val reasoningEffort: Reasoning? = null,
     val seed: Int? = null,
+    val isLocal: Boolean = false,
     val logProbs: Boolean? = null,
     val topLogProbs: Int? = null
 ) {

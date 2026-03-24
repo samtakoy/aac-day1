@@ -3,6 +3,7 @@ package com.example.day.app.di
 import android.content.Context
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.example.day.app.di.AppSettingsModule
 import com.example.day.core.core_features.agent.di.AgentCoreFeatureModule
 import com.example.day.core.core_features.chat.di.ChatCoreFeatureModule
 import com.example.day.core.core_features.llm.di.LlmCoreFeatureModule
@@ -40,7 +41,8 @@ import javax.inject.Singleton
         UserSettingsFeatureApiModule::class,
         LlmCoreFeatureModule::class,
         McpCoreFeatureModule::class,
-        McpSettingsFeatureApiModule::class
+        McpSettingsFeatureApiModule::class,
+        AppSettingsModule::class
     ]
 )
 @Immutable

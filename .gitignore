@@ -46,5 +46,7 @@ google-services.json
 *.hprof
 /mcp-server/build/
 /rag-server/build/
+/ai-gateway/build/
+/shared/simple-chat-api/build/
 /rag-server/rag_index.db
 /rag-server/reports/

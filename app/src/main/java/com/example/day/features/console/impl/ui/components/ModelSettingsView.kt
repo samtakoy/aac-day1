@@ -50,6 +50,7 @@ fun ModelSettingsView(
         mutableStateOf(modelSettings.stopSequence.firstOrNull().orEmpty()) 
     }
     var jsonFormat by remember(modelSettings.jsonFormat) { mutableStateOf(modelSettings.jsonFormat) }
+    var isLocal by remember(modelSettings.isLocal) { mutableStateOf(modelSettings.isLocal) }
     var reasoningEffort by remember(modelSettings.reasoningEffort) { 
         mutableStateOf(modelSettings.reasoningEffort.orEmpty()) 
     }
@@ -222,6 +223,35 @@ fun ModelSettingsView(
             colors = colors,
             helpDescription = ModelParameterDescriptions.REASONING_EFFORT
         )
+
+        // Local LLM (Ollama) checkbox
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(colors.inputBackground)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Checkbox(
+                checked = isLocal,
+                onCheckedChange = { newIsLocal ->
+                    isLocal = newIsLocal
+                    onModelSettingsChange(modelSettings.copy(isLocal = newIsLocal))
+                },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = colors.sendButtonEnabled,
+                    uncheckedColor = colors.inputPlaceholder
+                )
+            )
+            Text(
+                text = "Локальная LLM (Ollama)",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.botText,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
 
         // JSON Format checkbox
         Row(

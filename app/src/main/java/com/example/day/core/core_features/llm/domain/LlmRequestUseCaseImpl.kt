@@ -43,7 +43,8 @@ internal class LlmRequestUseCaseImpl @Inject constructor(
             presencePenalty = modelSettings.presencePenalty,
             frequencyPenalty = modelSettings.frequencyPenalty,
             reasoningEffort = modelSettings.reqReasoning(),
-            seed = modelSettings.seed
+            seed = modelSettings.seed,
+            isLocal = modelSettings.isLocal
         )
         val result = repository.sendRequest(request)
         return mapResult(result)
