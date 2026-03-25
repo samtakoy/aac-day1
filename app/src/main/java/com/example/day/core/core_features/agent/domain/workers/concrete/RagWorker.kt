@@ -10,12 +10,12 @@ import com.example.day.core.core_features.agent.domain.model.AContextParams
 import com.example.day.core.core_features.agent.domain.model.AContextState
 import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
+import com.example.day.core.core_features.agent.domain.tools.ToolExecutor
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
-import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.memory.domain.provider.RagContextMemoryProvider
 import com.example.day.core.core_features.memory.domain.provider.RagContextMemoryProviderFactory
 import com.example.day.core.core_features.memory.domain.provider.rag.RagLog
@@ -36,10 +36,10 @@ class RagWorker @Inject constructor(
     private val ragContextMemoryProviderFactory: RagContextMemoryProviderFactory,
     private val ragSearchRepository: RagSearchRepository,
     private val contextRepository: AgentContextRepository,
-    private val llmRequestUseCase: LlmRequestUseCase,
     private val strategyFactory: StrategyFactory,
     private val toolProvider: ToolProvider,
     private val toolCallOrchestrator: ToolCallOrchestrator,
+    private val toolExecutor: ToolExecutor
 ) : AWorker {
 
     companion object {
@@ -112,11 +112,11 @@ class RagWorker @Inject constructor(
         val agent = AIAgent(
             config = baseAgent.config,
             contextRepository = contextRepository,
-            llmProvider = llmRequestUseCase,
             strategy = strategy,
             memoryProvider = ragContextProvider,
             toolProvider = toolProvider,
             orchestrator = toolCallOrchestrator,
+            toolExecutor = toolExecutor
         )
 
         val result = agent.process(

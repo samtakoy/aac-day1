@@ -26,5 +26,6 @@ data class AgentConfig(
     val systemPrompt: String,
     /** тип стратегии по работе с контекстом - enum class Full, Summarization, SlidingWindow */
     val contextStrategyType: CtxStrategyType,
-    val memoryTypes: List<MemoryType>
+    val memoryTypes: List<MemoryType>,
+    val hitlEnabled: Boolean = false
 )

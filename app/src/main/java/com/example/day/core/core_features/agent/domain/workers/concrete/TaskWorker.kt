@@ -9,6 +9,7 @@ import com.example.day.core.core_features.agent.domain.model.TaskLlmResponse
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
+import com.example.day.core.core_features.agent.domain.tools.ToolExecutor
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.workers.task.TaskResponseParser
@@ -18,7 +19,6 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_store
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
-import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.memory.domain.provider.CompositeMemoryProvider
 import com.example.day.core.core_features.memory.domain.provider.TaskStateMemoryProviderFactory
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProviderFactory
@@ -35,11 +35,11 @@ class TaskWorker @Inject constructor(
     private val memoryProviderFactory: MemoryProviderFactory,
     private val taskStateMemoryProviderFactory: TaskStateMemoryProviderFactory,
     private val contextRepository: AgentContextRepository,
-    private val llmRequestUseCase: LlmRequestUseCase,
     private val strategyFactory: StrategyFactory,
     private val stateStore: StateStore,
     private val toolProvider: ToolProvider,
-    private val toolCallOrchestrator: ToolCallOrchestrator
+    private val toolCallOrchestrator: ToolCallOrchestrator,
+    private val toolExecutor: ToolExecutor
 ) : AWorker {
 
     companion object {
@@ -80,11 +80,11 @@ class TaskWorker @Inject constructor(
         val agentWithTaskState = AIAgent(
             config = agent.config,
             contextRepository = contextRepository,
-            llmProvider = llmRequestUseCase,
             strategy = strategy,
             memoryProvider = compositeProvider,
             toolProvider = toolProvider,
-            orchestrator = toolCallOrchestrator
+            orchestrator = toolCallOrchestrator,
+            toolExecutor = toolExecutor
         )
 
         //  current state to chat before LLM call

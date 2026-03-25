@@ -2,118 +2,196 @@
 
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.AIAgentResult
-import com.example.day.core.core_features.agent.domain.model.PromptMessages
 import com.example.day.core.core_features.agent.domain.model.AgentConfig
+import com.example.day.core.core_features.agent.domain.model.ProcessResult
 import com.example.day.core.core_features.agent.domain.model.toModelRequestMessages
 import com.example.day.core.core_features.agent.domain.strategy.ContextStrategy
+import com.example.day.core.core_features.agent.domain.strategy.ContextStrategyResult
+import com.example.day.core.core_features.agent.domain.tools.OrchestratorRequest
+import com.example.day.core.core_features.agent.domain.tools.OrchestratorResult
 import com.example.day.core.core_features.agent.domain.tools.ToolCallContext
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
+import com.example.day.core.core_features.agent.domain.tools.ToolExecutionResult
+import com.example.day.core.core_features.agent.domain.tools.ToolExecutor
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
+import com.example.day.core.core_features.agent.domain.tools.ToolResult
+import com.example.day.core.core_features.agent.domain.tools.hitl.HitlSessionManager
+import com.example.day.core.core_features.agent.domain.tools.hitl.ToolCallDecision
+import com.example.day.core.core_features.agent.domain.tools.toModelRequestMessages
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
-import com.example.day.core.core_features.chat.domain.model.ChatSettings
-import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
+import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProvider
+import java.util.UUID
 
-/**
- * Main AI Agent orchestrator.
- * Coordinates strategy, LLM, and context repository to process user messages.
- *
- * "Pure brain" — doesn't know about database or UI.
- * All persistence is delegated to ContextStrategy.
- */
 class AIAgent(
     val config: AgentConfig,
-    // TODO больше тут не актуально - нужно вынести в AgentContextMemoryProvider или AgentMessageHistoryProvider
     private val contextRepository: AgentContextRepository,
-    private val llmProvider: LlmRequestUseCase,
-    // TODO больше тут не актуально - нужно вынести в AgentContextMemoryProvider или AgentMessageHistoryProvider
     private val strategy: ContextStrategy,
-    private val memoryProvider: MemoryProvider,    // Долговременная + Рабочая
+    private val memoryProvider: MemoryProvider,
     private val toolProvider: ToolProvider,
-    private val orchestrator: ToolCallOrchestrator
+    private val orchestrator: ToolCallOrchestrator,
+    private val toolExecutor: ToolExecutor,
+    private val hitlSessionManager: HitlSessionManager
 ) {
+    companion object {
+        private const val MAX_TOOL_LOOPS = 10
+    }
 
-    /**
-     * Process user message:
-     * 1. strategy.process() — build context snapshot for LLM
-     * 2. LLM call
-     * 3. strategy.afterResponse() — persist messages, optional compression
-     *
-     * @return Result with response text and optional report message (e.g. compression stats)
-     */
-    suspend fun process(
-        prompt: AContextMessage,
-        onEvent: (suspend (WorkerEvent) -> Unit)?
-    ): Result<AIAgentResult> {
-        // 1. Получаем "знания" (LTM + Working Memory) в виде промптов
+    private data class LlmContext(
+        val llmMessages: MutableList<ModelRequest.Message>,
+        val newMessages: MutableList<ModelRequest.Message>,
+        val snapshot: ContextStrategyResult
+    )
+
+    private suspend fun buildLlmContext(prompt: AContextMessage): LlmContext {
         val memoryMessages = memoryProvider.getMemoryContext()
         val promptMessages = memoryProvider.appendUserPrompt(prompt)
         val snapshot = strategy.process(config, contextRepository)
 
-        val result = orchestrator.execute(
-            initialHistory = snapshot.messages.toModelRequestMessages(),
-            memoryMessages = memoryMessages,
-            contextMessages = promptMessages.context,
-            prompt = promptMessages.prompt,
-            systemPrompt = config.systemPrompt,
-            modelSettings = config.modelSettings,
-            tools = toolProvider.getTools(agentId = config.id),
-            context = ToolCallContext(agentId = config.id),
-            onEvent = onEvent
-        )
+        val llmMessages = buildList {
+            addAll(memoryMessages.map { it.toModelRequestMessage() })
+            addAll(snapshot.messages.toModelRequestMessages())
+            addAll(promptMessages.context.filter { it.content.isNotBlank() }.map { it.toModelRequestMessage() })
+            if (prompt.content.isNotBlank()) add(promptMessages.prompt.toModelRequestMessage())
+        }.toMutableList()
 
-        return result.map { toolCallingResult ->
-            // 4. Сохраняем ПОЛНУЮ историю от LLM (включая tool calls, НО БЕЗ memoryMessages)
-            val extendedSnapshot = snapshot.copy(messages = toolCallingResult.allMessages)
+        val newMessages = buildList {
+            addAll(snapshot.messages.toModelRequestMessages())
+            if (prompt.content.isNotBlank()) add(promptMessages.prompt.toModelRequestMessage())
+        }.toMutableList()
 
-            // 5. Передаём расширенный контекст в strategy
-            val strategyResult = strategy.afterResponse(
-                agent = config,
-                response = toolCallingResult.finalResponseText,
-                store = contextRepository,
-                fullContext = extendedSnapshot
-            )
-
-            val requestDebugInfo = buildRequestDebugInfo(config.systemPrompt, memoryMessages, promptMessages)
-            AIAgentResult(toolCallingResult.finalResponseText, strategyResult.reportMessage, requestDebugInfo)
-        }
+        return LlmContext(llmMessages, newMessages, snapshot)
     }
 
-    /** Returns formatted info about current context strategy/params state. */
+    suspend fun process(
+        prompt: AContextMessage,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ): Result<ProcessResult> {
+        if (hitlSessionManager.hasActiveSession(config.id)) {
+            return Result.failure(HitlSessionBusyError())
+        }
+        val runId = UUID.randomUUID().toString()
+        val (llmMessages, newMessages, snapshot) = buildLlmContext(prompt)
+        return runToolLoop(runId, llmMessages, newMessages, snapshot, onEvent)
+    }
+
+    internal suspend fun runToolLoop(
+        runId: String,
+        llmMessages: MutableList<ModelRequest.Message>,
+        newMessages: MutableList<ModelRequest.Message>,
+        snapshot: ContextStrategyResult,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ): Result<ProcessResult> {
+        var loopCount = 0
+
+        while (loopCount < MAX_TOOL_LOOPS) {
+            val request = OrchestratorRequest(
+                messages = llmMessages.toList(),
+                systemPrompt = config.systemPrompt,
+                modelSettings = config.modelSettings,
+                tools = toolProvider.getTools(config.id)
+            )
+            val result = orchestrator.execute(request, onEvent)
+                .getOrElse { return Result.failure(it) }
+
+            when (result) {
+                is OrchestratorResult.Completed -> {
+                    newMessages.add(result.assistantMessage)
+                    val extendedSnapshot = snapshot.copy(messages = newMessages.toAContextMessages())
+                    val strategyResult = strategy.afterResponse(
+                        agent = config,
+                        response = result.responseText,
+                        store = contextRepository,
+                        fullContext = extendedSnapshot
+                    )
+                    return Result.success(ProcessResult.Success(AIAgentResult(result.responseText, strategyResult.reportMessage, debugInfo = "")))
+                }
+                is OrchestratorResult.PendingApproval -> {
+                    llmMessages.add(result.assistantMessage)
+                    newMessages.add(result.assistantMessage)
+
+                    when (val exec = toolExecutor.submit(
+                        runId = runId,
+                        toolCalls = result.toolCalls,
+                        prompt = AContextMessage(AContextMessage.Role.USER, ""),
+                        loopMessages = newMessages.toList(),
+                        context = ToolCallContext(agentId = config.id),
+                        onEvent = onEvent
+                    )) {
+                        is ToolExecutionResult.Completed -> {
+                            val toolMessages = exec.results.toModelRequestMessages()
+                            llmMessages.addAll(toolMessages)
+                            newMessages.addAll(toolMessages)
+                        }
+                        is ToolExecutionResult.AwaitingApproval -> {
+                            return Result.success(ProcessResult.Pending(exec.runId))
+                        }
+                    }
+                }
+            }
+            loopCount++
+        }
+
+        val extendedSnapshot = snapshot.copy(messages = newMessages.toAContextMessages())
+        strategy.afterResponse(config, "", contextRepository, extendedSnapshot)
+        return Result.success(ProcessResult.Success(AIAgentResult("", null, debugInfo = "")))
+    }
+
+    suspend fun resumeWithDecisions(
+        runId: String,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ): Result<ProcessResult> {
+        val session = hitlSessionManager.getSession(runId)
+            ?: return Result.failure(IllegalStateException("Session $runId not found"))
+
+        val (llmMessages, _, snapshot) = buildLlmContext(session.prompt)
+
+        // Append all accumulated loop messages (includes prompt msg + previous iterations + pending assistantMsg)
+        llmMessages.addAll(session.loopMessages)
+        val newMessages = session.loopMessages.toMutableList()
+
+        // Execute approved / reject others
+        val toolResults = session.pendingToolCalls.map { call ->
+            val decision = session.decisions[call.id]
+            if (decision == ToolCallDecision.APPROVED) {
+                val result = toolProvider.executeToolCall(call, ToolCallContext(agentId = session.agentId))
+                val content = result.getOrElse { "Error: ${it.message}" }
+                onEvent?.invoke(WorkerEvent.ApprovalDecided(runId, call.id, ToolCallDecision.APPROVED))
+                ToolResult(toolCallId = call.id, content = content, isError = result.isFailure)
+            } else {
+                onEvent?.invoke(WorkerEvent.ApprovalDecided(runId, call.id, ToolCallDecision.REJECTED))
+                ToolResult(toolCallId = call.id, content = "Rejected by user", isError = true)
+            }
+        }
+
+        val toolMessages = toolResults.toModelRequestMessages()
+        llmMessages.addAll(toolMessages)
+        newMessages.addAll(toolMessages)
+
+        hitlSessionManager.closeSession(runId)
+        return runToolLoop(runId, llmMessages, newMessages, snapshot, onEvent)
+    }
+
     suspend fun getInfo(): String = strategy.getInfoReport(config, contextRepository)
-
-    /** Returns full context contents formatted for display. */
     suspend fun getFullContext(): String = strategy.getFullContextReport(config, contextRepository)
-
-    /**
-     * Update strategy parameters using a map of parameter names to values.
-     * @return confirmation message
-     */
     suspend fun setupParams(params: Map<String, String>): String =
         strategy.updateParams(config, params, contextRepository)
 
-    private fun buildRequestDebugInfo(
-        systemPrompt: String?,
-        memoryMessages: List<AContextMessage>,
-        promptMessages: PromptMessages,
-    ): String = buildString {
-        appendLine("=== LLM запрос (без истории) ===")
-        if (!systemPrompt.isNullOrBlank()) {
-            appendLine("[SYSTEM]")
-            appendLine(systemPrompt.trimEnd())
-            appendLine()
-        }
-        memoryMessages.forEach { msg ->
-            appendLine("[MEMORY:${msg.role.name}]")
-            appendLine(msg.content.trimEnd())
-            appendLine()
-        }
-        promptMessages.context.forEach { msg ->
-            appendLine("[${msg.role.name}:context]")
-            appendLine(msg.content.trimEnd())
-            appendLine()
-        }
-        appendLine("[${promptMessages.prompt.role.name}]")
-        append(promptMessages.prompt.content.trimEnd())
+    private fun List<ModelRequest.Message>.toAContextMessages() = map { msg ->
+        AContextMessage(
+            role = when (msg.role) {
+                ModelRequest.Role.System -> AContextMessage.Role.SYSTEM
+                ModelRequest.Role.User -> AContextMessage.Role.USER
+                ModelRequest.Role.Assistant -> AContextMessage.Role.ASSISTANT
+                ModelRequest.Role.Tool -> AContextMessage.Role.TOOL
+            },
+            content = msg.content,
+            toolCallId = msg.toolCallId,
+            toolCalls = msg.toolCalls?.map { call ->
+                AContextMessage.ToolCallRef(call.id, call.type, call.function.name, call.function.arguments)
+            }
+        )
     }
 }
+
+class HitlSessionBusyError : Exception("HITL session already active for this agent")

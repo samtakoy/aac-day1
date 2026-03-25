@@ -12,9 +12,12 @@ import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
+import com.example.day.core.core_features.agent.domain.tools.ToolExecutor
+import com.example.day.core.core_features.agent.domain.tools.impl.AutoToolExecutor
 import com.example.day.core.core_features.agent.domain.tools.impl.ToolCallOrchestratorImpl
-import com.example.day.core.core_features.state_machine.domain.StateStore
-import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskStateStoreImpl
+import com.example.day.core.core_features.agent.domain.tools.hitl.HitlSessionManager
+import com.example.day.core.core_features.agent.domain.tools.hitl.HitlSessionManagerImpl
+import com.example.day.core.core_features.agent.domain.tools.hitl.HitlToolExecutor
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentToolsImpl
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
@@ -22,6 +25,8 @@ import com.example.day.core.core_features.chat.data.local.ChatDatabase
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.tools.ChatToolsImpl
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
+import com.example.day.core.core_features.state_machine.domain.StateStore
+import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskStateStoreImpl
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -56,6 +61,13 @@ internal interface AgentCoreFeatureModule {
     fun bindsToolProvider(impl: McpToolProvider): ToolProvider
 
     @Binds
+    fun bindsToolExecutor(impl: AutoToolExecutor): ToolExecutor
+
+    @Binds
+    @Singleton
+    fun bindsHitlSessionManager(impl: HitlSessionManagerImpl): HitlSessionManager
+
+    @Binds
     fun bindsChatTools(impl: ChatToolsImpl): ChatTools
 
     @Binds
@@ -67,9 +79,8 @@ internal interface AgentCoreFeatureModule {
         @Provides
         @Singleton
         internal fun provideToolCallOrchestrator(
-            llmRequestUseCase: LlmRequestUseCase,
-            toolProvider: ToolProvider
-        ): ToolCallOrchestrator = ToolCallOrchestratorImpl(llmRequestUseCase, toolProvider)
+            llmRequestUseCase: LlmRequestUseCase
+        ): ToolCallOrchestrator = ToolCallOrchestratorImpl(llmRequestUseCase)
 
         @Provides
         @Singleton

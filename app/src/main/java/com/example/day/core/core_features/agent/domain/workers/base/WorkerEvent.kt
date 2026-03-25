@@ -57,4 +57,21 @@ sealed interface WorkerEvent {
         val category: String,
         val fact: String
     ) : WorkerEvent
+
+    // ========== HITL EVENTS ==========
+
+    /** Tool call placed in queue for confirmation */
+    class ApprovalRequired(
+        val runId: String,
+        val toolCallId: String,
+        val toolName: String,
+        val arguments: String
+    ) : WorkerEvent
+
+    /** User made a decision on tool call */
+    class ApprovalDecided(
+        val runId: String,
+        val toolCallId: String,
+        val decision: com.example.day.core.core_features.agent.domain.tools.hitl.ToolCallDecision
+    ) : WorkerEvent
 }
