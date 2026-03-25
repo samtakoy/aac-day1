@@ -22,7 +22,9 @@ fun main() {
             json(Json { ignoreUnknownKeys = true })
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 120_000
+            requestTimeoutMillis = 300_000
+            socketTimeoutMillis = 300_000
+            connectTimeoutMillis = 10_000
         }
     }
     val ollamaProvider = OllamaProvider(httpClient, config.ollamaUrl)
