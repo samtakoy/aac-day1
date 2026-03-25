@@ -12,7 +12,7 @@ interface TalkDelegate {
         chat: Chat,
         inputText: String,
         onSuccess: () -> Unit
-    )
+    ): String?
 
     /**
      * Handle button click action from chat message.

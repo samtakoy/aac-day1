@@ -60,6 +60,8 @@ interface RagSearchRepository {
         preset: String,
         items: List<RuntestResultItem>,
         serverUrl: String,
+        executionTimeMs: Long = 0,
+        isLocalLlm: Boolean = false,
     ): Result<RuntestSaveResponse>
 
     /**

@@ -28,7 +28,7 @@ internal class LlmTalkDelegate @Inject constructor(
         chat: Chat,
         inputText: String,
         onSuccess: () -> Unit
-    ) {
+    ): String? {
         val messageId = addChatMessageUseCase.invoke(
             chat.id,
             System.currentTimeMillis(),
@@ -52,6 +52,7 @@ internal class LlmTalkDelegate @Inject constructor(
                 onSuccess()
             }
             .getOrThrow()
+        return null
     }
 
     private suspend fun llmRequest(

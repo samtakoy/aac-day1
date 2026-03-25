@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.llm.data.remote
 
+import android.util.Log
 import com.example.day.shared.dto.ChatCompletionRequest
 import com.example.day.shared.dto.ChatCompletionResponse
 import io.ktor.client.*
@@ -13,6 +14,7 @@ internal class LocalLlmApiImpl @Inject constructor(
     private val client: HttpClient
 ) : LocalLlmApi {
     override suspend fun sendRequest(request: ChatCompletionRequest, serverUrl: String): ChatCompletionResponse {
+        Log.e("ktor", "Local LLM")
         val response = client.post("$serverUrl/v1/chat/completions") {
             contentType(ContentType.Application.Json)
             setBody(request)

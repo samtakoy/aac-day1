@@ -8,6 +8,7 @@ import com.example.day.core.core_features.chat.domain.model.ChatMessageStatus
 import com.example.day.core.core_features.chat.domain.model.UserType
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.usecase.AddChatMessageUseCase
+import com.example.day.core.core_features.memory.domain.provider.rag.TestQueries
 import kotlinx.coroutines.flow.SharedFlow
 import javax.inject.Inject
 
@@ -17,9 +18,9 @@ import javax.inject.Inject
  * - агент обогащает промпт контекстом из RAG-сервера
  * - история сжимается через ContextSummaryStrategy (4 сообщения + саммаризация при 6)
  *
- * Специальная команда:
- * - "debuginfo" — выводит info-сообщение с текущим состоянием TaskState и Short History
- *   (полноценно заработает после Этапа 3, сейчас выводит заглушку)
+ * Специальные команды:
+ * - "@@debuginfo" — выводит info-сообщение с текущим состоянием TaskState и Short History
+ * - "@@testqueries" — запускает автоматизированный тест по списку TestQueries
  */
 internal class RagTalkDelegate @Inject constructor(
     private val addChatMessageUseCase: AddChatMessageUseCase,
@@ -31,12 +32,18 @@ internal class RagTalkDelegate @Inject constructor(
         chat: Chat,
         inputText: String,
         onSuccess: () -> Unit
-    ) {
-        if (inputText.trim().equals("debuginfo", ignoreCase = true)) {
+    ): String? {
+        if (inputText.trim() == "@@debuginfo") {
             onSuccess()
             val info = ragWorker.getDebugInfo()
             chatTools.addInfoMessage(chat.id, info)
-            return
+            return null
+        }
+
+        if (inputText.trim() == "@@testqueries") {
+            onSuccess()
+            handleTestQueries(chat)
+            return null
         }
 
         addChatMessageUseCase.invoke(
@@ -49,15 +56,47 @@ internal class RagTalkDelegate @Inject constructor(
         )
         onSuccess()
 
+        var lastAnswer: String? = null
         try {
             ragWorker.doWork(
                 userPrompt = inputText,
                 chat = chat,
-                onEvent = null
+                onEvent = { event ->
+                    if (event is WorkerEvent.RequestSuccess) {
+                        lastAnswer = event.result.choices.firstOrNull()?.message?.content
+                    }
+                }
             )
         } catch (e: Throwable) {
             chatTools.addInfoMessage(chat.id, "❌ ${e.stackTraceToString()}")
         }
+        return lastAnswer
+    }
+
+    private suspend fun handleTestQueries(chat: Chat) {
+        val total = TestQueries.list.size
+        chatTools.addInfoMessage(chat.id, "🔄 Запускаю тест: $total вопросов...")
+
+        val startTime = System.currentTimeMillis()
+        val results = mutableListOf<Pair<String, String>>()
+
+        TestQueries.list.forEachIndexed { i, question ->
+            val answer = tryAddUserMessage(chat, question, onSuccess = {})
+            if (answer == null) {
+                chatTools.addInfoMessage(chat.id, "❌ Ошибка на вопросе #${i + 1}. Тест остановлен. Отчёт не отправлен.")
+                return
+            }
+            results.add(question to answer)
+        }
+
+        val executionTimeMs = System.currentTimeMillis() - startTime
+        ragWorker.saveTestResults(results, executionTimeMs, chat)
+            .onSuccess { report ->
+                chatTools.addInfoMessage(chat.id, "✅ Тест завершён: ${results.size} вопросов за ${executionTimeMs}мс\nОтчёт: $report")
+            }
+            .onFailure { error ->
+                chatTools.addInfoMessage(chat.id, "⚠️ Тест прошёл, но отчёт не сохранён: ${error.message}")
+            }
     }
 
     override suspend fun tryHandleAction(chat: Chat, messageId: Long, action: String) {

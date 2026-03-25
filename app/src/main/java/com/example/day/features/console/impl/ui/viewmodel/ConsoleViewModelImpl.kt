@@ -257,7 +257,7 @@ internal class ConsoleViewModelImpl(
                 _state.update { it.copy(settings = null) }
             }
             is ConsoleViewModel.Event.SettingsSubmitClick -> {
-                chatSettings = event.settings
+                chatSettings = event.settings.copy(model = event.settings.model.copy(name = event.settings.model.name.trim()))
                 _state.update { it.copy(settings = null) }
                 viewModelScope.launch {
                     updateChatTitleUseCase(chatId, event.chatTitle)

@@ -34,7 +34,7 @@ ollama serve
 ollama pull nomic-embed-text
 
 # Скачать LLM (нужна для метаданных / query optimization / reranking)
-ollama pull qwen2.5-coder:7b-instruct
+ollama pull qwen2_5-coder_7b-instruct
 ```
 
 Проверить embedding-модель:
@@ -124,7 +124,7 @@ java -jar rag-server/build/libs/rag-server.jar
 ```bash
 export CODE_PATH="/path/to/your/kotlin/project/src"
 export EXTRACT_METADATA=true
-export LLM_MODEL=qwen2.5-coder:7b-instruct
+export LLM_MODEL=qwen2_5-coder_7b-instruct
 java -jar rag-server/build/libs/rag-server.jar
 ```
 
@@ -133,7 +133,7 @@ java -jar rag-server/build/libs/rag-server.jar
 ```bash
 export CODE_PATH="/path/to/your/kotlin/project/src"
 export EXTRACT_METADATA=true
-export LLM_MODEL=qwen2.5-coder:7b-instruct
+export LLM_MODEL=qwen2_5-coder_7b-instruct
 export TRANSLATE_QUERIES=true
 export TRANSLATE_LLM_MODEL=qwen2.5:3b   # быстрая модель для оптимизации
 export RERANKER_LLM_MODEL=qwen2.5:3b    # быстрая модель для reranker

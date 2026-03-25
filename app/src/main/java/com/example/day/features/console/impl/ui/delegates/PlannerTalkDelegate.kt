@@ -37,7 +37,7 @@ internal class PlannerTalkDelegate @Inject constructor(
         chat: Chat,
         inputText: String,
         onSuccess: () -> Unit
-    ) {
+    ): String? {
         // добавить сообщение пользователя в чат
         addChatMessageUseCase.invoke(
             chatId = chat.id,
@@ -62,6 +62,7 @@ internal class PlannerTalkDelegate @Inject constructor(
         } catch (e: Throwable) {
             chatTools.addInfoMessage(chat.id, e.stackTraceToString())
         }
+        return null
     }
 
     override suspend fun tryHandleAction(

@@ -22,6 +22,8 @@ data class RagConfig(
     // Модель для LLM reranker. По умолчанию та же что llmModel.
     // Можно задать быструю модель отдельно: RERANKER_LLM_MODEL=qwen2.5:3b
     val rerankerLlmModel: String,
+    // Путь к файлу с эталонными ответами для сравнительного анализа.
+    val referenceAnswersPath: String,
 ) {
     companion object {
         fun from(): RagConfig {
@@ -43,6 +45,7 @@ data class RagConfig(
                 translateQueries = System.getenv("TRANSLATE_QUERIES")?.toBooleanStrictOrNull() ?: false,
                 translateLlmModel = System.getenv("TRANSLATE_LLM_MODEL") ?: llmModel,
                 rerankerLlmModel = System.getenv("RERANKER_LLM_MODEL") ?: llmModel,
+                referenceAnswersPath = System.getenv("REFERENCE_ANSWERS_PATH") ?: "./data/answers_v2.md",
             )
         }
     }

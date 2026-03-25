@@ -20,6 +20,7 @@ import com.example.day.core.core_features.memory.domain.provider.RagContextMemor
 import com.example.day.core.core_features.memory.domain.provider.RagContextMemoryProviderFactory
 import com.example.day.core.core_features.memory.domain.provider.rag.RagLog
 import com.example.day.core.core_features.memory.domain.provider.rag.RagSearchRepository
+import com.example.day.core.core_features.memory.domain.provider.rag.RuntestResultItem
 import kotlinx.collections.immutable.persistentListOf
 import javax.inject.Inject
 
@@ -149,4 +150,21 @@ class RagWorker @Inject constructor(
 
     suspend fun getDebugInfo(): String =
         currentRagContextProvider?.getDebugInfo() ?: "RAG provider не инициализирован (отправьте сообщение первым)"
+
+    suspend fun saveTestResults(
+        items: List<Pair<String, String>>,
+        executionTimeMs: Long,
+        chat: Chat,
+    ): Result<String> {
+        val provider = currentRagContextProvider
+            ?: return Result.failure(IllegalStateException("RAG provider не инициализирован"))
+        val serverUrl = provider.getServerUrl()
+        return ragSearchRepository.saveRuntestResults(
+            preset = "rag_worker",
+            items = items.map { (q, a) -> RuntestResultItem(question = q, llmAnswer = a) },
+            serverUrl = serverUrl,
+            executionTimeMs = executionTimeMs,
+            isLocalLlm = chat.settings.model.isLocal,
+        ).map { it.savedReport }
+    }
 }

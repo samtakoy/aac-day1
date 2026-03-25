@@ -19,7 +19,7 @@ internal class AgentsTalkDelegate @Inject constructor(
         chat: Chat,
         inputText: String,
         onSuccess: () -> Unit
-    ) {
+    ): String? {
         // добавить сообщение пользователя в чат
         addChatMessageUseCase.invoke(
             chatId = chat.id,
@@ -35,6 +35,7 @@ internal class AgentsTalkDelegate @Inject constructor(
             userMessage = inputText,
             chat = chat
         )
+        return null
     }
 
     override suspend fun tryHandleAction(

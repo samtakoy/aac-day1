@@ -93,12 +93,16 @@ class RagSearchRepositoryImpl @Inject constructor(
         preset: String,
         items: List<RuntestResultItem>,
         serverUrl: String,
+        executionTimeMs: Long,
+        isLocalLlm: Boolean,
     ): Result<RuntestSaveResponse> = runCatching {
         httpClient.post("${serverUrl.trimEnd('/')}/runtest/save") {
             contentType(ContentType.Application.Json)
             setBody(RuntestSaveRequestDto(
                 preset = preset,
                 items = items.map { RuntestItemDto(it.question, it.llmAnswer) },
+                executionTimeMs = executionTimeMs,
+                isLocalLlm = isLocalLlm,
             ))
         }.body<RuntestSaveResponseDto>().toDomain()
     }
@@ -120,6 +124,8 @@ class RagSearchRepositoryImpl @Inject constructor(
     private data class RuntestSaveRequestDto(
         val preset: String,
         val items: List<RuntestItemDto>,
+        val executionTimeMs: Long = 0,
+        val isLocalLlm: Boolean = false,
     )
 
     @Serializable

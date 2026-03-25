@@ -60,6 +60,8 @@ import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.mcpStreamableHttp
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
+import com.example.day.ragserver.comparison.ComparisonService
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 
@@ -199,6 +201,13 @@ fun main() {
 
     val evaluationService = EvaluationService(buildPipeline = { buildPipeline(it) })
 
+    val comparisonService = ComparisonService(
+        ollamaProvider = rerankerLlmProvider,
+        reportsDir = "./reports",
+        answersPath = config.referenceAnswersPath,
+    )
+    println("Comparison LLM:  ${config.rerankerLlmModel} | answers: ${config.referenceAnswersPath}")
+
     // TODO: Кандидат на переезд в отдельный AgentServer.
     // Вся логика изолирована в agent_context/ пакете — в RagServer.kt только регистрация маршрута.
     val taskStateUpdaterService = TaskStateUpdaterService(
@@ -297,10 +306,13 @@ fun main() {
                     return@post call.respond(HttpStatusCode.BadRequest, "Invalid request body")
                 }
                 val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm"))
-                val reportPath = "./reports/runtest_${request.preset.uppercase()}_$timestamp.md"
+                val modelLabel = if (request.isLocalLlm) "LOCAL" else "CLOUD"
+                val reportPath = "./reports/runtest_RAG_WORKER_${modelLabel}_$timestamp.md"
                 File("./reports").mkdirs()
-                File(reportPath).writeText(buildRuntestReport(request.preset, request.items))
+                File(reportPath).writeText(buildRuntestReport(request.preset, request.items, request.isLocalLlm, request.executionTimeMs))
                 call.respond(RuntestSaveResponse(savedReport = reportPath))
+                // Запускаем сравнение асинхронно после сохранения отчёта
+                call.application.launch { comparisonService.tryRunComparison() }
             }
 
             post("/evaluate") {
@@ -349,6 +361,8 @@ private data class RuntestItemDto(
 private data class RuntestSaveRequest(
     val preset: String,
     val items: List<RuntestItemDto>,
+    val isLocalLlm: Boolean = false,
+    val executionTimeMs: Long = 0,
 )
 
 @Serializable
@@ -356,16 +370,23 @@ private data class RuntestSaveResponse(
     val savedReport: String,
 )
 
-private fun buildRuntestReport(preset: String, items: List<RuntestItemDto>): String =
-    buildString {
-        appendLine("# Runtest: ${preset.uppercase()} | ${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}")
+private fun buildRuntestReport(
+    preset: String,
+    items: List<RuntestItemDto>,
+    isLocalLlm: Boolean = false,
+    executionTimeMs: Long = 0,
+): String = buildString {
+    val modelLabel = if (isLocalLlm) "Локальная (Ollama)" else "Облачная"
+    appendLine("# Runtest: ${preset.uppercase()} | ${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}")
+    appendLine("**Модель:** $modelLabel")
+    appendLine("**Время выполнения:** ${executionTimeMs} мс")
+    appendLine()
+    items.forEachIndexed { i, item ->
+        appendLine("## Q${i + 1}: \"${item.question}\"")
+        appendLine(item.llmAnswer)
         appendLine()
-        items.forEachIndexed { i, item ->
-            appendLine("## Q${i + 1}: \"${item.question}\"")
-            appendLine(item.llmAnswer)
-            appendLine()
-        }
     }
+}
 
 @Serializable
 private data class EvaluateRequest(

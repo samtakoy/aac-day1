@@ -1,11 +1,13 @@
 package com.example.day.core.core_features.llm.data.remote
 
+import android.util.Log
 import com.example.day.core.core_features.llm.data.remote.model.request.ChatRequestDto
 import com.example.day.core.core_features.llm.data.remote.model.response.ChatResponseDto
 import com.example.day.core.core_features.llm.data.remote.model.response.ChatResultDto
 import com.example.day.core.core_features.llm.data.remote.model.response.ErrorResponseDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -22,6 +24,7 @@ internal class RemoteLlmApiImpl @Inject constructor(
         request: ChatRequestDto,
         apiKey: String
     ): ChatResultDto {
+        Log.e("ktor", "Remote LLM")
         val response = client.post(END_POINT) {
             header(HttpHeaders.Authorization, "Bearer $apiKey")
             header("HTTP-Referer", HTTP_REFERER)
