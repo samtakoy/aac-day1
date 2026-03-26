@@ -137,7 +137,7 @@ class RagWorker @Inject constructor(
                 ragSearchRepository.logLlmResponse(
                     userMessage = userPrompt,
                     assistantResponse = agentResult.responseText,
-                    taskStateJson = taskStateJson,
+                    taskStateJson = null, // taskStateJson, ПОКА ОТКАЗАЛСЯ
                     serverUrl = serverUrl,
                 ).onFailure { Log.w(TAG, "logLlmResponse failed: ${it.message}") }
             },

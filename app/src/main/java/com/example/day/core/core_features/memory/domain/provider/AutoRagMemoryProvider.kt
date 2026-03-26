@@ -45,7 +45,10 @@ class AutoRagMemoryProvider @Inject constructor(
     override suspend fun getMemoryContext(): List<AContextMessage> = emptyList()
 
     override suspend fun appendUserPrompt(prompt: AContextMessage): PromptMessages {
-        val agentId = agentId ?: return PromptMessages(prompt = prompt)
+        val agentId = agentId ?: run {
+            Log.e(RagLog.TAG, "AutoRag: agentId IS NULL — search SKIPPED for '${prompt.content.take(60)}'")
+            return PromptMessages(prompt = prompt)
+        }
 
         val serverUrl = agentMemoryRepository
             .getFact(agentId, MEMORY_KEY, CATEGORY_URL)?.fact
@@ -56,13 +59,15 @@ class AutoRagMemoryProvider @Inject constructor(
         val ragResult = ragSearchRepository.search(
             query = prompt.content,
             serverUrl = serverUrl,
-            taskStateJson = taskStateJson,
+            taskStateJson = null, // taskStateJson, ПОКА ОТКАЗАЛСЯ, т.к. только вредит
             shortHistory = shortHistory,
             preset = "reranked_llm",
         ).getOrElse { e ->
-            Log.w(RagLog.TAG, "RAG search failed: ${e.message}")
+            Log.e(RagLog.TAG, "RAG search FAILED: ${e.javaClass.simpleName}: ${e.message}")
             return PromptMessages(prompt = prompt)
         }
+
+        Log.d(RagLog.TAG, "RAG raw response (${ragResult.length} chars): '${ragResult.take(200)}'")
 
         if (ragResult.isBlank()) return PromptMessages(prompt = prompt)
 

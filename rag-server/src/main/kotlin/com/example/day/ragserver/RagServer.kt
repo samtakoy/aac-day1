@@ -69,6 +69,8 @@ fun main() {
     // Redirect stdout → stderr so println output is unbuffered and
     // appears interleaved with SLF4J/Logback logs in the correct order.
     System.setOut(System.err)
+    // Enable INFO level for slf4j-simple (default is WARN).
+    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info")
 
     val config = RagConfig.from()
     println("=== RAG MCP Server ===")
@@ -252,17 +254,39 @@ fun main() {
                 call.respond(HttpStatusCode.OK)
             }
 
-            get("/search") {
-                val query = call.request.queryParameters["query"]
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing 'query' parameter")
+            post("/search") {
+                @kotlinx.serialization.Serializable
+                data class SearchRequest(
+                    val query: String,
+                    val preset: String? = null,
+                    val taskState: String? = null,
+                    val history: String? = null,
+                    val enableQueryOptimize: Boolean? = null,
+                    val retrievalTopK: Int? = null,
+                    val threshold: Double? = null,
+                    val rerankStrategy: String? = null,
+                    val finalTopK: Int? = null,
+                    val postRerankThreshold: Double? = null,
+                )
+                val req = runCatching { call.receive<SearchRequest>() }.getOrElse {
+                    return@post call.respond(HttpStatusCode.BadRequest, "Invalid body: ${it.message}")
+                }
+                val query = req.query
+                val taskState = req.taskState
+                val history = req.history
 
-                val taskState = call.request.queryParameters["task_state"]
-                val history = call.request.queryParameters["history"]
-
-                println("[rag][ktor][/search] query='${query.take(80)}', hasTaskState=${!taskState.isNullOrBlank()}, hasHistory=${!history.isNullOrBlank()}")
+                println("[rag][ktor][/search] query='${query.take(80)}', preset=${req.preset}, hasTaskState=${!taskState.isNullOrBlank()}, hasHistory=${!history.isNullOrBlank()}")
                 sessionLogger.logSearchStart(query, taskState, history)
 
-                val pipelineConfig = parsePipelineConfig(call.request)
+                val baseConfig = req.preset?.let { PipelinePreset.fromString(it).config } ?: PipelineConfig()
+                val pipelineConfig = baseConfig.copy(
+                    enableQueryOptimize = req.enableQueryOptimize ?: baseConfig.enableQueryOptimize,
+                    retrievalTopK = req.retrievalTopK ?: baseConfig.retrievalTopK,
+                    threshold = req.threshold ?: baseConfig.threshold,
+                    rerankStrategy = req.rerankStrategy?.let { s -> RerankStrategy.entries.firstOrNull { it.name.equals(s, ignoreCase = true) } } ?: baseConfig.rerankStrategy,
+                    finalTopK = req.finalTopK ?: baseConfig.finalTopK,
+                    postRerankThreshold = req.postRerankThreshold ?: baseConfig.postRerankThreshold,
+                )
                 val pipeline = buildPipeline(pipelineConfig, taskState = taskState, history = history)
                 var ctx = pipeline.execute(query)
 
@@ -287,7 +311,7 @@ fun main() {
                         "НЕДОСТАТОЧНО_КОНТЕКСТА: по запросу \"$query\" ничего не найдено. " +
                         "Уточните запрос или проверьте что индекс содержит нужный код."
                     )
-                    return@get
+                    return@post
                 }
 
                 // Определяем KEPT/DROPPED: resultsAfterRerank — полный список после реранка до TopK

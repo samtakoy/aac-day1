@@ -57,6 +57,7 @@ class RagContextMemoryProvider(
     }
 
     suspend fun getTaskStateJson(): String? {
+        return null
         val agentId = agentId ?: return null
         return taskStateRepository.getCurrentJson(agentId)
     }
@@ -83,6 +84,7 @@ class RagContextMemoryProvider(
         val recentMessages = getRecentMessages(agentId) + prompt
         Log.d(TAG, "recentMessages roles: ${recentMessages.map { it.role.name.lowercase() }}")
 
+        /* НЕ УДАЛЯТЬ. Закомментировал т.к. не работает, а только дает лишнюю ненужную информацию
         val taskStateStart = System.currentTimeMillis()
         val taskStateResult = runCatching {
             taskStateRepository.update(
@@ -96,7 +98,7 @@ class RagContextMemoryProvider(
         }
 
         Log.d(TAG, "taskState updated (${System.currentTimeMillis() - taskStateStart}ms): intent=${taskStateResult?.updatedState?.intent}, focus=${taskStateResult?.updatedState?.currentFocus?.className}, switched=${taskStateResult?.updatedState?.contextSwitched}")
-
+        */
         pendingUserMessage = prompt.content
 
         // Передать TaskState и Short History в AutoRag для QueryOptimizer на сервере

@@ -22,6 +22,14 @@ class RagSearchRepositoryImpl @Inject constructor(
     private val httpClient: HttpClient
 ) : RagSearchRepository {
 
+    @kotlinx.serialization.Serializable
+    private data class SearchRequestDto(
+        val query: String,
+        val preset: String? = null,
+        val taskState: String? = null,
+        val history: String? = null,
+    )
+
     override suspend fun search(
         query: String,
         serverUrl: String,
@@ -29,16 +37,18 @@ class RagSearchRepositoryImpl @Inject constructor(
         shortHistory: String?,
         preset: String,
     ): Result<String> = runCatching {
-        val response = httpClient.get("${serverUrl.trimEnd('/')}/search") {
-            parameter("query", query)
-            parameter("preset", preset)
-            if (!taskStateJson.isNullOrBlank() && taskStateJson != "{}") {
-                parameter("task_state", taskStateJson)
-            }
-            if (!shortHistory.isNullOrBlank()) {
-                parameter("history", shortHistory)
-            }
+        val url = "${serverUrl.trimEnd('/')}/search"
+        android.util.Log.d("(rag)(ktor)", "HTTP POST $url query='${query.take(60)}'")
+        val response = httpClient.post(url) {
+            contentType(ContentType.Application.Json)
+            setBody(SearchRequestDto(
+                query = query,
+                preset = preset,
+                taskState = taskStateJson?.takeIf { it.isNotBlank() && it != "{}" },
+                history = shortHistory?.takeIf { it.isNotBlank() },
+            ))
         }
+        android.util.Log.d("(rag)(ktor)", "HTTP response: status=${response.status}")
         response.bodyAsText()
     }
 
