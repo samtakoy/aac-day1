@@ -50,3 +50,12 @@ google-services.json
 /shared/simple-chat-api/build/
 /rag-server/rag_index.db
 /rag-server/reports/
+/rag-grammar/build/
+/rag-server/reports_prev/
+/tree-sitter-spike/
+/rag-grammar/build/
+/rag-server/data/test_classes/
+/rag-server/rag_index.back
+/plans/chunk_type_quota_plan.md
+/plans/chunking_fixes_plan.md
+/plans/metadata_enhancing.md

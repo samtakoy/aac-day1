@@ -7,7 +7,10 @@ data class ChunkEntity(
     val fileName: String,
     val packageName: String = "",
     val declarationName: String? = null,
+    val parentScope: String? = null,
+    val contextPath: String? = null,
     val startLine: Int = 0,
+    val nodeType: String? = null,  // "class_declaration", "object_declaration", "function_declaration", etc.
     val strategy: String,
     val chunkOrder: Int,
     val indexedAt: String,

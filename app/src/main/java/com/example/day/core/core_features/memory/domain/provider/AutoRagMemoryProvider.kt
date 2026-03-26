@@ -29,7 +29,6 @@ class AutoRagMemoryProvider @Inject constructor(
 ) : MemoryProvider {
 
     private var agentId: Long? = null
-    private var taskStateJson: String? = null
     private var shortHistory: String? = null
 
     fun bindAgentId(agentId: Long) {
@@ -38,31 +37,35 @@ class AutoRagMemoryProvider @Inject constructor(
 
     /** Устанавливается из RagContextMemoryProvider перед вызовом appendUserPrompt(). */
     fun setContext(taskStateJson: String?, shortHistory: String?) {
-        this.taskStateJson = taskStateJson
         this.shortHistory = shortHistory
     }
 
     override suspend fun getMemoryContext(): List<AContextMessage> = emptyList()
 
     override suspend fun appendUserPrompt(prompt: AContextMessage): PromptMessages {
-        val agentId = agentId ?: return PromptMessages(prompt = prompt)
+        val agentId = agentId ?: run {
+            Log.e(RagLog.TAG, "AutoRag: agentId IS NULL — search SKIPPED for '${prompt.content.take(60)}'")
+            return PromptMessages(prompt = prompt)
+        }
 
         val serverUrl = agentMemoryRepository
             .getFact(agentId, MEMORY_KEY, CATEGORY_URL)?.fact
             ?: DEFAULT_URL
 
-        Log.d(RagLog.TAG, "RAG search: query='${prompt.content.take(80)}', preset=reranked_llm, hasTaskState=${!taskStateJson.isNullOrBlank()}, hasHistory=${!shortHistory.isNullOrBlank()}")
+        Log.d(RagLog.TAG, "RAG search: query='${prompt.content.take(80)}', preset=reranked_llm, hasHistory=${!shortHistory.isNullOrBlank()}")
 
         val ragResult = ragSearchRepository.search(
             query = prompt.content,
             serverUrl = serverUrl,
-            taskStateJson = taskStateJson,
+            taskStateJson = null, // taskStateJson, ПОКА ОТКАЗАЛСЯ, т.к. только вредит
             shortHistory = shortHistory,
             preset = "reranked_llm",
         ).getOrElse { e ->
-            Log.w(RagLog.TAG, "RAG search failed: ${e.message}")
+            Log.e(RagLog.TAG, "RAG search FAILED: ${e.javaClass.simpleName}: ${e.message}")
             return PromptMessages(prompt = prompt)
         }
+
+        Log.d(RagLog.TAG, "RAG raw response (${ragResult.length} chars): '${ragResult.take(200)}'")
 
         if (ragResult.isBlank()) return PromptMessages(prompt = prompt)
 

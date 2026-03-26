@@ -21,7 +21,7 @@ class QueryOptimizer(
 
     /** Базовая оптимизация без контекста (обратная совместимость). */
     suspend fun optimize(query: String): String =
-        optimizeWithContext(query, taskState = null, history = null)
+        optimizeWithContext(query, history = null)
 
     /**
      * Оптимизация с учётом контекста задачи.
@@ -30,14 +30,12 @@ class QueryOptimizer(
      */
     suspend fun optimizeWithContext(
         query: String,
-        taskState: String?,
         history: String?,
     ): String {
-        val hasContext = (!taskState.isNullOrBlank() && taskState != "{}") ||
-                !history.isNullOrBlank()
+        val hasContext = !history.isNullOrBlank()
 
         val prompt = if (hasContext) {
-            buildContextAwarePrompt(query, taskState, history)
+            buildContextAwarePrompt(query, history)
         } else {
             buildBasePrompt(query)
         }
@@ -87,11 +85,10 @@ class QueryOptimizer(
 
     private fun buildContextAwarePrompt(
         query: String,
-        taskState: String?,
         history: String?,
     ): String = """
         Your goal: rewrite the user's query for semantic search over a Kotlin codebase,
-        using task context and conversation history for better precision.
+        using conversation history for better precision.
 
         PRIORITY RULES:
         1. If the query TEXT LITERALLY CONTAINS a compound word that looks like a class/method name (e.g. "wholehistory", "toolregistry", "aiagentbuilder") → translate to English, preserve that name, do NOT inject focus context. DO NOT invent class names not present in the query text.
@@ -108,10 +105,6 @@ class QueryOptimizer(
         - "wholehistory example" → "wholehistory" is in query → Rule 1 → output: WholeHistory class implementation Kotlin
         - "как агент работает с историей сообщений" → no class name → output: AI agent message history management Kotlin
         - "как конфигурируется агент" → no class name → output: AI agent configuration Kotlin class
-
-        ---
-        TASK STATE:
-        ${taskState?.takeIf { it.isNotBlank() && it != "{}" } ?: "(no context yet)"}
 
         ---
         RECENT HISTORY:

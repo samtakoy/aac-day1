@@ -11,18 +11,21 @@ class ContextPacker(
 ) {
 
     fun pack(results: List<SearchResult>): PackedContext {
-        val byClass = results.groupBy { resolveClassName(it.chunk) }
+        // Группировка по filePath — уникальный ключ файла.
+        // Ранее было groupBy { fileName.removeSuffix(".kt") }, что приводило к слиянию
+        // чанков из разных файлов с одинаковым именем (например, Utils.kt в разных пакетах).
+        val byFile = results.groupBy { it.chunk.filePath }
 
-        val sortedGroups = byClass.entries
-            .sortedByDescending { (_, chunks) -> chunks.maxOf { it.score } }
+        val sortedGroups = byFile.entries
+            .sortedByDescending { (_, groupResults) -> groupResults.maxOf { it.score } }
 
         val groups = mutableListOf<ClassGroup>()
         var usedTokens = 0
 
-        for ((className, chunks) in sortedGroups) {
+        for ((filePath, fileResults) in sortedGroups) {
             if (usedTokens >= tokenLimit) break
 
-            val uniqueChunks = chunks
+            val uniqueChunks = fileResults
                 .map { it.chunk }
                 .distinctBy { it.content.trim().hashCode() }
                 .sortedBy { it.startLine }
@@ -32,14 +35,15 @@ class ContextPacker(
             // Пропускаем группу если лимит превышен (кроме первой — её берём всегда)
             if (usedTokens + groupTokens > tokenLimit && groups.isNotEmpty()) continue
 
-            val metadata = db?.getClassMetadata(className)
+            val className = uniqueChunks.first().fileName.removeSuffix(".kt")
+            val metadata = db?.getClassMetadataByFilePath(filePath)
 
             groups.add(
                 ClassGroup(
                     className = className,
-                    filePath = uniqueChunks.first().filePath,
+                    filePath = filePath,
                     chunks = uniqueChunks,
-                    topScore = chunks.maxOf { it.score },
+                    topScore = fileResults.maxOf { it.score },
                     responsibility = metadata?.responsibility?.takeIf { it.isNotBlank() },
                     keyMethods = metadata?.keyMethods ?: emptyList(),
                 )
@@ -49,9 +53,6 @@ class ContextPacker(
 
         return PackedContext(groups = groups, totalTokens = usedTokens)
     }
-
-    private fun resolveClassName(chunk: ChunkEntity): String =
-        chunk.fileName.removeSuffix(".kt")
 
     private fun estimateTokens(text: String): Int = text.length / 4
 }

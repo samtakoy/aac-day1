@@ -21,6 +21,11 @@ object ContextFormatter {
             appendLine("File: ${group.filePath}")
             appendLine("Score: ${"%.3f".format(group.topScore)}")
 
+            // TODO Вариант C: ClassGroup сейчас содержит одну ClassMetadata (первую запись по filePath).
+            // Для файлов с несколькими top-level классами (например, data-классы + sealed hierarchy
+            // в одном .kt) вторая и последующие записи метаданных не попадают в контекст.
+            // Исправление: CodeDatabase.getClassMetadataListByFilePath() + List<ClassMetadata>
+            // в ClassGroup, с отображением responsibility/keyMethods для каждого класса отдельно.
             group.responsibility?.let {
                 appendLine("Responsibility: $it")
             }

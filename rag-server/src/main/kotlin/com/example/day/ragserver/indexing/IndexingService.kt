@@ -1,8 +1,13 @@
 package com.example.day.ragserver.indexing
 
 import com.example.day.ragserver.config.RagConfig
+import com.example.day.ragserver.db.ClassMetadata
 import com.example.day.ragserver.db.CodeDatabase
+import com.example.day.ragserver.db.toEmbeddingText
 import com.example.day.ragserver.embedding.EmbeddingProvider
+import com.example.day.ragserver.indexing.chunking.FixedSizeStrategy
+import com.example.day.ragserver.indexing.chunking.LanguageAwareChunker
+import com.example.day.ragserver.indexing.chunking.ast.KotlinTypeExtractor
 
 class IndexingService(
     private val db: CodeDatabase,
@@ -15,7 +20,7 @@ class IndexingService(
         val files = scanner.scan(config.codePath)
         val strategies = listOf(
             FixedSizeStrategy(),
-            StructuralStrategy(),
+            LanguageAwareChunker(useAst = config.useAstChunking),
         )
         for (strategy in strategies) {
             indexStrategy(strategy, files, config.forceReindex)
@@ -86,51 +91,79 @@ class IndexingService(
         val ktFiles = files.filter { it.name.endsWith(".kt") }
         println("[Metadata] Starting extraction for ${ktFiles.size} Kotlin files...")
 
-        // Ollama обрабатывает generate-запросы последовательно —
-        // параллельные вызовы вызывают таймауты. Обрабатываем файлы по одному.
+        // Phase A: LLM extraction — один вызов на каждую top-level декларацию файла
         var totalProcessed = 0
         var totalErrors = 0
         for (file in ktFiles) {
-            val (p, e) = processFileMetadata(file, forceReindex)
-            totalProcessed += p
-            totalErrors += e
+            val content = try { file.readText() } catch (e: Exception) {
+                println("  [WARN] Cannot read ${file.name}: ${e.message}")
+                totalErrors++
+                continue
+            }
+            val packageName = CodeMetadata.extractPackage(content)
+
+            val declarations = db.getChunksByFile(file.absolutePath, "structural")
+                .filter { it.nodeType in setOf("class_declaration", "object_declaration") && it.parentScope == null }
+                .mapNotNull { it.declarationName }
+                .distinct()
+                .ifEmpty { listOf(file.nameWithoutExtension) }
+
+            for (declaration in declarations) {
+                if (!forceReindex && db.hasClassMetadata(declaration)) {
+                    println("  [Metadata] Skipping '$declaration' — already indexed")
+                    continue
+                }
+                val metadata = metadataExtractor!!.extract(content, declaration, packageName)
+                if (metadata == null) { totalErrors++; continue }
+                db.saveClassMetadata(metadata, file.absolutePath)
+                totalProcessed++
+            }
         }
-        val totalSkipped = ktFiles.size - totalProcessed - totalErrors
-        println("[Metadata] Done — $totalProcessed extracted, $totalSkipped skipped, $totalErrors errors")
-    }
+        println("[Metadata] Phase A done — $totalProcessed extracted, $totalErrors errors")
 
-    // Обрабатывает один файл: один LLM-запрос на файл, className = имя файла.
-    // Возвращает Pair(processed, errors). Skipped = файл не трогается (0, 0).
-    private suspend fun processFileMetadata(
-        file: java.io.File,
-        forceReindex: Boolean,
-    ): Pair<Int, Int> {
-        val className = file.nameWithoutExtension
+        // Phase B: usedBy graph — AST-парсинг зависимостей, без LLM
+        val knownClasses = db.getAllClassMetadata().map { it.className }.toSet()
+        val dependencyMap = mutableMapOf<String, Set<String>>()
 
-        if (!forceReindex && db.hasClassMetadata(className)) {
-            println("  [Metadata] Skipping '$className' — already indexed")
-            return 0 to 0
+        for (file in ktFiles) {
+            val content = try { file.readText() } catch (e: Exception) { continue }
+
+            val rawTypes = KotlinTypeExtractor.extractReferencedTypes(content)
+            val projectTypes = rawTypes.filter { it in knownClasses }.toSet()
+
+            val fileDeclarations = db.getChunksByFile(file.absolutePath, "structural")
+                .filter { it.nodeType in setOf("class_declaration", "object_declaration") && it.parentScope == null }
+                .mapNotNull { it.declarationName }
+                .distinct()
+                .ifEmpty { listOf(file.nameWithoutExtension) }
+
+            for (declaration in fileDeclarations) {
+                dependencyMap[declaration] = projectTypes - setOf(declaration)
+            }
         }
 
-        val content = try {
-            file.readText()
-        } catch (e: Exception) {
-            println("  [WARN] Cannot read ${file.name}: ${e.message}")
-            return 0 to 1
+        // invert: dependencyMap[source] contains targets → usedByMap[target] += source
+        val usedByMap = mutableMapOf<String, MutableList<String>>()
+        for ((source, targets) in dependencyMap) {
+            for (target in targets) {
+                usedByMap.getOrPut(target) { mutableListOf() }.add(source)
+            }
         }
+        println("[Metadata] Phase B done — dependency graph built for ${dependencyMap.size} classes")
 
-        val metadata = metadataExtractor!!.extract(content, className)
-            ?: return 0 to 1
-
-        db.saveClassMetadata(metadata, file.absolutePath)
-
-        try {
-            val vector = embeddingProvider.embed(metadata.responsibility)
-            db.saveMetadataVector(metadata.className, vector)
-        } catch (e: Exception) {
-            println("  [WARN] Metadata vector failed for '$className': ${e.message}")
+        // Phase C: enrich with usedBy + generate composite embeddings
+        var embeddingErrors = 0
+        for ((metadata, filePath) in db.getAllClassMetadataWithPaths()) {
+            val enriched = metadata.copy(usedBy = usedByMap[metadata.className] ?: emptyList())
+            db.saveClassMetadata(enriched, filePath)
+            try {
+                val vector = embeddingProvider.embed(enriched.toEmbeddingText())
+                db.saveMetadataVector(enriched.className, vector)
+            } catch (e: Exception) {
+                println("  [WARN] Metadata vector failed for '${enriched.className}': ${e.message}")
+                embeddingErrors++
+            }
         }
-
-        return 1 to 0
+        println("[Metadata] Phase C done — embeddings generated, $embeddingErrors errors")
     }
 }

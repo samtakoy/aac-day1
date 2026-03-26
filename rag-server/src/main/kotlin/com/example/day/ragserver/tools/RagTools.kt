@@ -150,12 +150,19 @@ private fun registerSearchCodebaseSmart(
             isError = true
         )
 
-        log.info("[Search] >>> RAW QUERY: '{}' | optimizer: {}", query, if (queryOptimizer != null) "enabled" else "disabled")
+        println("[Search] >>> RAW QUERY: '${query.take(80)}' | optimizer: ${if (queryOptimizer != null) "enabled" else "disabled"}")
         sessionLogger?.logSearchStart(originalQuery = query, taskStateJson = null, history = null)
 
         val (results, searchQuery) = runBlocking {
-            val sq = queryOptimizer?.optimize(query) ?: query
-            if (sq != query) log.info("[Search] Optimized query: '{}'", sq)
+            val sq = if (queryOptimizer != null) {
+                println("[Search] Optimize START query='${query.take(80)}'")
+                val optimized = queryOptimizer.optimize(query)
+                println("[Search] Optimize DONE: '${query.take(80)}' → '${optimized.take(120)}'")
+                optimized
+            } else {
+                println("[Search] Optimize SKIPPED (queryOptimizer=null) — check TRANSLATE_QUERIES env var")
+                query
+            }
             twoStageSearchService.search(sq, topK * 2) to sq
         }
         if (results.isEmpty()) {

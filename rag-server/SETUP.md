@@ -62,6 +62,16 @@ curl http://localhost:11434/api/embeddings \
 | `FORCE_REINDEX` | нет | `false` | `true` — принудительно перестроить индекс |
 | `SEARCH_TOP_K` | нет | `5` | Дефолтный top-K для MCP-тулов |
 
+### Индексация и стратегия нарезки
+
+| Переменная | Обязательная | По умолчанию | Описание |
+|-----------|:---:|---|---|
+| `USE_AST_CHUNKING` | нет | `false` | `true` — использовать AST-нарезку (ktreesitter) вместо regex. Требует `FORCE_REINDEX=true` при переключении. |
+
+> **Как работает**: `USE_AST_CHUNKING=false` (default) — `StructuralStrategy` (regex), поведение как раньше.
+> `USE_AST_CHUNKING=true` — `LanguageAwareChunker`: `.kt`/`.kts` → ktreesitter AST, `.md` → по заголовкам, остальные → fixed window.
+> Оба режима записывают `strategy="structural"` в БД — поисковый pipeline не меняется.
+
 ### Метаданные и 2-Stage поиск
 
 | Переменная | Обязательная | По умолчанию | Описание |
@@ -379,6 +389,7 @@ rm rag_index.db
 | Изменился код существующих файлов | `FORCE_REINDEX=true` |
 | Сменилась embedding-модель | Удалить `rag_index.db`, переиндексировать |
 | Обновить метаданные классов | `FORCE_REINDEX=true` + `EXTRACT_METADATA=true` |
+| Переключить стратегию чанкинга | `USE_AST_CHUNKING=true/false` + `FORCE_REINDEX=true` |
 
 ---
 
@@ -399,3 +410,4 @@ rm rag_index.db
 | **Hybrid Retrieval** | Embedding (0.6) + Keyword (0.4) — альтернатива двухэтапному поиску |
 | **2-Stage Smart Search** | Классы → чанки — концептуальные вопросы находят правильные классы |
 | **Incremental Metadata** | Повторный запуск не регенерирует уже обработанные классы |
+| **AST Chunking** | `USE_AST_CHUNKING=true` — нарезка через ktreesitter: точные границы, companion object не отрывается, `.md` по заголовкам |

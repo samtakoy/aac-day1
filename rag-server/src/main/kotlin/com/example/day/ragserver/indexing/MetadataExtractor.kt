@@ -8,8 +8,8 @@ class MetadataExtractor(
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    suspend fun extract(fileContent: String, className: String): ClassMetadata? {
-        val prompt = buildPrompt(fileContent.take(3000), className)
+    suspend fun extract(fileContent: String, className: String, packageName: String = ""): ClassMetadata? {
+        val prompt = buildPrompt(fileContent.take(6000), className, packageName)
         return try {
             val response = llmProvider.generate(prompt)
             val cleaned = cleanJson(response)
@@ -22,8 +22,12 @@ class MetadataExtractor(
         }
     }
 
-    private fun buildPrompt(code: String, className: String): String = """
-        Analyze this Kotlin file. The primary class is named "$className".
+    private fun buildPrompt(code: String, className: String, packageName: String): String = """
+        Analyze this Kotlin file.
+        File context:
+          Class: $className
+          Package: ${packageName.ifEmpty { "unknown" }}
+
         Return ONLY a JSON object. No text outside JSON. No markdown.
 
         Schema:

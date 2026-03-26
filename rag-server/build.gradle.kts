@@ -24,11 +24,21 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.core)
 
+    // AST-based chunking
+    implementation(project(":rag-grammar"))
+    implementation("io.github.tree-sitter:ktreesitter:0.24.1")
+
     // Exposed + SQLite
     implementation("org.jetbrains.exposed:exposed-core:0.61.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.61.0")
     implementation("org.xerial:sqlite-jdbc:3.49.1.0")
     implementation("org.slf4j:slf4j-simple:2.0.17")
+
+    testImplementation(kotlin("test"))
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 application {

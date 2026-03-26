@@ -147,3 +147,25 @@ curl -X POST http://localhost:8081/v1/chat/completions \
 ```json
 {"data": ["llama3", "mistral", "qwen2.5:7b"]}
 ```
+
+---
+
+## 8. Связанные сервисы
+
+| Сервис | Порт | Описание | Документация |
+|--------|:----:|----------|---|
+| **ai-gateway** | `8081` | Прокси Ollama → OpenAI-совместимый API (этот сервис) | `ai-gateway/SETUP.md` |
+| **rag-server** | `3001` | Индексация кодовой базы, семантический поиск, MCP-тулы | `rag-server/SETUP.md` |
+| **mcp-server** | `3000` | MCP Inspector сервер для отладки MCP-протокола | — |
+
+Для полной локальной среды:
+```bash
+# Терминал 1 — Ollama
+ollama serve
+
+# Терминал 2 — AI Gateway (чат с LLM)
+./gradlew :ai-gateway:run
+
+# Терминал 3 — RAG Server (поиск по коду)
+CODE_PATH=/path/to/src ./gradlew :rag-server:run
+```

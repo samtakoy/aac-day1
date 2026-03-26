@@ -7,6 +7,7 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.max
@@ -23,7 +24,10 @@ object CodeChunksTable : Table("code_chunks") {
     val fileName = varchar("file_name", 255)
     val packageName = varchar("package_name", 200).default("")
     val declarationName = varchar("declaration_name", 200).nullable()
+    val parentScope = varchar("parent_scope", 255).nullable()
+    val contextPath = varchar("context_path", 500).nullable()
     val startLine = integer("start_line").default(0)
+    val nodeType = varchar("node_type", 50).nullable()
     val strategy = varchar("strategy", 50)
     val chunkOrder = integer("chunk_order")
     val indexedAt = varchar("indexed_at", 50)
@@ -98,7 +102,10 @@ class CodeDatabase(private val dbPath: String) {
             it[fileName] = entity.fileName
             it[packageName] = entity.packageName
             it[declarationName] = entity.declarationName
+            it[parentScope] = entity.parentScope
+            it[contextPath] = entity.contextPath
             it[startLine] = entity.startLine
+            it[nodeType] = entity.nodeType
             it[strategy] = entity.strategy
             it[chunkOrder] = entity.chunkOrder
             it[indexedAt] = entity.indexedAt
@@ -123,7 +130,10 @@ class CodeDatabase(private val dbPath: String) {
                     fileName = row[CodeChunksTable.fileName],
                     packageName = row[CodeChunksTable.packageName],
                     declarationName = row[CodeChunksTable.declarationName],
+                    parentScope = row[CodeChunksTable.parentScope],
+                    contextPath = row[CodeChunksTable.contextPath],
                     startLine = row[CodeChunksTable.startLine],
+                    nodeType = row[CodeChunksTable.nodeType],
                     strategy = row[CodeChunksTable.strategy],
                     chunkOrder = row[CodeChunksTable.chunkOrder],
                     indexedAt = row[CodeChunksTable.indexedAt],
@@ -131,6 +141,28 @@ class CodeDatabase(private val dbPath: String) {
                 val bytes = row[CodeVectorsTable.embedding].bytes
                 val vector = bytes.toFloatArray2()
                 entity to vector
+            }
+    }
+
+    fun getChunksByFile(filePath: String, strategy: String): List<ChunkEntity> = transaction {
+        CodeChunksTable.selectAll()
+            .where { (CodeChunksTable.filePath eq filePath) and (CodeChunksTable.strategy eq strategy) }
+            .map { row ->
+                ChunkEntity(
+                    id = row[CodeChunksTable.id],
+                    content = row[CodeChunksTable.content],
+                    filePath = row[CodeChunksTable.filePath],
+                    fileName = row[CodeChunksTable.fileName],
+                    packageName = row[CodeChunksTable.packageName],
+                    declarationName = row[CodeChunksTable.declarationName],
+                    parentScope = row[CodeChunksTable.parentScope],
+                    contextPath = row[CodeChunksTable.contextPath],
+                    startLine = row[CodeChunksTable.startLine],
+                    nodeType = row[CodeChunksTable.nodeType],
+                    strategy = row[CodeChunksTable.strategy],
+                    chunkOrder = row[CodeChunksTable.chunkOrder],
+                    indexedAt = row[CodeChunksTable.indexedAt],
+                )
             }
     }
 
@@ -159,9 +191,29 @@ class CodeDatabase(private val dbPath: String) {
             ?.let { json.decodeFromString<ClassMetadata>(it[ClassMetadataTable.metadataJson]) }
     }
 
+    // Возвращает первую запись метаданных для файла по его полному пути.
+    // Используется в ContextPacker для точного lookup без коллизий по имени класса.
+    // Ограничение: файлы с несколькими top-level классами вернут только первую запись.
+    // Исправление (Вариант C): getClassMetadataListByFilePath() + List<ClassMetadata> в ClassGroup.
+    fun getClassMetadataByFilePath(filePath: String): ClassMetadata? = transaction {
+        ClassMetadataTable.selectAll()
+            .where { ClassMetadataTable.filePath eq filePath }
+            .firstOrNull()
+            ?.let { json.decodeFromString<ClassMetadata>(it[ClassMetadataTable.metadataJson]) }
+    }
+
     fun getAllClassMetadata(): List<ClassMetadata> = transaction {
         ClassMetadataTable.selectAll()
             .map { json.decodeFromString<ClassMetadata>(it[ClassMetadataTable.metadataJson]) }
+    }
+
+    fun getAllClassMetadataWithPaths(): List<Pair<ClassMetadata, String>> = transaction {
+        ClassMetadataTable.selectAll()
+            .map { row ->
+                val metadata = json.decodeFromString<ClassMetadata>(row[ClassMetadataTable.metadataJson])
+                val filePath = row[ClassMetadataTable.filePath]
+                metadata to filePath
+            }
     }
 
     // --- Методы для векторов метаданных (Stage 1 поиска) ---

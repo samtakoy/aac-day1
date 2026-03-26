@@ -24,6 +24,9 @@ data class RagConfig(
     val rerankerLlmModel: String,
     // Путь к файлу с эталонными ответами для сравнительного анализа.
     val referenceAnswersPath: String,
+    // Если true — использует AstChunkingStrategy (ktreesitter) вместо StructuralStrategy (regex).
+    // Переключение требует FORCE_REINDEX=true.
+    val useAstChunking: Boolean,
 ) {
     companion object {
         fun from(): RagConfig {
@@ -46,6 +49,7 @@ data class RagConfig(
                 translateLlmModel = System.getenv("TRANSLATE_LLM_MODEL") ?: llmModel,
                 rerankerLlmModel = System.getenv("RERANKER_LLM_MODEL") ?: llmModel,
                 referenceAnswersPath = System.getenv("REFERENCE_ANSWERS_PATH") ?: "./data/answers_v2.md",
+                useAstChunking = System.getenv("USE_AST_CHUNKING")?.toBooleanStrictOrNull() ?: false,
             )
         }
     }

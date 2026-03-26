@@ -24,6 +24,9 @@ object MetadataValidator {
                 .map { it.trim() }
                 .filter { it.isNotBlank() }
                 .take(5),
+            usedBy = metadata.usedBy
+                .map { it.trim() }
+                .filter { it.isNotBlank() && it.length < 100 },
         )
     }
 }

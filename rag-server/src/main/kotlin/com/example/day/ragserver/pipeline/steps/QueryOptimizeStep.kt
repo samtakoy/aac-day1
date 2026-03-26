@@ -14,7 +14,6 @@ class QueryOptimizeStep(
     override suspend fun process(ctx: PipelineContext): PipelineContext {
         val optimized = optimizer.optimizeWithContext(
             query = ctx.query,
-            taskState = taskState,
             history = history,
         )
         return ctx.copy(

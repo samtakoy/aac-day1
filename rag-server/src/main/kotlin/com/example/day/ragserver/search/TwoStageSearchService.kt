@@ -19,28 +19,41 @@ class TwoStageSearchService(
     }
 
     suspend fun search(query: String, topK: Int): List<SearchResult> {
+        val stats = db.getStats()
+        println("[TwoStage] DB stats: total=${stats.totalChunks}, structural=${stats.structuralChunks}, fixed=${stats.fixedChunks}, metadata=${db.getAllClassMetadata().size}, metadataVectors=${db.getAllMetadataVectors().size}")
+
         val allMetadata = db.getAllClassMetadata()
         val queryVector = embeddingProvider.embed(query)
 
         if (allMetadata.isEmpty()) {
             println("[TwoStage] No class metadata — falling back to standard search")
-            return standardSearch(queryVector, topK)
+            val fallbackResults = standardSearch(queryVector, topK)
+            println("[TwoStage] standardSearch returned ${fallbackResults.size} chunks, strategies: ${fallbackResults.map { it.chunk.strategy }.distinct()}")
+            return fallbackResults
         }
 
         val relevantClasses = findRelevantClasses(query, queryVector, allMetadata)
         println("[TwoStage] Stage 1: ${relevantClasses.size} classes: ${relevantClasses.map { it.className }}")
 
         if (relevantClasses.isEmpty()) {
-            return standardSearch(queryVector, topK)
+            println("[TwoStage] Stage 1 returned 0 classes — falling back to standard search")
+            val fallbackResults = standardSearch(queryVector, topK)
+            println("[TwoStage] standardSearch returned ${fallbackResults.size} chunks, strategies: ${fallbackResults.map { it.chunk.strategy }.distinct()}")
+            return fallbackResults
         }
 
         val results = drillDown(queryVector, relevantClasses)
-        println("[TwoStage] Stage 2: ${results.size} chunks found")
+        println("[TwoStage] Stage 2: ${results.size} chunks found, strategies: ${results.map { it.chunk.strategy }.distinct()}")
 
-        return results
+        val final = results
             .distinctBy { it.chunk.id }
             .sortedByDescending { it.score }
             .take(topK)
+        println("[TwoStage] Final: ${final.size} chunks")
+        final.forEachIndexed { i, r ->
+            println("[TwoStage]   [$i] score=${r.score} strategy=${r.chunk.strategy} file=${r.chunk.fileName} decl=${r.chunk.declarationName} content_preview=${r.chunk.content.take(60).replace('\n', ' ')}")
+        }
+        return final
     }
 
     /**
@@ -152,19 +165,23 @@ class TwoStageSearchService(
         relevantClasses: List<ClassMetadata>,
     ): List<SearchResult> {
         val allStructural = db.getAllVectors("structural")
+        println("[TwoStage] drillDown: allStructural=${allStructural.size} chunks")
         val results = mutableListOf<SearchResult>()
         val keyMethodNames = relevantClasses.flatMap { it.keyMethods }.map { it.name.lowercase() }.toSet()
 
         for (classMeta in relevantClasses) {
-            val classChunks = allStructural.filter { (chunk, _) ->
+            val exactMatch = allStructural.filter { (chunk, _) ->
                 chunk.fileName.removeSuffix(".kt").equals(classMeta.className, ignoreCase = true) ||
-                    chunk.declarationName?.equals(classMeta.className, ignoreCase = true) == true
-            }.ifEmpty {
+                    chunk.declarationName?.equals(classMeta.className, ignoreCase = true) == true ||
+                    chunk.parentScope?.contains(classMeta.className, ignoreCase = true) == true
+            }
+            val classChunks = exactMatch.ifEmpty {
                 // Soft match: имя класса встречается где-то в содержимом чанка
                 allStructural.filter { (chunk, _) ->
                     chunk.content.contains(classMeta.className)
                 }
             }
+            println("[TwoStage]   class=${classMeta.className} exactMatch=${exactMatch.size} softMatch=${if (exactMatch.isEmpty()) classChunks.size else 0} total=${classChunks.size}")
 
             val scored = classChunks
                 .map { (chunk, vector) ->

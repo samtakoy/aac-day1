@@ -4,8 +4,8 @@ import android.util.Log
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.agent.domain.model.AContextState
-import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.agent.domain.model.PromptMessages
+import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProvider
 import com.example.day.core.core_features.memory.domain.provider.rag.RagLog
 import com.example.day.core.core_features.memory.domain.provider.rag.ShortHistoryRepository
@@ -57,8 +57,7 @@ class RagContextMemoryProvider(
     }
 
     suspend fun getTaskStateJson(): String? {
-        val agentId = agentId ?: return null
-        return taskStateRepository.getCurrentJson(agentId)
+        return null
     }
 
     suspend fun getServerUrl(): String {
@@ -75,32 +74,12 @@ class RagContextMemoryProvider(
 
         Log.d(TAG, "appendUserPrompt: agentId=$agentId, prompt='${prompt.content.take(80)}'")
 
-        val serverUrl = agentMemoryRepository
-            .getFact(agentId, AutoRagMemoryProvider.MEMORY_KEY, AutoRagMemoryProvider.CATEGORY_URL)?.fact
-            ?: AutoRagMemoryProvider.DEFAULT_URL
-
         // История теперь чистая (RAG-контекст не сохраняется), обрезка не нужна
         val recentMessages = getRecentMessages(agentId) + prompt
         Log.d(TAG, "recentMessages roles: ${recentMessages.map { it.role.name.lowercase() }}")
-
-        val taskStateStart = System.currentTimeMillis()
-        val taskStateResult = runCatching {
-            taskStateRepository.update(
-                agentId = agentId,
-                lastMessages = recentMessages,
-                serverUrl = serverUrl,
-            )
-        }.getOrElse { e ->
-            Log.w(TAG, "TaskState update failed (${System.currentTimeMillis() - taskStateStart}ms): ${e.message}")
-            null
-        }
-
-        Log.d(TAG, "taskState updated (${System.currentTimeMillis() - taskStateStart}ms): intent=${taskStateResult?.updatedState?.intent}, focus=${taskStateResult?.updatedState?.currentFocus?.className}, switched=${taskStateResult?.updatedState?.contextSwitched}")
-
         pendingUserMessage = prompt.content
 
         // Передать TaskState и Short History в AutoRag для QueryOptimizer на сервере
-        val taskStateJson = taskStateRepository.getCurrentJson(agentId)
         val shortHistoryEntries = shortHistoryRepository.getEntries(agentId).takeLast(3)
         val historyText = shortHistoryEntries
             .joinToString("\n") { "USER: ${it.userMessage}\nASSISTANT: ${it.assistantSummary}" }
@@ -108,7 +87,7 @@ class RagContextMemoryProvider(
         Log.d(TAG, "shortHistory: ${shortHistoryEntries.size} entries, assistantSummaryLengths=${shortHistoryEntries.map { it.assistantSummary.length }}")
 
         autoRagMemoryProvider.setContext(
-            taskStateJson = taskStateJson,
+            taskStateJson = null,
             shortHistory = historyText,
         )
 
@@ -146,23 +125,10 @@ class RagContextMemoryProvider(
      */
     suspend fun getDebugInfo(): String {
         val agentId = agentId ?: return "agentId не установлен"
-        val taskState = taskStateRepository.getCurrent(agentId)
         val entries = shortHistoryRepository.getEntries(agentId)
         val shortHistoryText = shortHistoryRepository.getAsText(agentId)
 
         return buildString {
-            appendLine("=== TaskState ===")
-            appendLine("focus: ${taskState.currentFocus.file} / ${taskState.currentFocus.className} / ${taskState.currentFocus.method}")
-            appendLine("intent: ${taskState.intent}")
-            appendLine("context_switched: ${taskState.contextSwitched}")
-            appendLine("tech_stack: ${taskState.techStack}")
-            if (taskState.confirmedDecisions.isNotEmpty()) {
-                appendLine("decisions: ${taskState.confirmedDecisions.joinToString("; ")}")
-            }
-            if (taskState.openQuestions.isNotEmpty()) {
-                appendLine("open: ${taskState.openQuestions.joinToString("; ")}")
-            }
-            appendLine()
             appendLine("=== Short History (${entries.size} записей) ===")
             appendLine(shortHistoryText.ifBlank { "(пусто)" })
         }
