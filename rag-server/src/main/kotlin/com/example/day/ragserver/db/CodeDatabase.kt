@@ -23,6 +23,7 @@ object CodeChunksTable : Table("code_chunks") {
     val fileName = varchar("file_name", 255)
     val packageName = varchar("package_name", 200).default("")
     val declarationName = varchar("declaration_name", 200).nullable()
+    val parentScope = varchar("parent_scope", 255).nullable()
     val startLine = integer("start_line").default(0)
     val strategy = varchar("strategy", 50)
     val chunkOrder = integer("chunk_order")
@@ -98,6 +99,7 @@ class CodeDatabase(private val dbPath: String) {
             it[fileName] = entity.fileName
             it[packageName] = entity.packageName
             it[declarationName] = entity.declarationName
+            it[parentScope] = entity.parentScope
             it[startLine] = entity.startLine
             it[strategy] = entity.strategy
             it[chunkOrder] = entity.chunkOrder
@@ -123,6 +125,7 @@ class CodeDatabase(private val dbPath: String) {
                     fileName = row[CodeChunksTable.fileName],
                     packageName = row[CodeChunksTable.packageName],
                     declarationName = row[CodeChunksTable.declarationName],
+                    parentScope = row[CodeChunksTable.parentScope],
                     startLine = row[CodeChunksTable.startLine],
                     strategy = row[CodeChunksTable.strategy],
                     chunkOrder = row[CodeChunksTable.chunkOrder],

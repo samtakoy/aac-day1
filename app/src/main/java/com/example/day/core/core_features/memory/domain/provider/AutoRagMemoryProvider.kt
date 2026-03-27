@@ -29,7 +29,6 @@ class AutoRagMemoryProvider @Inject constructor(
 ) : MemoryProvider {
 
     private var agentId: Long? = null
-    private var taskStateJson: String? = null
     private var shortHistory: String? = null
 
     fun bindAgentId(agentId: Long) {
@@ -38,7 +37,6 @@ class AutoRagMemoryProvider @Inject constructor(
 
     /** Устанавливается из RagContextMemoryProvider перед вызовом appendUserPrompt(). */
     fun setContext(taskStateJson: String?, shortHistory: String?) {
-        this.taskStateJson = taskStateJson
         this.shortHistory = shortHistory
     }
 
@@ -54,7 +52,7 @@ class AutoRagMemoryProvider @Inject constructor(
             .getFact(agentId, MEMORY_KEY, CATEGORY_URL)?.fact
             ?: DEFAULT_URL
 
-        Log.d(RagLog.TAG, "RAG search: query='${prompt.content.take(80)}', preset=reranked_llm, hasTaskState=${!taskStateJson.isNullOrBlank()}, hasHistory=${!shortHistory.isNullOrBlank()}")
+        Log.d(RagLog.TAG, "RAG search: query='${prompt.content.take(80)}', preset=reranked_llm, hasHistory=${!shortHistory.isNullOrBlank()}")
 
         val ragResult = ragSearchRepository.search(
             query = prompt.content,

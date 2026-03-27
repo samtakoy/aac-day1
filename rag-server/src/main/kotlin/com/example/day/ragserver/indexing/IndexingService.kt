@@ -15,7 +15,7 @@ class IndexingService(
         val files = scanner.scan(config.codePath)
         val strategies = listOf(
             FixedSizeStrategy(),
-            StructuralStrategy(),
+            LanguageAwareChunker(useAst = config.useAstChunking),
         )
         for (strategy in strategies) {
             indexStrategy(strategy, files, config.forceReindex)

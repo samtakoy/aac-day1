@@ -7,6 +7,7 @@ data class ChunkEntity(
     val fileName: String,
     val packageName: String = "",
     val declarationName: String? = null,
+    val parentScope: String? = null,
     val startLine: Int = 0,
     val strategy: String,
     val chunkOrder: Int,

@@ -1,6 +1,10 @@
 package com.example.day.ragserver.indexing
 
+import com.example.day.raggrammar.KotlinLanguage
 import com.example.day.ragserver.db.ChunkEntity
+import io.github.treesitter.ktreesitter.Language
+import io.github.treesitter.ktreesitter.Node
+import io.github.treesitter.ktreesitter.Parser
 import java.time.Instant
 
 interface ChunkingStrategy {
@@ -212,5 +216,285 @@ class StructuralStrategy(
             line += block.count { it == '\n' }
         }
         return offsets
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Strategy C: AST-based — split-then-merge via ktreesitter (Kotlin grammar)
+// Корректно обрабатывает вложенность: companion object, лямбды, inner classes.
+// ──────────────────────────────────────────────────────────────────────────────
+
+private val AST_INTERESTING_TYPES = setOf(
+    "class_declaration",
+    "object_declaration",
+    "companion_object",
+    "function_declaration",
+    "property_declaration",
+    "typealias_declaration",
+    "interface_declaration",
+)
+
+private data class AstChunk(
+    val text: String,
+    val startLine: Int,
+    val declarationName: String?,
+    val parentScope: String?,
+)
+
+class AstChunkingStrategy private constructor(
+    private val parser: Parser,
+    private val maxChunkSize: Int,
+) : ChunkingStrategy {
+
+    override val strategyName = "structural"
+
+    companion object {
+        fun create(maxChunkSize: Int = 2000): AstChunkingStrategy {
+            val language = Language(KotlinLanguage.language())
+            val parser = Parser(language)
+            return AstChunkingStrategy(parser, maxChunkSize)
+        }
+    }
+
+    override fun split(content: String, filePath: String, fileName: String): List<ChunkEntity> {
+        if (content.isBlank()) return emptyList()
+
+        val now = Instant.now().toString()
+        val header = "// File: $fileName\n"
+        val packageName = CodeMetadata.extractPackage(content)
+
+        // Если файл целиком помещается — один чанк без разбора AST
+        if (content.length <= maxChunkSize) {
+            return listOf(
+                ChunkEntity(
+                    content = header + content,
+                    filePath = filePath, fileName = fileName,
+                    packageName = packageName, startLine = 1,
+                    strategy = strategyName, chunkOrder = 0, indexedAt = now,
+                )
+            )
+        }
+
+        val candidates = extractCandidates(content)
+
+        // Если AST ничего не нашёл (пустой файл, только imports) — fallback
+        if (candidates.isEmpty()) {
+            return FixedSizeStrategy(maxChunkSize, maxChunkSize / 5)
+                .split(content, filePath, fileName)
+                .map { it.copy(strategy = strategyName) }
+        }
+
+        val merged = mergeGreedy(candidates)
+        val chunks = mutableListOf<ChunkEntity>()
+        var order = 0
+
+        for (candidate in merged) {
+            val blockWithHeader = header + candidate.text
+            if (blockWithHeader.length <= maxChunkSize) {
+                chunks.add(
+                    ChunkEntity(
+                        content = blockWithHeader,
+                        filePath = filePath, fileName = fileName,
+                        packageName = packageName,
+                        declarationName = candidate.declarationName,
+                        parentScope = candidate.parentScope,
+                        startLine = candidate.startLine,
+                        strategy = strategyName, chunkOrder = order++, indexedAt = now,
+                    )
+                )
+            } else {
+                // Одна нода больше maxChunkSize — sub-split, сохраняем метаданные
+                val subChunks = FixedSizeStrategy(maxChunkSize, maxChunkSize / 5)
+                    .split(candidate.text, filePath, fileName)
+                subChunks.forEach { sub ->
+                    chunks.add(
+                        sub.copy(
+                            strategy = strategyName,
+                            packageName = packageName,
+                            declarationName = candidate.declarationName,
+                            parentScope = candidate.parentScope,
+                            startLine = candidate.startLine + (sub.startLine - 1),
+                            chunkOrder = order++,
+                            indexedAt = now,
+                        )
+                    )
+                }
+            }
+        }
+
+        return chunks
+    }
+
+    // Извлекаем «интересные» ноды AST верхнего уровня и ноды внутри классов (методы, props).
+    // Companion object и вложенные классы — внутри родителя, не на top-level.
+    private fun extractCandidates(source: String): List<AstChunk> {
+        val tree = synchronized(parser) { parser.parse(source) }
+        val root = tree.rootNode
+        val result = mutableListOf<AstChunk>()
+        collectNodes(source, root, parentName = null, result = result)
+        return result
+    }
+
+    // Собирает все предшествующие комментарии (KDoc, однострочные //, многострочные /* */)
+    // идущие подряд перед нодой. Возвращает текст комментариев (с переносом строки) и
+    // первую строку (1-based) — чтобы скорректировать startLine чанка.
+    private fun collectLeadingComments(node: Node): Pair<String, Int> {
+        val comments = mutableListOf<String>()
+        var firstLine = node.startPoint.row.toInt() + 1
+        var sibling = node.prevNamedSibling
+        while (sibling != null && sibling.type in setOf("multiline_comment", "line_comment")) {
+            val commentText = sibling.text()?.toString() ?: break
+            comments.add(0, commentText)
+            firstLine = sibling.startPoint.row.toInt() + 1
+            sibling = sibling.prevNamedSibling
+        }
+        return if (comments.isEmpty()) {
+            "" to (node.startPoint.row.toInt() + 1)
+        } else {
+            (comments.joinToString("\n") + "\n") to firstLine
+        }
+    }
+
+    private fun collectNodes(source: String, node: Node, parentName: String?, result: MutableList<AstChunk>) {
+        for (child in node.children) {
+            if (!child.isNamed) continue
+            if (child.type in AST_INTERESTING_TYPES) {
+                val declText = child.text()?.toString() ?: continue
+                val name = child.childByFieldName("name")?.text()?.toString()
+                val (leadingComments, startLine) = collectLeadingComments(child)
+                val text = leadingComments + declText
+                result.add(AstChunk(text, startLine, name, parentName))
+                // Рекурсируем внутрь класса/объекта чтобы извлечь методы как отдельные чанки
+                if (child.type in setOf("class_declaration", "object_declaration", "companion_object", "interface_declaration")) {
+                    val body = child.childByFieldName("body")
+                    if (body != null) collectNodes(source, body, name, result)
+                }
+            } else {
+                collectNodes(source, child, parentName, result)
+            }
+        }
+    }
+
+    // Жадное слияние: если несколько соседних кандидатов суммарно < maxChunkSize — объединяем.
+    // declarationName берётся от первого кандидата в группе.
+    private fun mergeGreedy(candidates: List<AstChunk>): List<AstChunk> {
+        if (candidates.isEmpty()) return emptyList()
+        val result = mutableListOf<AstChunk>()
+        var acc = candidates[0]
+
+        for (i in 1 until candidates.size) {
+            val next = candidates[i]
+            // Не сливаем если разные parentScope (методы разных классов)
+            if (acc.parentScope == next.parentScope && (acc.text.length + next.text.length + 1) <= maxChunkSize) {
+                acc = acc.copy(text = acc.text + "\n\n" + next.text)
+            } else {
+                result.add(acc)
+                acc = next
+            }
+        }
+        result.add(acc)
+        return result
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Strategy D: Markdown — split by headers (#, ##, ###)
+// ──────────────────────────────────────────────────────────────────────────────
+
+class MarkdownChunkingStrategy(
+    val maxChunkSize: Int = 2000,
+) : ChunkingStrategy {
+
+    override val strategyName = "structural"
+
+    private val HEADER_SPLIT_REGEX = Regex("""(?=\n#{1,3} )""")
+
+    override fun split(content: String, filePath: String, fileName: String): List<ChunkEntity> {
+        if (content.isBlank()) return emptyList()
+
+        val now = Instant.now().toString()
+        val header = "// File: $fileName\n"
+
+        val sections = content.split(HEADER_SPLIT_REGEX).filter { it.isNotBlank() }
+
+        if (sections.size <= 1) {
+            // Нет заголовков — fallback на fixed
+            return FixedSizeStrategy(maxChunkSize, maxChunkSize / 5)
+                .split(content, filePath, fileName)
+                .map { it.copy(strategy = strategyName) }
+        }
+
+        val chunks = mutableListOf<ChunkEntity>()
+        var order = 0
+        var currentLine = 1
+
+        for (section in sections) {
+            val declarationName = section.lines()
+                .firstOrNull { it.startsWith("#") }
+                ?.trimStart('#', ' ')
+                ?.trim()
+
+            val blockWithHeader = header + section.trim()
+            val startLine = currentLine
+
+            if (blockWithHeader.length <= maxChunkSize) {
+                chunks.add(
+                    ChunkEntity(
+                        content = blockWithHeader,
+                        filePath = filePath, fileName = fileName,
+                        packageName = "", declarationName = declarationName,
+                        startLine = startLine,
+                        strategy = strategyName, chunkOrder = order++, indexedAt = now,
+                    )
+                )
+            } else {
+                val subChunks = FixedSizeStrategy(maxChunkSize, maxChunkSize / 5)
+                    .split(section.trim(), filePath, fileName)
+                subChunks.forEach { sub ->
+                    chunks.add(
+                        sub.copy(
+                            strategy = strategyName,
+                            declarationName = declarationName,
+                            startLine = startLine + (sub.startLine - 1),
+                            chunkOrder = order++,
+                            indexedAt = now,
+                        )
+                    )
+                }
+            }
+
+            currentLine += section.count { it == '\n' }
+        }
+
+        return chunks
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Strategy E: LanguageAwareChunker — routes by file extension + useAst flag.
+// Implements ChunkingStrategy so IndexingService needs no changes.
+// ──────────────────────────────────────────────────────────────────────────────
+
+class LanguageAwareChunker(
+    private val useAst: Boolean,
+    private val maxChunkSize: Int = 2000,
+) : ChunkingStrategy {
+
+    override val strategyName = "structural"
+
+    private val astStrategy by lazy { AstChunkingStrategy.create(maxChunkSize) }
+    private val markdownStrategy = MarkdownChunkingStrategy(maxChunkSize)
+    private val legacyStrategy = StructuralStrategy(maxChunkSize)
+    private val fixedFallback = FixedSizeStrategy(maxChunkSize, maxChunkSize / 5)
+
+    override fun split(content: String, filePath: String, fileName: String): List<ChunkEntity> {
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        return when {
+            ext in setOf("kt", "kts") && useAst -> astStrategy.split(content, filePath, fileName)
+            ext in setOf("kt", "kts") -> legacyStrategy.split(content, filePath, fileName)
+            ext == "md" -> markdownStrategy.split(content, filePath, fileName)
+            else -> fixedFallback.split(content, filePath, fileName)
+                .map { it.copy(strategy = strategyName) }
+        }
     }
 }

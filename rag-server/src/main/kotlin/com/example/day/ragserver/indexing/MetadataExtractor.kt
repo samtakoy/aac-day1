@@ -9,7 +9,7 @@ class MetadataExtractor(
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     suspend fun extract(fileContent: String, className: String): ClassMetadata? {
-        val prompt = buildPrompt(fileContent.take(3000), className)
+        val prompt = buildPrompt(fileContent.take(6000), className)
         return try {
             val response = llmProvider.generate(prompt)
             val cleaned = cleanJson(response)

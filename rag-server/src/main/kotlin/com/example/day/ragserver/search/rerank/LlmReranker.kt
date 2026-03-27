@@ -28,8 +28,10 @@ class LlmReranker(
 
         val prompt = buildPrompt(query, results)
         val response = llmProvider.generate(prompt)
+        println("[LlmReranker] raw response: ${response.replace('\n', '|').take(300)}")
 
         val scores = parseScores(response, results.size)
+        println("[LlmReranker] parsed scores: $scores")
         if (scores.isEmpty()) {
             println("[LlmReranker][${llmProvider.modelName}] Failed to parse scores, returning original order")
             return results

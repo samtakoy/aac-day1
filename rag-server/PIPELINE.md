@@ -168,6 +168,122 @@ Fallback (если векторы метаданных отсутствуют �
 
 ---
 
+## Стратегии нарезки (Chunking)
+
+Нарезка выполняется при **индексации** (не при поиске). Результат — чанки с `strategy="structural"` или `strategy="fixed"` в БД. Выбор стратегии управляется env var `USE_AST_CHUNKING`.
+
+```
+FileScanner (kt, kts, md, txt)
+        │
+        ▼
+LanguageAwareChunker(useAst)
+        ├── .kt / .kts + useAst=false → StructuralStrategy   (regex)
+        ├── .kt / .kts + useAst=true  → AstChunkingStrategy  (ktreesitter)
+        ├── .md                       → MarkdownChunkingStrategy
+        └── остальные                 → FixedSizeStrategy (fallback)
+```
+
+Параллельно `FixedSizeStrategy` индексируется отдельно — даёт `strategy="fixed"` индекс.
+
+---
+
+### `StructuralStrategy` (режим по умолчанию, `USE_AST_CHUNKING=false`)
+
+**Подход**: regex-сплит по ключевым словам Kotlin (`fun`, `class`, `interface`, `object`, ...).
+
+**Алгоритм**:
+1. Разбить файл по `(?=\n(?:fun |class |interface |...))`.
+2. Переместить KDoc-блоки и аннотации к следующему объявлению (`attachPreamblesForward`).
+3. Если блок > `maxChunkSize` — sub-split через `FixedSizeStrategy`.
+
+**Ограничения**:
+- Не отслеживает глубину скобок: `fun` в лямбде, `companion object` внутри класса — триггерят лишний сплит.
+- Sub-split режет строки посередине при больших блоках.
+- `declarationName` может быть мусором (`decl=for`, `decl=serves`) если чанк начался не с объявления.
+
+---
+
+### `AstChunkingStrategy` (`USE_AST_CHUNKING=true`, файлы `.kt`/`.kts`)
+
+**Подход**: настоящий AST через [ktreesitter](https://github.com/tree-sitter/kotlin-tree-sitter) + Kotlin grammar от [fwcd](https://github.com/fwcd/tree-sitter-kotlin). Нативная grammar-библиотека поставляется модулем `:rag-grammar`.
+
+**Алгоритм split-then-merge**:
+
+1. **Parse** — `Parser.parse(source)` → `Tree` → `rootNode`.
+2. **Split** — рекурсивный обход AST, извлекаем "интересные" ноды:
+   - `class_declaration`, `interface_declaration`
+   - `object_declaration`, `companion_object`
+   - `function_declaration`
+   - `property_declaration`, `typealias_declaration`
+3. Для каждой ноды:
+   - `text` = `node.text().toString()` — точные байтовые границы, никогда не посередине строки.
+   - `declarationName` = `node.childByFieldName("name")` — гарантированно имя объявления.
+   - `parentScope` = имя enclosing-класса (если нода в `class_body`) — методы знают своего владельца.
+4. **Merge** — жадное слияние соседних нод с одинаковым `parentScope`, пока суммарный размер ≤ `maxChunkSize`.
+5. **Oversized node** — одна нода > `maxChunkSize`: sub-split через `FixedSizeStrategy` с сохранением `declarationName` + `parentScope`.
+
+**Что решает vs StructuralStrategy**:
+
+| Проблема | StructuralStrategy | AstChunkingStrategy |
+|----------|-------------------|-------------------|
+| `fun` в лямбде триггерит сплит | да | нет — AST видит глубину |
+| `companion object` отрывается от класса | да | нет — `companion_object` в `class_body` |
+| Sub-split посередине строки | да | нет — oversized → FixedSize с сохранением метаданных |
+| `decl=for`, `decl=serves` (мусор) | часто | никогда — `node.childByFieldName("name")` |
+| `parentScope` недоступен | — | `parentScope` заполняется для всех вложенных объявлений |
+
+**Метрики (ожидаемые после переиндексации)**:
+
+| | До (regex) | После (AST) |
+|--|--|--|
+| structural chunks в БД | ~1367 | ~2500+ |
+| chunks начинаются с объявления | ~60% | ~100% |
+| LLM reranker score=0.00 для всех | каждый второй запрос | не должно быть |
+
+**Поле `parentScope`**:
+Заполняется для методов внутри классов: `parentScope = "GraphAIAgent"` для методов внутри `GraphAIAgent`. Используется в `TwoStageSearchService.drillDown()` как третье условие при exactMatch — позволяет найти методы класса по его имени даже если `fileName` и `declarationName` не совпадают с именем класса.
+
+---
+
+### `MarkdownChunkingStrategy` (файлы `.md`)
+
+**Подход**: split по заголовкам `#`, `##`, `###`.
+
+**Алгоритм**:
+1. Split по `(?=\n#{1,3} )` — каждый заголовок начинает новый чанк.
+2. `declarationName` = текст заголовка без `#` и пробелов.
+3. `packageName = ""`, `parentScope = null`.
+4. Если нет заголовков (plain text .md) — fallback на `FixedSizeStrategy`.
+5. Oversized секция — sub-split через `FixedSizeStrategy`.
+
+**Ранее**: `.md` обрабатывался `StructuralStrategy`, которая ничего не находила → весь файл как один блок → sub-split посимвольно.
+
+---
+
+### `FixedSizeStrategy` (fallback и `strategy="fixed"` индекс)
+
+**Подход**: sliding window с overlap.
+
+- `chunkSize = 1000`, `overlap = 200` (для `strategy="fixed"` индекса)
+- `chunkSize = maxChunkSize`, `overlap = maxChunkSize / 5` (как fallback внутри других стратегий)
+- Используется для `.txt` и неизвестных расширений через `LanguageAwareChunker`.
+
+---
+
+### Переключение стратегий
+
+```bash
+# Старая стратегия (regression check)
+USE_AST_CHUNKING=false FORCE_REINDEX=true CODE_PATH=... ./gradlew :rag-server:run
+
+# Новая AST стратегия (полный прогон с метаданными)
+USE_AST_CHUNKING=true FORCE_REINDEX=true EXTRACT_METADATA=true CODE_PATH=... ./gradlew :rag-server:run
+```
+
+Оба режима пишут в `strategy="structural"` — поисковый pipeline (`TwoStageSearchService`, `HybridSearchService`) не меняется.
+
+---
+
 ## Пресеты
 
 | Пресет              | queryOpt | strategy  | topK | threshold | rerank    | finalTopK |

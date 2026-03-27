@@ -5,7 +5,7 @@ import java.io.File
 object FileScanner {
 
     private val EXCLUDED_DIRS = setOf("build", ".git", ".gradle", "generated", ".idea", ".kotlin", "node_modules")
-    private val INCLUDED_EXTENSIONS = setOf("kt", "kts", "md")
+    private val INCLUDED_EXTENSIONS = setOf("kt", "kts", "md", "txt")
 
     fun scan(rootPath: String): List<File> {
         val root = File(rootPath)
