@@ -1,5 +1,6 @@
 package com.example.day.ragserver.indexing
 
+import com.example.day.ragserver.indexing.chunking.DEFAULT_MAX_CHUNK_SIZE
 import com.example.day.ragserver.indexing.chunking.ast.AstChunkingStrategy
 import java.io.File
 import kotlin.test.Test
@@ -7,7 +8,10 @@ import kotlin.test.assertTrue
 
 class AstChunkingTest {
 
-    // Small maxChunkSize so AST splitting kicks in even for short snippets
+    // Real chunk size for inspecting actual files — mirrors production default
+    private val fileStrategy = AstChunkingStrategy.create(maxChunkSize = DEFAULT_MAX_CHUNK_SIZE)
+
+    // Small maxChunkSize so AST splitting kicks in even for short snippets in unit assertions
     private val strategy = AstChunkingStrategy.create(maxChunkSize = 100)
 
     // -------------------------------------------------------------------
@@ -18,27 +22,17 @@ class AstChunkingTest {
     @Test
     fun testChunkFile() {
         val filePath = System.getProperty("chunk.file")
-        val (content, label) = if (filePath != null) {
-            val file = File(filePath)
-            assertTrue(file.exists(), "File not found: $filePath")
-            file.readText() to file.name
-        } else {
-            BUILTIN_SNIPPET to "builtin_snippet.kt"
-        }
+            ?: "/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/rag-server/data/test_classes/ai/koog/agents/core/agent/AIAgent.kt"
+        val file = File(filePath)
+        assertTrue(file.exists(), "File not found: $filePath")
+        val (content, label) = file.readText() to file.name
 
-        val chunks = strategy.split(content, label, label)
+        val chunks = fileStrategy.split(content, label, label)
 
         println("\n=== AST chunks for: $label (${chunks.size} chunks) ===")
         chunks.forEachIndexed { i, chunk ->
-            val preview = chunk.content.lines().take(2).joinToString(" ↵ ").take(120)
-            println(
-                "#${i + 1}  " +
-                "decl=${chunk.declarationName?.padEnd(30) ?: "<none>".padEnd(30)}  " +
-                "parent=${(chunk.parentScope ?: "null").padEnd(25)}  " +
-                "line=${chunk.startLine.toString().padEnd(4)}  " +
-                "len=${chunk.content.length}"
-            )
-            println("    $preview")
+            println("━━━ #${i + 1}  decl=${chunk.declarationName ?: "<none>"}  parent=${chunk.parentScope ?: "null"}  line=${chunk.startLine}  len=${chunk.content.length}")
+            println(chunk.content)
             println()
         }
 

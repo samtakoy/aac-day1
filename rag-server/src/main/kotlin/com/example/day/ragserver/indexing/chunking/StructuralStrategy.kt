@@ -8,7 +8,7 @@ import java.time.Instant
 // Strategy B: Structural — split by Kotlin top-level declarations via regex,
 // keeping KDoc comments and annotations attached to their declaration.
 class StructuralStrategy(
-    val maxChunkSize: Int = 2000,
+    val maxChunkSize: Int = DEFAULT_MAX_CHUNK_SIZE,
 ) : ChunkingStrategy {
 
     override val strategyName = "structural"

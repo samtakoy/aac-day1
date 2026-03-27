@@ -28,6 +28,6 @@ include(":mcp-server")
 include(":rag-server")
 include(":shared:simple-chat-api")
 include(":ai-gateway")
-include(":tree-sitter-spike")
+//include(":tree-sitter-spike")
 include(":rag-grammar")
 

@@ -4,6 +4,7 @@ import com.example.day.raggrammar.KotlinLanguage
 import com.example.day.ragserver.db.ChunkEntity
 import com.example.day.ragserver.indexing.ChunkingStrategy
 import com.example.day.ragserver.indexing.CodeMetadata
+import com.example.day.ragserver.indexing.chunking.DEFAULT_MAX_CHUNK_SIZE
 import com.example.day.ragserver.indexing.chunking.FixedSizeStrategy
 import io.github.treesitter.ktreesitter.Language
 import io.github.treesitter.ktreesitter.Node
@@ -28,7 +29,7 @@ class AstChunkingStrategy private constructor(
     override val strategyName = "structural"
 
     companion object {
-        fun create(maxChunkSize: Int = 2000): AstChunkingStrategy {
+        fun create(maxChunkSize: Int = DEFAULT_MAX_CHUNK_SIZE): AstChunkingStrategy {
             val language = Language(KotlinLanguage.language())
             val parser = Parser(language)
             return AstChunkingStrategy(parser, maxChunkSize)
@@ -68,37 +69,19 @@ class AstChunkingStrategy private constructor(
         var order = 0
 
         for (candidate in merged) {
-            val blockWithHeader = header + candidate.text
-            if (blockWithHeader.length <= maxChunkSize) {
-                chunks.add(
-                    ChunkEntity(
-                        content = blockWithHeader,
-                        filePath = filePath, fileName = fileName,
-                        packageName = packageName,
-                        declarationName = candidate.declarationName,
-                        parentScope = candidate.parentScope,
-                        startLine = candidate.startLine,
-                        strategy = strategyName, chunkOrder = order++, indexedAt = now,
-                    )
+            // AST-нода — атомарная семантическая единица: берём целиком, даже если > maxChunkSize.
+            // FixedSize субсплит здесь бессмысленен: он режет посередине KDoc или сигнатуры.
+            chunks.add(
+                ChunkEntity(
+                    content = header + candidate.text,
+                    filePath = filePath, fileName = fileName,
+                    packageName = packageName,
+                    declarationName = candidate.declarationName,
+                    parentScope = candidate.parentScope,
+                    startLine = candidate.startLine,
+                    strategy = strategyName, chunkOrder = order++, indexedAt = now,
                 )
-            } else {
-                // Одна нода больше maxChunkSize — sub-split, сохраняем метаданные
-                val subChunks = FixedSizeStrategy(maxChunkSize, maxChunkSize / 5)
-                    .split(candidate.text, filePath, fileName)
-                subChunks.forEach { sub ->
-                    chunks.add(
-                        sub.copy(
-                            strategy = strategyName,
-                            packageName = packageName,
-                            declarationName = candidate.declarationName,
-                            parentScope = candidate.parentScope,
-                            startLine = candidate.startLine + (sub.startLine - 1),
-                            chunkOrder = order++,
-                            indexedAt = now,
-                        )
-                    )
-                }
-            }
+            )
         }
 
         return chunks
@@ -149,16 +132,31 @@ class AstChunkingStrategy private constructor(
         for (child in node.namedChildren) {
             if (!child.isNamed) continue
             if (child.type in AST_INTERESTING_TYPES) {
-                val declText = nodeText(child, sourceBytes)
-                if (declText.isEmpty()) continue
                 val name = extractDeclarationName(child, sourceBytes)
                 val (leadingComments, startLine) = collectLeadingComments(child, sourceBytes)
-                val text = leadingComments + declText
-                result.add(AstChunk(text, startLine, name, parentName))
-                // Рекурсируем внутрь класса/объекта чтобы извлечь методы как отдельные чанки
+
+                val declText = if (child.type in AST_CONTAINER_TYPES) {
+                    // Для контейнеров берём только заголовок (сигнатуру до тела).
+                    // Содержимое тела извлекается рекурсией как отдельные чанки.
+                    val body = child.namedChildren.firstOrNull { it.type in AST_BODY_TYPES }
+                    if (body != null) {
+                        val start = child.startByte.toInt()
+                        val end = body.startByte.toInt()
+                        if (start < end) String(sourceBytes, start, end - start, Charsets.UTF_8).trimEnd()
+                        else nodeText(child, sourceBytes)
+                    } else nodeText(child, sourceBytes)
+                } else {
+                    nodeText(child, sourceBytes)
+                }
+
+                if (declText.isEmpty()) continue
+                result.add(AstChunk(leadingComments + declText, startLine, name, parentName))
+
                 if (child.type in AST_CONTAINER_TYPES) {
                     val body = child.namedChildren.firstOrNull { it.type in AST_BODY_TYPES }
-                    if (body != null) collectNodes(sourceBytes, body, name, result)
+                    // companion object без имени: пробрасываем имя родителя, чтобы не терять parentScope
+                    val scopeName = name ?: parentName
+                    if (body != null) collectNodes(sourceBytes, body, scopeName, result)
                 }
             } else {
                 collectNodes(sourceBytes, child, parentName, result)

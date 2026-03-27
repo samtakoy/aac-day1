@@ -4,11 +4,13 @@ import com.example.day.ragserver.db.ChunkEntity
 import com.example.day.ragserver.indexing.ChunkingStrategy
 import com.example.day.ragserver.indexing.chunking.ast.AstChunkingStrategy
 
+internal const val DEFAULT_MAX_CHUNK_SIZE = 2000
+
 // Strategy E: routes by file extension + useAst flag.
 // Implements ChunkingStrategy so IndexingService needs no changes.
 class LanguageAwareChunker(
     private val useAst: Boolean,
-    private val maxChunkSize: Int = 2000,
+    private val maxChunkSize: Int = DEFAULT_MAX_CHUNK_SIZE,
 ) : ChunkingStrategy {
 
     override val strategyName = "structural"

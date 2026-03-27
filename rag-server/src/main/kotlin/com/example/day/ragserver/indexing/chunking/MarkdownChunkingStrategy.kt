@@ -6,7 +6,7 @@ import java.time.Instant
 
 // Strategy D: Markdown — split by headers (#, ##, ###)
 class MarkdownChunkingStrategy(
-    val maxChunkSize: Int = 2000,
+    val maxChunkSize: Int = DEFAULT_MAX_CHUNK_SIZE,
 ) : ChunkingStrategy {
 
     override val strategyName = "structural"
