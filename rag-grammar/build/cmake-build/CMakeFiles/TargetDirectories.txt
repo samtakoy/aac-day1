@@ -1,0 +1,7 @@
+/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/rag-grammar/build/cmake-build/CMakeFiles/kotlin.dir
+/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/rag-grammar/build/cmake-build/CMakeFiles/edit_cache.dir
+/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/rag-grammar/build/cmake-build/CMakeFiles/rebuild_cache.dir
+/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/rag-grammar/build/cmake-build/CMakeFiles/list_install_components.dir
+/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/rag-grammar/build/cmake-build/CMakeFiles/install.dir
+/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/rag-grammar/build/cmake-build/CMakeFiles/install/local.dir
+/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/rag-grammar/build/cmake-build/CMakeFiles/install/strip.dir

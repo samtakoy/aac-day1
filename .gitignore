@@ -50,3 +50,5 @@ google-services.json
 /shared/simple-chat-api/build/
 /rag-server/rag_index.db
 /rag-server/reports/
+/rag-grammar/build/
+/rag-grammar/build/
