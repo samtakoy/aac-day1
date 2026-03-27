@@ -33,6 +33,8 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-jdbc:0.61.0")
     implementation("org.xerial:sqlite-jdbc:3.49.1.0")
     implementation("org.slf4j:slf4j-simple:2.0.17")
+
+    testImplementation(kotlin("test"))
 }
 
 application {

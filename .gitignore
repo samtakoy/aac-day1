@@ -52,3 +52,4 @@ google-services.json
 /rag-server/reports/
 /rag-grammar/build/
 /rag-grammar/build/
+/rag-server/reports_prev/

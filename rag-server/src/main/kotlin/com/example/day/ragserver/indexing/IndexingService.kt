@@ -3,6 +3,8 @@ package com.example.day.ragserver.indexing
 import com.example.day.ragserver.config.RagConfig
 import com.example.day.ragserver.db.CodeDatabase
 import com.example.day.ragserver.embedding.EmbeddingProvider
+import com.example.day.ragserver.indexing.chunking.FixedSizeStrategy
+import com.example.day.ragserver.indexing.chunking.LanguageAwareChunker
 
 class IndexingService(
     private val db: CodeDatabase,

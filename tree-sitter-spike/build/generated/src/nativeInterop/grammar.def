@@ -1,0 +1,6 @@
+# Automatically generated file. DO NOT MODIFY
+
+package = com.example.spike.grammar.internal
+headers = tree-sitter-kotlin.h
+compilerOpts = -DTREE_SITTER_HIDE_SYMBOLS
+staticLibraries = libtree-sitter-kotlin.a
