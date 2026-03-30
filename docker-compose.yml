@@ -31,6 +31,9 @@ services:
     environment:
       - OLLAMA_URL=http://host.docker.internal:11434
       - PORT=8081
+      - RATE_LIMIT_RPM=${RATE_LIMIT_RPM:-60}
+      - CONCURRENCY_LIMIT=${CONCURRENCY_LIMIT:-4}
+      - OLLAMA_MAX_CONTEXT=${OLLAMA_MAX_CONTEXT:-8192}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/v1/models"]
@@ -38,3 +41,37 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  rag-server:
+    build:
+      context: .
+      dockerfile: rag-server/Dockerfile
+    container_name: rag-server
+    ports:
+      - "3001:3001"
+    volumes:
+      - ${RAG_CODE_PATH}:/workspace/src:ro
+      - ./rag-server/rag_index.db:/app/data/rag_index.db
+    environment:
+      - CODE_PATH=/workspace/src
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - DB_PATH=/app/data/rag_index.db
+      - RAG_SERVER_PORT=3001
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-ollama}
+      - LLM_MODEL=${LLM_MODEL:-qwen2.5-coder:7b-instruct}
+      - TRANSLATE_LLM_MODEL=${TRANSLATE_LLM_MODEL:-qwen2.5-coder:7b-instruct}
+      - RERANKER_LLM_MODEL=${RERANKER_LLM_MODEL:-qwen2.5-coder:7b-instruct}
+      - TASK_STATE_LLM_MODEL=${TASK_STATE_LLM_MODEL:-qwen2.5-coder:7b-instruct}
+      - SEARCH_TOP_K=${SEARCH_TOP_K:-5}
+      - FORCE_REINDEX=${FORCE_REINDEX:-false}
+      - EXTRACT_METADATA=${EXTRACT_METADATA:-false}
+      - TRANSLATE_QUERIES=${TRANSLATE_QUERIES:-false}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/search?query=test"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+

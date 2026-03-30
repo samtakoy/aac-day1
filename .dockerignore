@@ -10,4 +10,5 @@ plans/
 prompts/
 meta/
 **/build/
+!ai-gateway/build/libs/ai-gateway.jar
 **/target/

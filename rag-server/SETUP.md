@@ -19,6 +19,8 @@
 - Gradle 8.5+ (или использовать `./gradlew` из корня проекта)
 - Ollama (для локальных эмбеддингов и LLM) **или** ключ OpenRouter (только для embeddings)
 
+> **Docker:** для запуска через `docker-compose` смотри [корневой SETUP.md](../SETUP.md).
+
 ---
 
 ## 1. Настройка Ollama

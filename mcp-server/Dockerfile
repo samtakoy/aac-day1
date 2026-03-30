@@ -8,7 +8,7 @@ COPY --chown=gradle:gradle mcp-server ./mcp-server
 
 RUN gradle :mcp-server:build --no-daemon
 
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 COPY --from=build /home/gradle/project/mcp-server/build/libs/mcp-server.jar ./mcp-server.jar

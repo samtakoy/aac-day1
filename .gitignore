@@ -16,6 +16,8 @@ local.properties
 
 /prompts/my
 
+.env
+
 # Log/OS Files
 *.log
 
