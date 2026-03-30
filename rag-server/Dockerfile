@@ -8,7 +8,7 @@ COPY --chown=gradle:gradle rag-server ./rag-server
 
 RUN gradle :rag-server:build --no-daemon
 
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 COPY --from=build /home/gradle/project/rag-server/build/libs/rag-server.jar ./rag-server.jar

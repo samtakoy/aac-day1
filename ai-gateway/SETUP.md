@@ -40,8 +40,33 @@ curl http://localhost:11434/api/tags
 |-----------|---|---|
 | `OLLAMA_URL` | `http://localhost:11434` | URL Ollama-сервера |
 | `PORT` | `8081` | Порт, на котором слушает ai-gateway |
+| `RATE_LIMIT_RPM` | `60` | Максимум запросов в минуту на один IP (per-IP, token bucket) |
+| `CONCURRENCY_LIMIT` | `4` | Максимум одновременных запросов к Ollama |
+| `OLLAMA_MAX_CONTEXT` | `8192` | Административный лимит контекста (токенов). Итоговый `num_ctx` = `min(OLLAMA_MAX_CONTEXT, лимит_модели)` |
 
 > При запуске в Docker через `docker-compose` Ollama недоступна на `localhost` — используется `http://host.docker.internal:11434` (уже задано в `docker-compose.yml`).
+
+### Rate limiting
+
+Оба эндпоинта (`/v1/chat/completions` и `/v1/models`) защищены двумя типами лимитов:
+
+- **RPM per-IP** — при превышении `RATE_LIMIT_RPM` возвращается `429` с заголовками `X-RateLimit-Remaining` и `Retry-After`
+- **Concurrency** — при превышении `CONCURRENCY_LIMIT` одновременных запросов возвращается `429` немедленно (не ждёт освобождения)
+
+Настройте Ollama на параллельную обработку (`OLLAMA_NUM_PARALLEL`) в соответствии с `CONCURRENCY_LIMIT`.
+
+### num_ctx (max context)
+
+`num_ctx` — Ollama-специфичный параметр, не передаётся клиентом (OpenAI API его не имеет). ai-gateway вычисляет его автоматически для каждого запроса:
+
+```
+num_ctx = min(OLLAMA_MAX_CONTEXT, лимит_модели_из_Ollama)
+```
+
+- **`OLLAMA_MAX_CONTEXT`** — административный лимит сервера (память, ресурсы)
+- **лимит модели** — запрашивается у Ollama через `/api/show` (поле `llama.context_length`), кешируется
+
+Защита: если запросить `num_ctx` больше лимита модели — Ollama упадёт. `min()` гарантирует, что этого не произойдёт.
 
 ---
 
@@ -108,7 +133,7 @@ curl -X POST http://localhost:8081/v1/chat/completions \
 
 ### GET /v1/models
 
-Возвращает список доступных моделей (статичный список).
+Возвращает список моделей, доступных в Ollama (динамически через `/api/tags`).
 
 ```bash
 curl http://localhost:8081/v1/models
@@ -143,7 +168,7 @@ curl -X POST http://localhost:8081/v1/chat/completions \
   -d '{"model":"qwen2.5:7b","messages":[{"role":"user","content":"1+1=?"}]}'
 ```
 
-Ожидаемый ответ `/v1/models`:
+Ожидаемый ответ `/v1/models` (реальный список из Ollama):
 ```json
-{"data": ["llama3", "mistral", "qwen2.5:7b"]}
+{"data": ["llama3:latest", "qwen2.5:7b", "nomic-embed-text:latest"]}
 ```

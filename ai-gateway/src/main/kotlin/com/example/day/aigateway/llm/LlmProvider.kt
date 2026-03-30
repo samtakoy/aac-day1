@@ -5,4 +5,5 @@ import com.example.day.shared.dto.ChatCompletionResponse
 
 interface LlmProvider {
     suspend fun chat(request: ChatCompletionRequest): ChatCompletionResponse
+    suspend fun models(): List<String>
 }

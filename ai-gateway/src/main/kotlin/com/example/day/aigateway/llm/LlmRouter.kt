@@ -7,4 +7,7 @@ import com.example.day.shared.dto.ChatCompletionResponse
 class LlmRouter(private val ollamaProvider: LlmProvider) : LlmProvider {
     override suspend fun chat(request: ChatCompletionRequest): ChatCompletionResponse =
         ollamaProvider.chat(request)
+
+    override suspend fun models(): List<String> =
+        ollamaProvider.models()
 }

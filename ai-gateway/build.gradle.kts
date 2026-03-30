@@ -18,6 +18,8 @@ dependencies {
     implementation("io.ktor:ktor-server-core:3.2.3")
     implementation("io.ktor:ktor-server-netty:3.2.3")
     implementation("io.ktor:ktor-server-content-negotiation:3.2.3")
+    implementation("io.ktor:ktor-server-rate-limit:3.2.3")
+    implementation("io.ktor:ktor-server-forwarded-header:3.2.3")
     implementation("io.ktor:ktor-client-core:3.2.3")
     implementation("io.ktor:ktor-client-okhttp:3.2.3")
     implementation("io.ktor:ktor-client-content-negotiation:3.2.3")
