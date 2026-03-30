@@ -14,15 +14,22 @@ class AstChunkingTest {
     // Small maxChunkSize so AST splitting kicks in even for short snippets in unit assertions
     private val strategy = AstChunkingStrategy.create(maxChunkSize = 100)
 
+    @Test
+    fun test1() {
+        testChunkFile("C:\\devs\\AI\\aiadvent_projects\\frameworks\\koog\\agents\\agents-core\\src\\commonMain\\kotlin\\ai\\koog\\agents\\core\\agent\\AIAgent.kt")
+    }
+
+    @Test
+    fun test2() {
+        testChunkFile("C:\\devs\\AI\\aiadvent_projects\\frameworks\\koog\\agents\\agents-core\\src\\commonMain\\kotlin\\ai\\koog\\agents\\core\\agent\\FunctionalAIAgent.kt")
+    }
+
     // -------------------------------------------------------------------
     // Test 1: Diagnostic — point at any file via -Dchunk.file=<path>
     // Falls back to built-in snippet if property is not set.
     // Always passes; output is visible via --info or HTML report.
     // -------------------------------------------------------------------
-    @Test
-    fun testChunkFile() {
-        val filePath = System.getProperty("chunk.file")
-            ?: "/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/rag-server/data/test_classes/ai/koog/agents/core/agent/AIAgent.kt"
+    fun testChunkFile(filePath: String) {
         val file = File(filePath)
         assertTrue(file.exists(), "File not found: $filePath")
         val (content, label) = file.readText() to file.name

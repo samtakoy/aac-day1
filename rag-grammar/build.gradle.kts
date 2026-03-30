@@ -142,6 +142,17 @@ val copyNativeLib = tasks.register<Copy>("copyNativeLib") {
     from(cmakeBuildDir) {
         include("${prefix}kotlin.${ext}")
     }
+    if (os == "windows") {
+        from(cmakeBuildDir.map { it.dir("Release") }) {
+            include("kotlin.dll")
+        }
+        from(cmakeBuildDir.map { it.dir("Debug") }) {
+            include("kotlin.dll")
+        }
+        from(cmakeBuildDir.map { it.dir("RelWithDebInfo") }) {
+            include("kotlin.dll")
+        }
+    }
     into(layout.buildDirectory.dir("resources/main/lib/$os/$arch"))
 }
 

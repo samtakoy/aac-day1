@@ -521,4 +521,69 @@ class AdditionalAstChunkingTest {
             "Expected callback property content inside a Handler chunk"
         )
     }
+
+    // -------------------------------------------------------------------
+    // Test: Large function should be split into signature + body parts
+    // -------------------------------------------------------------------
+    @Test
+    fun testLargeFunctionSplitIntoParts() {
+        val code = """
+            package test
+
+            fun huge() {
+                val a = 1
+                val b = 2
+                val c = 3
+                val d = 4
+                val e = 5
+                val f = 6
+                val g = 7
+                val h = 8
+            }
+        """.trimIndent()
+
+        val chunks = strategy.split(code, "test.kt", "test.kt")
+
+        println("\n=== testLargeFunctionSplitIntoParts (${chunks.size} chunks) ===")
+        chunks.forEach { chunk ->
+            println("decl=${chunk.declarationName}  parent=${chunk.parentScope}")
+            println("  content preview: ${chunk.content.take(100)}")
+        }
+
+        assertTrue(chunks.any { it.declarationName == "huge" }, "Expected signature chunk for huge")
+        assertTrue(
+            chunks.any { it.declarationName?.startsWith("huge#part") == true },
+            "Expected body part chunks for huge"
+        )
+    }
+
+    // -------------------------------------------------------------------
+    // Test: Oversized KDoc should be separated from declaration code
+    // -------------------------------------------------------------------
+    @Test
+    fun testOversizedKDocGetsSeparated() {
+        val code = """
+            package test
+
+            /**
+             * This is a very long KDoc block for one tiny function.
+             * It should become a separate chunk when combined text exceeds maxChunkSize.
+             * Keeping docs and code together here would exceed the configured threshold.
+             */
+            fun docHeavy() = 1
+        """.trimIndent()
+
+        val chunks = strategy.split(code, "test.kt", "test.kt")
+        val docHeavyChunks = chunks.filter { it.declarationName == "docHeavy" }
+
+        println("\n=== testOversizedKDocGetsSeparated (${chunks.size} chunks) ===")
+        docHeavyChunks.forEach { chunk ->
+            println("decl=${chunk.declarationName}  parent=${chunk.parentScope}")
+            println("  content preview: ${chunk.content.take(140)}")
+        }
+
+        assertTrue(docHeavyChunks.size >= 2, "Expected doc + code chunks for docHeavy")
+        assertTrue(docHeavyChunks.any { it.content.contains("/**") }, "Expected a KDoc-only chunk")
+        assertTrue(docHeavyChunks.any { it.content.contains("fun docHeavy()") }, "Expected a code chunk")
+    }
 }

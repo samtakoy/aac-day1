@@ -32,3 +32,9 @@ internal val AST_COMMENT_TYPES = setOf(
     "multiline_comment",
     "line_comment",
 )
+
+/** Named nodes that may appear between a comment block and its declaration. */
+internal val AST_COMMENT_BRIDGE_TYPES = setOf(
+    "annotation",
+    "modifiers",
+)
