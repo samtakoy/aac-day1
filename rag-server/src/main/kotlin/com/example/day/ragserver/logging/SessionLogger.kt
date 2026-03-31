@@ -210,6 +210,93 @@ class SessionLogger(logsDir: String = "./logs") {
         })
     }
 
+    // ─── TWO-STAGE RETRIEVAL internals ───────────────────────────────────────
+
+    data class Stage2ChunkDetail(
+        val className: String,
+        val exactMatches: Int,
+        val softMatches: Int,
+        val topChunks: List<Triple<String, Int, Double>>, // fileName, startLine, score
+    )
+
+    /**
+     * Логирует внутреннее состояние TwoStageSearchService в debug-файл.
+     * Вызывается из TwoStageSearchService после Stage 1 и Stage 2.
+     */
+    fun logTwoStageSearch(
+        query: String,
+        metadataCount: Int,
+        metadataVectorCount: Int,
+        fallback: Boolean,
+        stage1Classes: List<Pair<String, Double>>,   // className → finalScore
+        stage2Details: List<Stage2ChunkDetail>,
+        finalChunks: List<Pair<String, Double>>,     // "fileName:line decl" → score
+    ) {
+        debug(buildString {
+            appendLine()
+            appendLine("### TWO-STAGE RETRIEVAL  query=\"${query.take(80)}\"")
+            appendLine("metadata=$metadataCount  metadataVectors=$metadataVectorCount  fallback=$fallback")
+            appendLine()
+            if (fallback) {
+                appendLine("**FALLBACK to standardSearch** (no metadata)")
+            } else {
+                appendLine("**Stage 1 — selected classes (top ${stage1Classes.size}):**")
+                stage1Classes.forEach { (cls, score) ->
+                    appendLine("  ${"%.3f".format(score)} — $cls")
+                }
+                appendLine()
+                appendLine("**Stage 2 — drill-down per class:**")
+                stage2Details.forEach { d ->
+                    appendLine("  ${d.className}: exactMatch=${d.exactMatches} softMatch=${d.softMatches}")
+                    d.topChunks.forEach { (file, line, score) ->
+                        appendLine("    ${"%.3f".format(score)} — $file:$line")
+                    }
+                }
+            }
+            appendLine()
+            appendLine("**Final ${finalChunks.size} chunks:**")
+            finalChunks.forEach { (label, score) ->
+                appendLine("  ${"%.3f".format(score)} — $label")
+            }
+        })
+    }
+
+    // ─── INDEXING ─────────────────────────────────────────────────────────────
+
+    /**
+     * Лог индексации одного файла: какие чанки были созданы.
+     * Пишет в index_YYYY-MM-DD.md (отдельный файл, т.к. индексация — разовая операция).
+     */
+    fun logIndexingFile(
+        fileName: String,
+        filePath: String,
+        strategy: String,
+        chunks: List<IndexedChunkLog>,
+    ) {
+        val indexFile = File(dir, "index_${LocalDate.now()}.md")
+        indexFile.appendText(buildString {
+            appendLine()
+            appendLine("### $fileName  [$strategy]  ${chunks.size} chunks")
+            appendLine("path: $filePath")
+            chunks.forEachIndexed { i, c ->
+                val decl = buildString {
+                    if (c.declarationName != null) append(c.declarationName)
+                    if (c.parentScope != null) append(" (in ${c.parentScope})")
+                    if (c.nodeType != null) append(" [${c.nodeType}]")
+                }
+                appendLine("  #$i  line=${c.startLine}  ${decl.ifEmpty { "<no-decl>" }}  len=${c.contentLength}")
+            }
+        })
+    }
+
+    data class IndexedChunkLog(
+        val declarationName: String?,
+        val parentScope: String?,
+        val nodeType: String?,
+        val startLine: Int,
+        val contentLength: Int,
+    )
+
     // ─── LLM RESPONSE (от Android) ───────────────────────────────────────────
 
     fun logLlmResponse(

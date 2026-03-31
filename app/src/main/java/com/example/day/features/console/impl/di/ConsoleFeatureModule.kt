@@ -1,5 +1,6 @@
 package com.example.day.features.console.impl.di
 
+import com.example.day.features.console.impl.ui.delegates.AssistantTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.PlannerTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.RagTalkDelegate
 import dagger.Module
@@ -27,6 +28,16 @@ internal class ConsoleFeatureModule {
             addChatMessageUseCase = deps.addChatMessageUseCase,
             ragWorker = deps.ragWorker,
             chatTools = deps.chatTools,
+        )
+    }
+
+    @Provides
+    fun provideAssistantTalkDelegate(deps: ConsoleFeatureDeps): AssistantTalkDelegate {
+        return AssistantTalkDelegate(
+            addChatMessageUseCase = deps.addChatMessageUseCase,
+            assistantWorker = deps.assistantWorker,
+            chatTools = deps.chatTools,
+            consumptionCalculator = deps.consuption,
         )
     }
 }

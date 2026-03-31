@@ -101,6 +101,7 @@ class RagContextMemoryProvider(
      * Берёт фактический ответ ассистента из AgentContextRepository и сохраняет в ShortHistory.
      */
     suspend fun postProcess() {
+        // TODO: Используется не там где надо. Перенести в AIAgent
         val agentId = agentId ?: return
         if (pendingUserMessage.isBlank()) return
 

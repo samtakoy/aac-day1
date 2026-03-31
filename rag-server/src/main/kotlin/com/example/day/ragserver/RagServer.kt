@@ -2,6 +2,7 @@ package com.example.day.ragserver
 
 import com.example.day.ragserver.config.RagConfig
 import com.example.day.ragserver.db.CodeDatabase
+import com.example.day.ragserver.db.toEmbeddingText
 import com.example.day.ragserver.embedding.createEmbeddingProvider
 import com.example.day.ragserver.indexing.FileScanner
 import com.example.day.ragserver.indexing.IndexingService
@@ -21,6 +22,7 @@ import com.example.day.ragserver.pipeline.steps.TopKStep
 import com.example.day.ragserver.search.QueryOptimizer
 import com.example.day.ragserver.search.SearchService
 import com.example.day.ragserver.search.TwoStageSearchService
+import com.example.day.ragserver.search.VectorMath
 import com.example.day.ragserver.search.context.ContextFormatter
 import com.example.day.ragserver.search.context.ContextPacker
 import com.example.day.ragserver.search.rerank.HeuristicReranker
@@ -51,6 +53,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.request.receive
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
@@ -103,10 +106,11 @@ fun main() {
     val llmProvider = if (config.extractMetadata) {
         OllamaLlmProvider(baseUrl = config.ollamaBaseUrl, model = config.llmModel, httpClient = httpClient)
     } else null
-    val indexingService = IndexingService(db, embeddingProvider, llmProvider)
 
     val sessionLogger = SessionLogger()
     println("Session logging: ./logs/session_<date>.md")
+
+    val indexingService = IndexingService(db, embeddingProvider, llmProvider, sessionLogger = sessionLogger)
 
     // QueryOptimizer (query rewrite + translate) — создаётся только если TRANSLATE_QUERIES=true.
     // Если env=false и enable_query_optimize=true в запросе — шаг пропускается с логом.
@@ -149,8 +153,7 @@ fun main() {
     )
 
     val searchService = SearchService(db, embeddingProvider)
-    val twoStageSearchService = TwoStageSearchService(db, embeddingProvider)
-    registerRagTools(mcpServer, searchService, db, config.searchTopK, embeddingProvider, queryOptimizer, sessionLogger)
+    val twoStageSearchService = TwoStageSearchService(db, embeddingProvider, sessionLogger = sessionLogger)
 
     // --- Pipeline helpers ---
 
@@ -181,6 +184,9 @@ fun main() {
         add(TopKStep(pipelineConfig.finalTopK))
         add(ContextPackingStep(ContextPacker(db = db)))
     })
+
+    // Register MCP tools AFTER buildPipeline is defined
+    registerRagTools(mcpServer, buildPipeline = { config -> buildPipeline(config) }, sessionLogger = sessionLogger)
 
     fun parsePipelineConfig(params: io.ktor.server.request.ApplicationRequest): PipelineConfig {
         val p = params.queryParameters
@@ -324,6 +330,269 @@ fun main() {
                 val debugHeader = buildDebugHeader(ctx, pipelineConfig)
                 call.respondText(debugHeader + contextText)
             }
+
+            // ─── DEBUG ────────────────────────────────────────────────────────────
+
+            /**
+             * GET /debug/index?strategy=structural
+             * Показывает состояние индекса: сколько чанков на файл, метаданные, векторы.
+             */
+            get("/debug/index") {
+                val strategy = call.request.queryParameters["strategy"] ?: "structural"
+                val stats = db.getStats()
+                val chunksByFile = db.getChunkCountsByFile(strategy)
+                val allMetadata = db.getAllClassMetadata()
+                val metadataVectors = db.getAllMetadataVectors()
+
+                val text = buildString {
+                    appendLine("# Debug Index State")
+                    appendLine()
+                    appendLine("## Stats")
+                    appendLine("- Total chunks: ${stats.totalChunks}")
+                    appendLine("- Structural chunks: ${stats.structuralChunks}")
+                    appendLine("- Fixed chunks: ${stats.fixedChunks}")
+                    appendLine("- Class metadata entries: ${allMetadata.size}")
+                    appendLine("- Metadata vectors: ${metadataVectors.size}")
+                    appendLine("- Last indexed: ${stats.indexedAt ?: "unknown"}")
+                    appendLine()
+                    appendLine("## Chunks per file (strategy=$strategy, ${chunksByFile.size} files)")
+                    chunksByFile.entries.sortedBy { it.key }.forEach { (file, count) ->
+                        val hasMeta = allMetadata.any { it.className.equals(file.removeSuffix(".kt"), ignoreCase = true) }
+                        val metaMark = if (hasMeta) " ✓meta" else ""
+                        appendLine("  $count\t$file$metaMark")
+                    }
+                    if (allMetadata.isNotEmpty()) {
+                        appendLine()
+                        appendLine("## Class metadata (${allMetadata.size} classes)")
+                        allMetadata.sortedBy { it.className }.forEach { m ->
+                            val hasVector = metadataVectors.any { it.first == m.className }
+                            val vectorMark = if (hasVector) " ✓vec" else " ✗vec"
+                            appendLine("  ${m.className}$vectorMark — ${m.responsibility.take(80)}")
+                        }
+                    }
+                }
+                call.respondText(text)
+            }
+
+            /**
+             * GET /debug/metadata/orphans
+             * Метаданные без backing chunks в structural индексе — библиотечные/галлюцинированные классы.
+             * Эти записи захламляют Stage 1 и вытесняют проектные классы.
+             */
+            get("/debug/metadata/orphans") {
+                val allMetadata = db.getAllClassMetadata()
+                val allChunks = db.getAllVectors("structural").map { it.first }
+                val chunkClassNames = allChunks.mapNotNull { it.declarationName }.toSet()
+                val chunkFileNames = allChunks.map { it.fileName.removeSuffix(".kt") }.toSet()
+
+                val orphans = allMetadata.filter { meta ->
+                    val byDecl = meta.className in chunkClassNames
+                    val byFile = meta.className in chunkFileNames
+                    !byDecl && !byFile
+                }.sortedBy { it.className }
+
+                val text = buildString {
+                    appendLine("# Metadata Orphans (no backing chunks)")
+                    appendLine("total_metadata=${allMetadata.size}  orphans=${orphans.size}  backed=${allMetadata.size - orphans.size}")
+                    appendLine()
+                    orphans.take(100).forEach { m ->
+                        appendLine("  ${m.className} — ${m.responsibility.take(80)}")
+                    }
+                    if (orphans.size > 100) appendLine("  ... and ${orphans.size - 100} more")
+                }
+                call.respondText(text)
+            }
+
+            /**
+             * DELETE /debug/metadata/orphans
+             * Удаляет из БД metadata + vectors для классов без backing chunks.
+             * Безопасно: backed классы не трогаются. Не требует FORCE_REINDEX.
+             */
+            delete("/debug/metadata/orphans") {
+                val allMetadata = db.getAllClassMetadata()
+                val allChunks = db.getAllVectors("structural").map { it.first }
+                val chunkClassNames = allChunks.mapNotNull { it.declarationName }.toSet()
+                val chunkFileNames = allChunks.map { it.fileName.removeSuffix(".kt") }.toSet()
+
+                val orphanNames = allMetadata
+                    .filter { meta -> meta.className !in chunkClassNames && meta.className !in chunkFileNames }
+                    .map { it.className }
+
+                val deleted = db.deleteClassMetadata(orphanNames)
+                val text = "Deleted $deleted orphan metadata entries (+ their vectors). Backed: ${allMetadata.size - orphanNames.size}"
+                println("[Debug] $text")
+                call.respondText(text)
+            }
+
+            /**
+             * GET /debug/chunks?query=AIAgent&strategy=structural&top_k=20&file=AIAgent
+             * Raw similarity поиск по БД, минуя pipeline.
+             * Позволяет увидеть реальные скоры чанков к запросу.
+             * Параметр `file` — опциональный фильтр по fileName (substring, case-insensitive).
+             */
+            get("/debug/chunks") {
+                val query = call.request.queryParameters["query"]
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, "query param required")
+                val strategy = call.request.queryParameters["strategy"] ?: "structural"
+                val topK = call.request.queryParameters["top_k"]?.toIntOrNull() ?: 20
+                val fileFilter = call.request.queryParameters["file"]
+
+                val queryVector = embeddingProvider.embed(query)
+                val allVectors = db.getAllVectors(strategy)
+
+                val filtered = if (fileFilter != null) {
+                    allVectors.filter { (chunk, _) ->
+                        chunk.fileName.contains(fileFilter, ignoreCase = true) ||
+                        chunk.filePath.contains(fileFilter, ignoreCase = true)
+                    }
+                } else allVectors
+
+                val scored = filtered
+                    .map { (chunk, vector) ->
+                        val score = VectorMath.cosineSimilarity(queryVector, vector)
+                        chunk to score
+                    }
+                    .sortedByDescending { it.second }
+                    .take(topK)
+
+                val text = buildString {
+                    appendLine("# Debug Chunks: query=\"$query\"")
+                    appendLine("strategy=$strategy  top_k=$topK  file=${fileFilter ?: "*"}  searched=${filtered.size} chunks")
+                    appendLine()
+                    scored.forEachIndexed { i, (chunk, score) ->
+                        appendLine("## [$i] score=${"%.4f".format(score)}  ${chunk.fileName}:${chunk.startLine}")
+                        appendLine("decl=${chunk.declarationName ?: "-"}  parent=${chunk.parentScope ?: "-"}  nodeType=${chunk.nodeType ?: "-"}")
+                        appendLine("```")
+                        appendLine(chunk.content.take(300))
+                        if (chunk.content.length > 300) appendLine("... [${chunk.content.length} chars total]")
+                        appendLine("```")
+                        appendLine()
+                    }
+                }
+                call.respondText(text)
+            }
+
+            /**
+             * GET /debug/metadata?class=AIAgent
+             * Показывает полные метаданные класса и текст который будет embedded.
+             * Помогает понять почему класс не попадает в Stage 1.
+             */
+            get("/debug/metadata") {
+                val className = call.request.queryParameters["class"]
+                val allMetadata = db.getAllClassMetadata()
+                val metadataVectors = db.getAllMetadataVectors()
+
+                val toShow = if (className != null) {
+                    allMetadata.filter { it.className.contains(className, ignoreCase = true) }
+                } else {
+                    allMetadata.take(50)
+                }
+
+                val text = buildString {
+                    appendLine("# Debug Metadata")
+                    if (className != null) appendLine("filter=\"$className\"  found=${toShow.size}")
+                    else appendLine("showing first 50 of ${allMetadata.size} entries")
+                    appendLine()
+                    toShow.forEach { m ->
+                        val hasVector = metadataVectors.any { it.first == m.className }
+                        appendLine("## ${m.className}  ${if (hasVector) "✓vec" else "✗vec"}")
+                        appendLine("**Responsibility:** ${m.responsibility}")
+                        appendLine("**Domain tags:** ${m.domainTags.joinToString(", ").ifEmpty { "-" }}")
+                        if (m.keyMethods.isNotEmpty()) {
+                            appendLine("**Key methods:** ${m.keyMethods.joinToString(", ") { it.name }}")
+                        }
+                        if (m.usedBy.isNotEmpty()) {
+                            appendLine("**Used by:** ${m.usedBy.take(5).joinToString(", ")}${if (m.usedBy.size > 5) " (+${m.usedBy.size - 5})" else ""}")
+                        }
+                        appendLine("**Embedding text:** `${m.toEmbeddingText().take(200)}`")
+                        appendLine()
+                    }
+                }
+                call.respondText(text)
+            }
+
+            /**
+             * GET /debug/stage1?query=AIAgent&top_k=20
+             * Показывает Stage 1 скоры для ВСЕХ классов, не только топ K.
+             * Помогает найти почему нужный класс не попадает в топ.
+             */
+            get("/debug/stage1") {
+                val query = call.request.queryParameters["query"]
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, "query param required")
+                val topK = call.request.queryParameters["top_k"]?.toIntOrNull() ?: 20
+                val filterName = call.request.queryParameters["class"]
+
+                val allMetadata = db.getAllClassMetadata()
+                val metadataVectors = db.getAllMetadataVectors()
+                val queryVector = embeddingProvider.embed(query)
+                val vectorMap = metadataVectors.toMap()
+
+                val queryTokens = query
+                    .replace(Regex("([a-z])([A-Z])"), "$1 $2")
+                    .lowercase()
+                    .split(Regex("[\\s\\-_.,:;()\\[\\]{}]+"))
+                    .filter { it.length > 2 }
+
+                data class Stage1Score(val className: String, val embScore: Double, val kwBoost: Double, val exactBoost: Double, val total: Double, val hasVector: Boolean, val isOrphan: Boolean)
+
+                val allChunkClassNames = db.getAllVectors("structural").map { it.first }.let { chunks ->
+                    chunks.mapNotNull { it.declarationName }.toSet() + chunks.map { it.fileName.removeSuffix(".kt") }.toSet()
+                }
+
+                val scored = allMetadata.map { meta ->
+                    val vector = vectorMap[meta.className]
+                    val embScore = if (vector != null) VectorMath.cosineSimilarity(queryVector, vector).toDouble() else 0.0
+                    val kwScore = if (queryTokens.isNotEmpty()) {
+                        val searchText = buildString {
+                            append(meta.responsibility); append(" ")
+                            append(meta.domainTags.joinToString(" ")); append(" ")
+                            append(meta.className); append(" ")
+                            append(meta.keyMethods.joinToString(" ") { it.name + " " + it.description })
+                        }.lowercase()
+                        queryTokens.count { token -> searchText.contains(token) }.toDouble() / queryTokens.size
+                    } else 0.0
+                    val kwBoost = minOf(kwScore * 0.2, 0.2)
+                    val exactBoost = if (meta.className.equals(query.trim(), ignoreCase = true)) 1.0 else 0.0
+                    val isOrphan = meta.className !in allChunkClassNames
+                    Stage1Score(meta.className, embScore, kwBoost, exactBoost, embScore + kwBoost + exactBoost, vector != null, isOrphan)
+                }
+
+                val filtered = if (filterName != null) scored.filter { it.className.contains(filterName, ignoreCase = true) }
+                               else scored
+
+                val top = filtered.sortedByDescending { it.total }.take(topK)
+                val all = filtered.sortedByDescending { it.total }
+
+                val text = buildString {
+                    appendLine("# Debug Stage 1: query=\"$query\"")
+                    appendLine("top_k=$topK  total_metadata=${allMetadata.size}  tokens=$queryTokens")
+                    appendLine()
+                    appendLine("## Top $topK classes")
+                    top.forEachIndexed { i, s ->
+                        val flags = buildString {
+                            if (!s.hasVector) append(" ✗vec")
+                            if (s.isOrphan) append(" ⚠orphan")
+                            if (s.exactBoost > 0) append(" ★exact")
+                        }
+                        appendLine("  [$i] total=${"%.4f".format(s.total)}  emb=${"%.4f".format(s.embScore)}  kw=${"%.4f".format(s.kwBoost)}  exact=${"%.1f".format(s.exactBoost)}  — ${s.className}$flags")
+                    }
+                    if (filterName != null) {
+                        appendLine()
+                        appendLine("## All matching \"$filterName\" (rank in full list)")
+                        all.forEachIndexed { i, s ->
+                            val rank = scored.sortedByDescending { it.total }.indexOfFirst { it.className == s.className }
+                            val flags = buildString {
+                                if (s.isOrphan) append(" ⚠orphan")
+                                if (s.exactBoost > 0) append(" ★exact")
+                            }
+                            appendLine("  rank=$rank  total=${"%.4f".format(s.total)}  emb=${"%.4f".format(s.embScore)}  kw=${"%.4f".format(s.kwBoost)}  exact=${"%.1f".format(s.exactBoost)}  — ${s.className}$flags")
+                        }
+                    }
+                }
+                call.respondText(text)
+            }
+
+            // ─── /runtest /evaluate ───────────────────────────────────────────────
 
             post("/runtest/save") {
                 val request = runCatching { call.receive<RuntestSaveRequest>() }.getOrElse {

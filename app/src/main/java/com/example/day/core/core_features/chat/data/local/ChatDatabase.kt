@@ -70,7 +70,7 @@ import com.example.day.core.core_features.reminder.data.local.model.ReminderEnti
         GitFileCacheEntity::class,
         FileAnalysisEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 internal abstract class ChatDatabase : RoomDatabase() {

@@ -6,13 +6,16 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 class MarkdownChunkingStrategyTest {
+    private val codePath = "/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/app/src/main/java/com/example/day"
+    
     private val fileStrategy = MarkdownChunkingStrategy(
-        maxChunkSize = 2000
+        maxChunkSize = 2000,
+        codePath = codePath
     )
 
     @Test
     fun test1() {
-        testChunkFile("/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/rag-server/data/test_classes/ai/koog/agents/core/feature/FEATURES.md")
+        testChunkFile("/Users/samtakot/devs/learnings/aiadvent/day1/androidprj/aac-day1_kimi/app/src/main/java/com/example/day/core/core_features/memory/Module.md")
     }
 
     fun testChunkFile(filePath: String) {

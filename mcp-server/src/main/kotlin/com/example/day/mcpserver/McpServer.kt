@@ -54,7 +54,8 @@ fun main() {
         )
     )
 
-    registerMcpTools(server, githubClient)
+    val projectPath = System.getenv("GIT_PROJECT_PATH") ?: "."
+    registerMcpTools(server, githubClient, projectPath)
 
     embeddedServer(Netty, port = ServerConstants.DEFAULT_PORT, host = "0.0.0.0") {
         install(ContentNegotiation) { json(json) }

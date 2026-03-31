@@ -11,12 +11,13 @@ internal const val DEFAULT_MAX_CHUNK_SIZE = 2000
 class LanguageAwareChunker(
     private val useAst: Boolean,
     private val maxChunkSize: Int = DEFAULT_MAX_CHUNK_SIZE,
+    private val codePath: String? = null,
 ) : ChunkingStrategy {
 
     override val strategyName = "structural"
 
     private val astStrategy by lazy { AstChunkingStrategy.create(maxChunkSize) }
-    private val markdownStrategy = MarkdownChunkingStrategy(maxChunkSize)
+    private val markdownStrategy = MarkdownChunkingStrategy(maxChunkSize, codePath)
     private val legacyStrategy = StructuralStrategy(maxChunkSize)
     private val fixedFallback = FixedSizeStrategy(maxChunkSize, maxChunkSize / 5)
 

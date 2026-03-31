@@ -184,6 +184,12 @@ class CodeDatabase(private val dbPath: String) {
         }
     }
 
+    fun deleteClassMetadata(classNames: List<String>): Int = transaction {
+        val deleted = ClassMetadataTable.deleteWhere { className inList classNames }
+        ClassMetadataVectorsTable.deleteWhere { ClassMetadataVectorsTable.className inList classNames }
+        deleted
+    }
+
     fun getClassMetadata(name: String): ClassMetadata? = transaction {
         ClassMetadataTable.selectAll()
             .where { ClassMetadataTable.className eq name }
@@ -238,6 +244,41 @@ class CodeDatabase(private val dbPath: String) {
             val vector = row[ClassMetadataVectorsTable.vector].bytes.toFloatArray2()
             name to vector
         }
+    }
+
+    // --- Debug / диагностика ---
+
+    /** Количество чанков по каждому файлу для заданной стратегии. */
+    fun getChunkCountsByFile(strategy: String): Map<String, Int> = transaction {
+        CodeChunksTable
+            .selectAll()
+            .where { CodeChunksTable.strategy eq strategy }
+            .map { it[CodeChunksTable.fileName] }
+            .groupingBy { it }
+            .eachCount()
+    }
+
+    /** Все чанки (без векторов) для конкретного файла. */
+    fun getChunksByFileName(fileName: String, strategy: String): List<ChunkEntity> = transaction {
+        CodeChunksTable.selectAll()
+            .where { (CodeChunksTable.fileName eq fileName) and (CodeChunksTable.strategy eq strategy) }
+            .map { row ->
+                ChunkEntity(
+                    id = row[CodeChunksTable.id],
+                    content = row[CodeChunksTable.content],
+                    filePath = row[CodeChunksTable.filePath],
+                    fileName = row[CodeChunksTable.fileName],
+                    packageName = row[CodeChunksTable.packageName],
+                    declarationName = row[CodeChunksTable.declarationName],
+                    parentScope = row[CodeChunksTable.parentScope],
+                    contextPath = row[CodeChunksTable.contextPath],
+                    startLine = row[CodeChunksTable.startLine],
+                    nodeType = row[CodeChunksTable.nodeType],
+                    strategy = row[CodeChunksTable.strategy],
+                    chunkOrder = row[CodeChunksTable.chunkOrder],
+                    indexedAt = row[CodeChunksTable.indexedAt],
+                )
+            }
     }
 
     // --- Статистика ---

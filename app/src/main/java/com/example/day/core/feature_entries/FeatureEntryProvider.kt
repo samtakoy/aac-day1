@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.example.day.features.chats.api.ChatsFeatureEntry
 import com.example.day.features.console.api.AgentsConsoleFeatureEntry
+import com.example.day.features.console.api.AssistantConsoleFeatureEntry
 import com.example.day.features.console.api.ConsoleFeatureEntry
 import com.example.day.features.console.api.PlannerConsoleFeatureEntry
 import com.example.day.features.console.api.RagConsoleFeatureEntry
@@ -29,4 +30,6 @@ interface FeatureEntryProvider {
     fun getMcpSettingsFeatureEntry(): McpSettingsFeatureEntry
     @Stable
     fun getRagConsoleFeatureEntry(): RagConsoleFeatureEntry
+    @Stable
+    fun getAssistantConsoleFeatureEntry(): AssistantConsoleFeatureEntry
 }

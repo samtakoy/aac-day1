@@ -12,6 +12,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import java.util.concurrent.TimeUnit
 
 object GitHubToolNames {
     const val GET_ISSUE = "get_issue"
@@ -24,6 +25,8 @@ object GitHubToolNames {
     const val GET_GIT_FILE_LIST = "get_git_file_list"
     const val GET_FILE_CONTENT = "get_file_content"
     const val RESET_GIT_FILE_LIST_CACHE = "reset_git_file_list_cache"
+    // Day 31: Developer assistant
+    const val GET_CURRENT_GIT_BRANCH = "get_current_git_branch"
 }
 
 object GitHubToolDefaults {
@@ -32,7 +35,7 @@ object GitHubToolDefaults {
     const val DEFAULT_PAGE = 1
 }
 
-fun registerMcpTools(server: Server, api: GitHubApiClient) {
+fun registerMcpTools(server: Server, api: GitHubApiClient, projectPath: String) {
     registerEcho(server)
     registerGetIssue(server, api)
     registerListIssues(server, api)
@@ -44,6 +47,8 @@ fun registerMcpTools(server: Server, api: GitHubApiClient) {
     registerGetGitFileList(server, api)
     registerGetFileContent(server, api)
     registerResetGitFileListCache(server, api)
+    // Day 31: Developer assistant
+    registerGetCurrentGitBranch(server, projectPath)
 }
 
 private fun registerEcho(server: Server) {
@@ -334,5 +339,44 @@ private fun registerResetGitFileListCache(server: Server, @Suppress("UNUSED_PARA
             put("content", JsonArray(emptyList()))
         }
         CallToolResult(content = listOf(TextContent(text = responseJson.toString())))
+    }
+}
+
+private fun registerGetCurrentGitBranch(server: Server, projectPath: String) {
+    server.addTool(
+        name = GitHubToolNames.GET_CURRENT_GIT_BRANCH,
+        description = "Возвращает текущую ветку git-репозитория проекта",
+        inputSchema = ToolSchema(properties = buildJsonObject {})
+    ) { _ ->
+        try {
+            val process = ProcessBuilder("git", "-C", projectPath, "branch", "--show-current").start()
+            val completed = process.waitFor(5, TimeUnit.SECONDS)
+
+            if (!completed) {
+                process.destroyForcibly()
+                return@addTool CallToolResult(
+                    content = listOf(TextContent(text = "Timeout: git не ответил за 5 секунд")),
+                    isError = true
+                )
+            }
+
+            val branchName = process.inputStream.bufferedReader().readText().trim()
+            val exitValue = process.exitValue()
+
+            if (exitValue != 0 || branchName.isBlank()) {
+                val errorText = process.errorStream.bufferedReader().readText().trim()
+                return@addTool CallToolResult(
+                    content = listOf(TextContent(text = "Не удалось получить ветку: $errorText")),
+                    isError = true
+                )
+            }
+
+            CallToolResult(content = listOf(TextContent(text = branchName)))
+        } catch (e: Exception) {
+            CallToolResult(
+                content = listOf(TextContent(text = e.message ?: "Unknown error")),
+                isError = true
+            )
+        }
     }
 }

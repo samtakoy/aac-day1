@@ -4,13 +4,15 @@ import com.example.day.ragserver.db.ClassMetadata
 import com.example.day.ragserver.db.CodeDatabase
 import com.example.day.ragserver.db.SearchResult
 import com.example.day.ragserver.embedding.EmbeddingProvider
+import com.example.day.ragserver.logging.SessionLogger
 
 class TwoStageSearchService(
     private val db: CodeDatabase,
     private val embeddingProvider: EmbeddingProvider,
+    private val sessionLogger: SessionLogger? = null,
 ) {
     companion object {
-        const val COARSE_TOP_K = 5
+        const val COARSE_TOP_K = 8
         const val DRILL_DOWN_PER_CLASS = 3
 
         // Максимальный вклад keyword-буста в Stage 1.
@@ -19,31 +21,50 @@ class TwoStageSearchService(
     }
 
     suspend fun search(query: String, topK: Int): List<SearchResult> {
-        val stats = db.getStats()
-        println("[TwoStage] DB stats: total=${stats.totalChunks}, structural=${stats.structuralChunks}, fixed=${stats.fixedChunks}, metadata=${db.getAllClassMetadata().size}, metadataVectors=${db.getAllMetadataVectors().size}")
-
         val allMetadata = db.getAllClassMetadata()
+        val metadataVectors = db.getAllMetadataVectors()
         val queryVector = embeddingProvider.embed(query)
+
+        println("[TwoStage] DB stats: structural=${db.getStats().structuralChunks}, metadata=${allMetadata.size}, metadataVectors=${metadataVectors.size}")
 
         if (allMetadata.isEmpty()) {
             println("[TwoStage] No class metadata — falling back to standard search")
             val fallbackResults = standardSearch(queryVector, topK)
-            println("[TwoStage] standardSearch returned ${fallbackResults.size} chunks, strategies: ${fallbackResults.map { it.chunk.strategy }.distinct()}")
+            println("[TwoStage] standardSearch returned ${fallbackResults.size} chunks")
+            sessionLogger?.logTwoStageSearch(
+                query = query,
+                metadataCount = 0,
+                metadataVectorCount = 0,
+                fallback = true,
+                stage1Classes = emptyList(),
+                stage2Details = emptyList(),
+                finalChunks = fallbackResults.map { "${it.chunk.fileName}:${it.chunk.startLine} ${it.chunk.declarationName ?: ""}" to it.score.toDouble() },
+            )
             return fallbackResults
         }
 
-        val relevantClasses = findRelevantClasses(query, queryVector, allMetadata)
+        val stage1WithScores = findRelevantClassesWithScores(query, queryVector, allMetadata, metadataVectors)
+        val relevantClasses = stage1WithScores.map { (meta, _) -> meta }
         println("[TwoStage] Stage 1: ${relevantClasses.size} classes: ${relevantClasses.map { it.className }}")
 
         if (relevantClasses.isEmpty()) {
             println("[TwoStage] Stage 1 returned 0 classes — falling back to standard search")
             val fallbackResults = standardSearch(queryVector, topK)
-            println("[TwoStage] standardSearch returned ${fallbackResults.size} chunks, strategies: ${fallbackResults.map { it.chunk.strategy }.distinct()}")
+            println("[TwoStage] standardSearch returned ${fallbackResults.size} chunks")
+            sessionLogger?.logTwoStageSearch(
+                query = query,
+                metadataCount = allMetadata.size,
+                metadataVectorCount = metadataVectors.size,
+                fallback = true,
+                stage1Classes = emptyList(),
+                stage2Details = emptyList(),
+                finalChunks = fallbackResults.map { "${it.chunk.fileName}:${it.chunk.startLine} ${it.chunk.declarationName ?: ""}" to it.score.toDouble() },
+            )
             return fallbackResults
         }
 
-        val results = drillDown(queryVector, relevantClasses)
-        println("[TwoStage] Stage 2: ${results.size} chunks found, strategies: ${results.map { it.chunk.strategy }.distinct()}")
+        val (results, stage2Details) = drillDownWithDetails(queryVector, relevantClasses)
+        println("[TwoStage] Stage 2: ${results.size} chunks found")
 
         val final = results
             .distinctBy { it.chunk.id }
@@ -51,52 +72,50 @@ class TwoStageSearchService(
             .take(topK)
         println("[TwoStage] Final: ${final.size} chunks")
         final.forEachIndexed { i, r ->
-            println("[TwoStage]   [$i] score=${r.score} strategy=${r.chunk.strategy} file=${r.chunk.fileName} decl=${r.chunk.declarationName} content_preview=${r.chunk.content.take(60).replace('\n', ' ')}")
+            println("[TwoStage]   [$i] score=${r.score} file=${r.chunk.fileName} decl=${r.chunk.declarationName} preview=${r.chunk.content.take(60).replace('\n', ' ')}")
         }
+
+        sessionLogger?.logTwoStageSearch(
+            query = query,
+            metadataCount = allMetadata.size,
+            metadataVectorCount = metadataVectors.size,
+            fallback = false,
+            stage1Classes = stage1WithScores.map { (meta, score) -> meta.className to score },
+            stage2Details = stage2Details,
+            finalChunks = final.map { "${it.chunk.fileName}:${it.chunk.startLine} ${it.chunk.declarationName ?: ""}" to it.score.toDouble() },
+        )
         return final
     }
 
     /**
      * Stage 1: выбираем наиболее релевантные классы по их метаданным.
-     *
-     * Если в БД есть векторы метаданных — используем embedding similarity как основной сигнал,
-     * дополняя keyword-бустом для точных совпадений имён классов/методов.
-     *
-     * Fallback на чистый keyword-поиск если векторы ещё не сгенерированы
-     * (например, при первом запуске до индексации метаданных).
+     * Возвращает пары (ClassMetadata, finalScore) для логирования.
      */
-    private suspend fun findRelevantClasses(
+    private fun findRelevantClassesWithScores(
         query: String,
         queryVector: FloatArray,
         allMetadata: List<ClassMetadata>,
-    ): List<ClassMetadata> {
-        val metadataVectors = db.getAllMetadataVectors()
-
+        metadataVectors: List<Pair<String, FloatArray>>,
+    ): List<Pair<ClassMetadata, Double>> {
         return if (metadataVectors.isNotEmpty()) {
-            findRelevantClassesByEmbedding(queryVector, allMetadata, metadataVectors, tokenize(query))
+            findRelevantClassesByEmbeddingWithScores(queryVector, allMetadata, metadataVectors, tokenize(query), query)
         } else {
             println("[TwoStage] No metadata vectors — using keyword-only Stage 1")
-            findRelevantClassesByKeyword(query, allMetadata)
+            findRelevantClassesByKeywordWithScores(query, allMetadata)
         }
     }
 
     /**
      * Embedding-based Stage 1 (основной путь).
-     *
      * Score = embeddingScore + min(keywordScore * KEYWORD_BOOST_MAX, KEYWORD_BOOST_MAX)
-     *
-     * Логика буста:
-     * - Русский запрос → keywordScore = 0 → score = embeddingScore. Корректно.
-     * - Английский запрос с точным именем класса → keyword даёт буст до +0.2.
-     *   Это важно когда пользователь знает имя класса и хочет точное попадание.
-     * - Буст ограничен KEYWORD_BOOST_MAX — семантика всегда управляет рейтингом.
      */
-    private fun findRelevantClassesByEmbedding(
+    private fun findRelevantClassesByEmbeddingWithScores(
         queryVector: FloatArray,
         allMetadata: List<ClassMetadata>,
         metadataVectors: List<Pair<String, FloatArray>>,
         queryTokens: List<String> = emptyList(),
-    ): List<ClassMetadata> {
+        rawQuery: String = "",
+    ): List<Pair<ClassMetadata, Double>> {
         val vectorMap = metadataVectors.toMap()
 
         return allMetadata
@@ -104,33 +123,31 @@ class TwoStageSearchService(
                 val vector = vectorMap[meta.className] ?: return@mapNotNull null
                 val embScore = VectorMath.cosineSimilarity(queryVector, vector).toDouble()
 
-                // Keyword буст: усиливает точные совпадения имён, не перекрывает семантику
                 val kwBoost = if (queryTokens.isNotEmpty()) {
                     val kwScore = computeKeywordScore(queryTokens, meta)
                     minOf(kwScore * KEYWORD_BOOST_MAX, KEYWORD_BOOST_MAX)
                 } else 0.0
 
-                val finalScore = embScore + kwBoost
+                // Exact class name match — query is "AIAgent" and class is "AIAgent".
+                // Overcomes the embedding pollution from many similarly-named library classes.
+                val exactBoost = if (rawQuery.isNotEmpty() && meta.className.equals(rawQuery.trim(), ignoreCase = true)) 1.0 else 0.0
 
-                // Минимальный порог по embedding — отсекаем заведомо нерелевантные классы
+                val finalScore = embScore + kwBoost + exactBoost
                 if (embScore > 0.1) meta to finalScore else null
             }
             .sortedByDescending { (_, score) -> score }
             .take(COARSE_TOP_K)
-            .map { (meta, _) -> meta }
     }
 
     /**
      * Keyword-only Stage 1 (fallback если metadata vectors не сгенерированы).
-     * Поиск по responsibility + domainTags + className + keyMethods.
-     * Эффективен только для английских запросов с точными именами.
      */
-    private fun findRelevantClassesByKeyword(
+    private fun findRelevantClassesByKeywordWithScores(
         query: String,
         allMetadata: List<ClassMetadata>,
-    ): List<ClassMetadata> {
+    ): List<Pair<ClassMetadata, Double>> {
         val queryTokens = tokenize(query)
-        if (queryTokens.isEmpty()) return allMetadata.take(COARSE_TOP_K)
+        if (queryTokens.isEmpty()) return allMetadata.take(COARSE_TOP_K).map { it to 0.0 }
 
         return allMetadata
             .mapNotNull { meta ->
@@ -139,7 +156,6 @@ class TwoStageSearchService(
             }
             .sortedByDescending { (_, score) -> score }
             .take(COARSE_TOP_K)
-            .map { (meta, _) -> meta }
     }
 
     // Считает долю токенов запроса, найденных в текстовых полях метаданных класса
@@ -159,14 +175,16 @@ class TwoStageSearchService(
 
     /**
      * Stage 2: embedding-поиск по чанкам внутри отобранных классов.
+     * Возвращает результаты + детали для логирования.
      */
-    private fun drillDown(
+    private fun drillDownWithDetails(
         queryVector: FloatArray,
         relevantClasses: List<ClassMetadata>,
-    ): List<SearchResult> {
+    ): Pair<List<SearchResult>, List<SessionLogger.Stage2ChunkDetail>> {
         val allStructural = db.getAllVectors("structural")
         println("[TwoStage] drillDown: allStructural=${allStructural.size} chunks")
         val results = mutableListOf<SearchResult>()
+        val details = mutableListOf<SessionLogger.Stage2ChunkDetail>()
         val keyMethodNames = relevantClasses.flatMap { it.keyMethods }.map { it.name.lowercase() }.toSet()
 
         for (classMeta in relevantClasses) {
@@ -175,13 +193,17 @@ class TwoStageSearchService(
                     chunk.declarationName?.equals(classMeta.className, ignoreCase = true) == true ||
                     chunk.parentScope?.contains(classMeta.className, ignoreCase = true) == true
             }
+            // Soft-match only when className is a specific enough identifier (length >= 6).
+            // Short names like "Failure", "Error" match too many unrelated chunks.
             val classChunks = exactMatch.ifEmpty {
-                // Soft match: имя класса встречается где-то в содержимом чанка
-                allStructural.filter { (chunk, _) ->
-                    chunk.content.contains(classMeta.className)
-                }
+                if (classMeta.className.length >= 6) {
+                    allStructural.filter { (chunk, _) ->
+                        chunk.content.contains(classMeta.className)
+                    }
+                } else emptyList()
             }
-            println("[TwoStage]   class=${classMeta.className} exactMatch=${exactMatch.size} softMatch=${if (exactMatch.isEmpty()) classChunks.size else 0} total=${classChunks.size}")
+            val softMatchCount = if (exactMatch.isEmpty()) classChunks.size else 0
+            println("[TwoStage]   class=${classMeta.className} exactMatch=${exactMatch.size} softMatch=$softMatchCount total=${classChunks.size}")
 
             val scored = classChunks
                 .map { (chunk, vector) ->
@@ -193,9 +215,15 @@ class TwoStageSearchService(
                 .take(DRILL_DOWN_PER_CLASS)
 
             results.addAll(scored)
+            details.add(SessionLogger.Stage2ChunkDetail(
+                className = classMeta.className,
+                exactMatches = exactMatch.size,
+                softMatches = softMatchCount,
+                topChunks = scored.map { Triple(it.chunk.fileName, it.chunk.startLine, it.score.toDouble()) },
+            ))
         }
 
-        return results
+        return results to details
     }
 
     private fun standardSearch(queryVector: FloatArray, topK: Int): List<SearchResult> {

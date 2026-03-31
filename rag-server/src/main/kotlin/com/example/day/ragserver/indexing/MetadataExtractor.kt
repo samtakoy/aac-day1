@@ -45,7 +45,7 @@ class MetadataExtractor(
           If file contains nested/helper classes, describe the primary class only.
           If class name is unclear — infer responsibility from the name.
         - dependencies: real class names from constructors, properties, function params
-        - key_methods: methods actually present in the primary class, max 5
+        - key_methods: ONLY functions/methods (fun keyword) actually present in the primary class (NOT properties, NOT val/var fields.), max 5
           - name: method name only, no parentheses
           - description: one sentence, max 10 words
           - params: parameter list as "name: Type, name: Type" or null if no params

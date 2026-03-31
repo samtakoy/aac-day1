@@ -29,6 +29,7 @@ import com.example.day.features.console.impl.ui.components.LongTermFactItem
 import com.example.day.features.console.impl.ui.components.MemoryInspectorUiModel
 import com.example.day.features.console.impl.ui.components.ShortTermMemoryItem
 import com.example.day.features.console.impl.ui.delegates.AgentsTalkDelegate
+import com.example.day.features.console.impl.ui.delegates.AssistantTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.LlmTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.PlannerTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.PlannerUiEvent
@@ -466,6 +467,34 @@ internal class ConsoleViewModelImpl(
         private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
         private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
         private val talkDelegate: RagTalkDelegate,
+        private val getChatByIdAsFlowUseCase: GetChatByIdAsFlowUseCase,
+        private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
+        private val updateChatTitleUseCase: UpdateChatTitleUseCase,
+        private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
+        private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
+    ) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+            val chatId = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
+            return ConsoleViewModelImpl(
+                getMessagesUseCase,
+                clearUnviewedUseCase,
+                talkDelegate,
+                getChatByIdAsFlowUseCase,
+                updateChatSettingsUseCase,
+                updateChatTitleUseCase,
+                createPlannerStageChatUseCase,
+                handleMessageButtonClickUseCase,
+                getLtmByGroupUseCase = null,
+                artifactRepository = null,
+                chatId = chatId
+            ) as T
+        }
+    }
+
+    class AssistantFactory @Inject constructor(
+        private val getMessagesUseCase: GetChatMessagesAsFlowUseCase,
+        private val clearUnviewedUseCase: ClearChatNotViewedMessageUseCase,
+        private val talkDelegate: AssistantTalkDelegate,
         private val getChatByIdAsFlowUseCase: GetChatByIdAsFlowUseCase,
         private val updateChatSettingsUseCase: UpdateChatSettingsUseCase,
         private val updateChatTitleUseCase: UpdateChatTitleUseCase,

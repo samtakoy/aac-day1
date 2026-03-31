@@ -8,11 +8,13 @@ import com.example.day.ragserver.embedding.EmbeddingProvider
 import com.example.day.ragserver.indexing.chunking.FixedSizeStrategy
 import com.example.day.ragserver.indexing.chunking.LanguageAwareChunker
 import com.example.day.ragserver.indexing.chunking.ast.KotlinTypeExtractor
+import com.example.day.ragserver.logging.SessionLogger
 
 class IndexingService(
     private val db: CodeDatabase,
     private val embeddingProvider: EmbeddingProvider,
     private val llmProvider: LlmProvider? = null,
+    private val sessionLogger: SessionLogger? = null,
 ) {
     private val metadataExtractor = llmProvider?.let { MetadataExtractor(it) }
 
@@ -20,7 +22,7 @@ class IndexingService(
         val files = scanner.scan(config.codePath)
         val strategies = listOf(
             FixedSizeStrategy(),
-            LanguageAwareChunker(useAst = config.useAstChunking),
+            LanguageAwareChunker(useAst = config.useAstChunking, codePath = config.codePath),
         )
         for (strategy in strategies) {
             indexStrategy(strategy, files, config.forceReindex)
@@ -64,6 +66,24 @@ class IndexingService(
             }
 
             val chunks = strategy.split(content, file.absolutePath, file.name)
+
+            // Логируем чанки файла для диагностики индексации
+            if (sessionLogger != null && chunks.isNotEmpty()) {
+                sessionLogger.logIndexingFile(
+                    fileName = file.name,
+                    filePath = file.absolutePath,
+                    strategy = name,
+                    chunks = chunks.map { c ->
+                        SessionLogger.IndexedChunkLog(
+                            declarationName = c.declarationName,
+                            parentScope = c.parentScope,
+                            nodeType = c.nodeType,
+                            startLine = c.startLine,
+                            contentLength = c.content.length,
+                        )
+                    },
+                )
+            }
 
             for (chunk in chunks) {
                 val embedding = try {
@@ -113,8 +133,14 @@ class IndexingService(
                     println("  [Metadata] Skipping '$declaration' — already indexed")
                     continue
                 }
-                val metadata = metadataExtractor!!.extract(content, declaration, packageName)
-                if (metadata == null) { totalErrors++; continue }
+                val rawMetadata = metadataExtractor!!.extract(content, declaration, packageName)
+                if (rawMetadata == null) { totalErrors++; continue }
+                // Enforce className = declaration regardless of what LLM returned.
+                // LLM sometimes hallucinates library class names (ai.koog.*) or common words.
+                val metadata = if (rawMetadata.className != declaration) {
+                    println("  [Metadata] WARN: LLM returned className='${rawMetadata.className}' for '$declaration', overriding")
+                    rawMetadata.copy(className = declaration)
+                } else rawMetadata
                 db.saveClassMetadata(metadata, file.absolutePath)
                 totalProcessed++
             }
@@ -152,9 +178,20 @@ class IndexingService(
         println("[Metadata] Phase B done — dependency graph built for ${dependencyMap.size} classes")
 
         // Phase C: enrich with usedBy + generate composite embeddings
+        // Пропускаем классы у которых usedBy не изменился и вектор уже есть.
         var embeddingErrors = 0
+        var skipped = 0
         for ((metadata, filePath) in db.getAllClassMetadataWithPaths()) {
-            val enriched = metadata.copy(usedBy = usedByMap[metadata.className] ?: emptyList())
+            val newUsedBy = usedByMap[metadata.className] ?: emptyList()
+            val usedByChanged = metadata.usedBy.toSet() != newUsedBy.toSet()
+            val hasVector = db.hasMetadataVector(metadata.className)
+
+            if (!forceReindex && hasVector && !usedByChanged) {
+                skipped++
+                continue
+            }
+
+            val enriched = metadata.copy(usedBy = newUsedBy)
             db.saveClassMetadata(enriched, filePath)
             try {
                 val vector = embeddingProvider.embed(enriched.toEmbeddingText())
@@ -164,6 +201,6 @@ class IndexingService(
                 embeddingErrors++
             }
         }
-        println("[Metadata] Phase C done — embeddings generated, $embeddingErrors errors")
+        println("[Metadata] Phase C done — skipped=$skipped, errors=$embeddingErrors")
     }
 }

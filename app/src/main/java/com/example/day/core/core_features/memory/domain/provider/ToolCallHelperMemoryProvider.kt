@@ -9,6 +9,7 @@ import javax.inject.Inject
 class ToolCallHelperMemoryProvider @Inject constructor() : MemoryProvider {
     override suspend fun getMemoryContext(): List<AContextMessage> {
         val currentTime = ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+        // return listOf()
         return listOf(
             AContextMessage(
                 role = AContextMessage.Role.SYSTEM,

@@ -3,6 +3,7 @@ package com.example.day.features.console.impl.di
 import com.example.day.core.core_features.agent.domain.usecase.GetAgentContextUseCase
 import com.example.day.core.core_features.memory.domain.repository.LongTermMemoryRepository
 import com.example.day.core.core_features.agent.domain.utils.ConsumptionCalculator
+import com.example.day.core.core_features.agent.domain.workers.concrete.AssistantWorker
 import com.example.day.core.core_features.agent.domain.workers.concrete.CompareWorker
 import com.example.day.core.core_features.agent.domain.workers.concrete.PromptWorker
 import com.example.day.core.core_features.agent.domain.workers.concrete.RagWorker
@@ -57,6 +58,8 @@ interface ConsoleFeatureDeps {
     val taskWorker: TaskWorker
     // RAG context chat dependencies
     val ragWorker: RagWorker
+    // Assistant chat dependencies
+    val assistantWorker: AssistantWorker
     val longTermMemoryRepository: LongTermMemoryRepository
     val artifactRepository: ArtifactRepository
     val chatTools: ChatTools
