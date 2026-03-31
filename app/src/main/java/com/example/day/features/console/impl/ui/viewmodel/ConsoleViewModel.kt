@@ -62,5 +62,8 @@ internal interface ConsoleViewModel {
 
         // Button click in chat message
         class ChatButtonClick(val messageId: Long, val action: String) : Event
+
+        // PR Monitoring toggle
+        class HandlePrToggled(val isEnabled: Boolean) : Event
     }
 }

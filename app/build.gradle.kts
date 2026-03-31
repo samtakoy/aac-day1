@@ -33,6 +33,12 @@ android {
 
         // Создаем поле в BuildConfig
         buildConfigField("String", "LLM_API_KEY", "\"$apiKey\"")
+
+        val telegramBotToken = localProperties.getProperty("TELEGRAM_BOT_TOKEN") ?: ""
+        buildConfigField("String", "TELEGRAM_BOT_TOKEN", "\"$telegramBotToken\"")
+
+        val telegramChatId = localProperties.getProperty("TELEGRAM_CHAT_ID") ?: ""
+        buildConfigField("String", "TELEGRAM_CHAT_ID", "\"$telegramChatId\"")
     }
 
     buildTypes {

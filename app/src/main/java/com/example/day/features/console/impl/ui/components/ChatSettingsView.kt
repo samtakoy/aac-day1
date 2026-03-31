@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,6 +39,7 @@ fun ChatSettingsView(
     state: ChatSettingsUiModel,
     onSubmit: (chatTitle: String, ChatSettings) -> Unit,
     onCancel: () -> Unit,
+    onHandlePrToggle: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     colors: ChatColorScheme = LocalChatColorScheme.current
 ) {
@@ -109,6 +111,33 @@ fun ChatSettingsView(
                 modifier = Modifier.fillMaxWidth(),
                 colors = colors
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // PR Monitoring toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Мониторинг PR",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Автоматическое ревью Pull Request-ов",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = state.handlePr,
+                    onCheckedChange = onHandlePrToggle
+                )
+            }
         }
 
         // Fixed buttons at the bottom

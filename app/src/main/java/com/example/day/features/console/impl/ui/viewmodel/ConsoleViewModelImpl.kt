@@ -28,6 +28,8 @@ import com.example.day.features.console.impl.ui.components.ChatSettingsUiModel
 import com.example.day.features.console.impl.ui.components.LongTermFactItem
 import com.example.day.features.console.impl.ui.components.MemoryInspectorUiModel
 import com.example.day.features.console.impl.ui.components.ShortTermMemoryItem
+import com.example.day.core.core_features.pr_review.domain.usecase.GetPrHandleStateUseCase
+import com.example.day.core.core_features.pr_review.domain.usecase.SetPrHandleEnabledUseCase
 import com.example.day.features.console.impl.ui.delegates.AgentsTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.AssistantTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.LlmTalkDelegate
@@ -63,7 +65,9 @@ internal class ConsoleViewModelImpl(
     private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
     private val getLtmByGroupUseCase: GetLongTermMemoryByGroupUseCase?,
     private val artifactRepository: ArtifactRepository?,
-    private val chatId: Long
+    private val chatId: Long,
+    private val getPrHandleStateUseCase: GetPrHandleStateUseCase,
+    private val setPrHandleEnabledUseCase: SetPrHandleEnabledUseCase
 ) : ViewModel(), ConsoleViewModel {
 
     private val _state = MutableStateFlow(
@@ -80,6 +84,7 @@ internal class ConsoleViewModelImpl(
     private var chat: Chat? = null
     private var chatSettings: ChatSettings? = null
     private var currentLtmFacts: List<LongTermMemoryFact> = emptyList()
+    private var currentHandlePrForThisChat: Boolean = false
 
     private val _expandedStates = MutableStateFlow(persistentMapOf<Long, Boolean>())
     private val _markdownStates = MutableStateFlow(persistentMapOf<Long, Boolean>())
@@ -178,6 +183,24 @@ internal class ConsoleViewModelImpl(
                 }
             }
             ?.launchIn(viewModelScope)
+
+        // Subscribe to PR handle state — update handlePr in settings when settings panel is open
+        viewModelScope.launch {
+            getPrHandleStateUseCase().collect { prHandleState ->
+                val handlePrForThisChat = prHandleState.isEnabled && prHandleState.chatId == chatId
+                currentHandlePrForThisChat = handlePrForThisChat
+                _state.update { currentState ->
+                    val currentSettings = currentState.settings
+                    if (currentSettings != null) {
+                        currentState.copy(
+                            settings = currentSettings.copy(handlePr = handlePrForThisChat)
+                        )
+                    } else {
+                        currentState
+                    }
+                }
+            }
+        }
     }
 
     override fun getStateAsFlow(): StateFlow<ConsoleViewModel.State> = _state
@@ -249,7 +272,7 @@ internal class ConsoleViewModelImpl(
             ConsoleViewModel.Event.OpenSettingsClick -> {
                 chatSettings?.let { settings ->
                     _state.update {
-                        it.copy(settings = ChatSettingsUiModel("Настройки", chat?.title.orEmpty(), settings))
+                        it.copy(settings = ChatSettingsUiModel("Настройки", chat?.title.orEmpty(), settings, handlePr = currentHandlePrForThisChat))
                     }
                 }
             }
@@ -324,6 +347,13 @@ internal class ConsoleViewModelImpl(
                     talkDelegate.tryHandleAction(currentChat, event.messageId, event.action)
                 }
             }
+
+            is ConsoleViewModel.Event.HandlePrToggled -> {
+                viewModelScope.launch {
+                    val currentModelSettings = _state.value.settings?.settingsState?.model
+                    setPrHandleEnabledUseCase(event.isEnabled, chatId, currentModelSettings)
+                }
+            }
         }
     }
 
@@ -386,6 +416,8 @@ internal class ConsoleViewModelImpl(
         private val updateChatTitleUseCase: UpdateChatTitleUseCase,
         private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
         private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
+        private val getPrHandleStateUseCase: GetPrHandleStateUseCase,
+        private val setPrHandleEnabledUseCase: SetPrHandleEnabledUseCase,
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
             val id = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
@@ -400,7 +432,9 @@ internal class ConsoleViewModelImpl(
                 handleMessageButtonClickUseCase,
                 getLtmByGroupUseCase = null,
                 artifactRepository = null,
-                id
+                chatId = id,
+                getPrHandleStateUseCase = getPrHandleStateUseCase,
+                setPrHandleEnabledUseCase = setPrHandleEnabledUseCase
             ) as T
         }
     }
@@ -414,6 +448,8 @@ internal class ConsoleViewModelImpl(
         private val updateChatTitleUseCase: UpdateChatTitleUseCase,
         private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
         private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
+        private val getPrHandleStateUseCase: GetPrHandleStateUseCase,
+        private val setPrHandleEnabledUseCase: SetPrHandleEnabledUseCase,
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
             val chatId = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
@@ -428,7 +464,9 @@ internal class ConsoleViewModelImpl(
                 handleMessageButtonClickUseCase,
                 getLtmByGroupUseCase = null,
                 artifactRepository = null,
-                chatId = chatId
+                chatId = chatId,
+                getPrHandleStateUseCase = getPrHandleStateUseCase,
+                setPrHandleEnabledUseCase = setPrHandleEnabledUseCase
             ) as T
         }
     }
@@ -444,6 +482,8 @@ internal class ConsoleViewModelImpl(
         private val getLtmByGroupUseCase: GetLongTermMemoryByGroupUseCase,
         private val artifactRepository: ArtifactRepository,
         private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
+        private val getPrHandleStateUseCase: GetPrHandleStateUseCase,
+        private val setPrHandleEnabledUseCase: SetPrHandleEnabledUseCase,
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
             val chatId = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
@@ -458,7 +498,9 @@ internal class ConsoleViewModelImpl(
                 handleMessageButtonClickUseCase,
                 getLtmByGroupUseCase = getLtmByGroupUseCase,
                 artifactRepository = artifactRepository,
-                chatId = chatId
+                chatId = chatId,
+                getPrHandleStateUseCase = getPrHandleStateUseCase,
+                setPrHandleEnabledUseCase = setPrHandleEnabledUseCase
             ) as T
         }
     }
@@ -472,6 +514,8 @@ internal class ConsoleViewModelImpl(
         private val updateChatTitleUseCase: UpdateChatTitleUseCase,
         private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
         private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
+        private val getPrHandleStateUseCase: GetPrHandleStateUseCase,
+        private val setPrHandleEnabledUseCase: SetPrHandleEnabledUseCase,
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
             val chatId = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
@@ -486,7 +530,9 @@ internal class ConsoleViewModelImpl(
                 handleMessageButtonClickUseCase,
                 getLtmByGroupUseCase = null,
                 artifactRepository = null,
-                chatId = chatId
+                chatId = chatId,
+                getPrHandleStateUseCase = getPrHandleStateUseCase,
+                setPrHandleEnabledUseCase = setPrHandleEnabledUseCase
             ) as T
         }
     }
@@ -500,6 +546,8 @@ internal class ConsoleViewModelImpl(
         private val updateChatTitleUseCase: UpdateChatTitleUseCase,
         private val createPlannerStageChatUseCase: CreatePlannerStageChatUseCase,
         private val handleMessageButtonClickUseCase: HandleMessageButtonClickUseCase,
+        private val getPrHandleStateUseCase: GetPrHandleStateUseCase,
+        private val setPrHandleEnabledUseCase: SetPrHandleEnabledUseCase,
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
             val chatId = extras[CHAT_ID_KEY] ?: error("ID not found in extras")
@@ -514,7 +562,9 @@ internal class ConsoleViewModelImpl(
                 handleMessageButtonClickUseCase,
                 getLtmByGroupUseCase = null,
                 artifactRepository = null,
-                chatId = chatId
+                chatId = chatId,
+                getPrHandleStateUseCase = getPrHandleStateUseCase,
+                setPrHandleEnabledUseCase = setPrHandleEnabledUseCase
             ) as T
         }
     }

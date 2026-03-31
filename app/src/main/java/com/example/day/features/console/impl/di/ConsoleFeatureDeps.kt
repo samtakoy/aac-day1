@@ -30,6 +30,9 @@ import com.example.day.core.core_features.chat.domain.usecase.UpdateChatTitleUse
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.mcp.domain.repository.McpRepository
 import com.example.day.core.core_features.mcp.domain.tools.McpTools
+import com.example.day.core.core_features.pr_review.domain.usecase.GetPrHandleStateUseCase
+import com.example.day.core.core_features.pr_review.domain.usecase.SetPrHandleEnabledUseCase
+import com.example.day.core.core_features.pr_review.domain.usecase.StartPrReviewUseCase
 import kotlinx.serialization.json.Json
 
 interface ConsoleFeatureDeps {
@@ -44,7 +47,9 @@ interface ConsoleFeatureDeps {
     val createChatUseCase: CreateChatUseCase
     val getOrCreateChatUseCase: GetOrCreateChatUseCase
     val updateChatTitleUseCase: UpdateChatTitleUseCase
-    
+    fun getPrHandleStateUseCase(): GetPrHandleStateUseCase
+    fun setPrHandleEnabledUseCase(): SetPrHandleEnabledUseCase
+
     val worker0: RejectWorker
     val worker1: CompareWorker
     val worker2: SimpleWorker

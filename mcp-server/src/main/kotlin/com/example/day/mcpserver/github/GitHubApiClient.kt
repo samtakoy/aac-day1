@@ -11,6 +11,7 @@ import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.headers
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.request.url
@@ -24,6 +25,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -173,6 +175,93 @@ class GitHubApiClient(
         // GitHub добавляет переносы строк в base64 — убираем их
         val cleanBase64 = contentBase64.replace("\n", "").replace("\r", "")
         String(Base64.getDecoder().decode(cleanBase64), Charsets.UTF_8)
+    }
+
+    /**
+     * Получает информацию о Pull Request: метаданные + список изменённых файлов.
+     * @param repo в формате "owner/repo"
+     */
+    suspend fun getPrInfo(repo: String, prNumber: Int): String {
+        val prResponse = client.get("/repos/$repo/pulls/$prNumber").body<JsonObject>()
+        val filesResponse = client.get("/repos/$repo/pulls/$prNumber/files").body<JsonArray>()
+
+        val files = filesResponse.map { element ->
+            val obj = element.jsonObject
+            buildJsonObject {
+                put("path", JsonPrimitive(obj["filename"]?.jsonPrimitive?.content ?: ""))
+                put("status", JsonPrimitive(obj["status"]?.jsonPrimitive?.content ?: ""))
+                put("additions", JsonPrimitive(obj["additions"]?.jsonPrimitive?.intOrNull ?: 0))
+                put("deletions", JsonPrimitive(obj["deletions"]?.jsonPrimitive?.intOrNull ?: 0))
+            }
+        }
+
+        val result = buildJsonObject {
+            put("number", JsonPrimitive(prResponse["number"]?.jsonPrimitive?.intOrNull ?: prNumber))
+            put("title", JsonPrimitive(prResponse["title"]?.jsonPrimitive?.content ?: ""))
+            put("description", JsonPrimitive(prResponse["body"]?.jsonPrimitive?.content ?: ""))
+            put("state", JsonPrimitive(prResponse["state"]?.jsonPrimitive?.content ?: ""))
+            put("author", JsonPrimitive(prResponse["user"]?.jsonObject?.get("login")?.jsonPrimitive?.content ?: ""))
+            put("head_sha", JsonPrimitive(prResponse["head"]?.jsonObject?.get("sha")?.jsonPrimitive?.content ?: ""))
+            put("files", JsonArray(files))
+        }
+        return result.toString()
+    }
+
+    /**
+     * Получает полный unified diff Pull Request.
+     * @param repo в формате "owner/repo"
+     */
+    suspend fun getPrDiff(repo: String, prNumber: Int): String {
+        val response = client.get("/repos/$repo/pulls/$prNumber") {
+            headers {
+                remove(HttpHeaders.Accept)
+                append(HttpHeaders.Accept, "application/vnd.github.v3.diff")
+            }
+        }
+        return response.body()
+    }
+
+    /**
+     * Получает diff конкретного файла из Pull Request (поле "patch").
+     * @param repo в формате "owner/repo"
+     */
+    suspend fun getPrFileDiff(repo: String, prNumber: Int, filePath: String): String {
+        val filesResponse = client.get("/repos/$repo/pulls/$prNumber/files").body<JsonArray>()
+        val fileObj = filesResponse
+            .map { it.jsonObject }
+            .firstOrNull { it["filename"]?.jsonPrimitive?.content == filePath }
+            ?: return "File $filePath not found in PR #$prNumber"
+        return fileObj["patch"]?.jsonPrimitive?.content ?: "No patch available for $filePath"
+    }
+
+    /**
+     * Добавляет review-комментарий к конкретной строке файла в Pull Request.
+     * @param repo в формате "owner/repo"
+     */
+    suspend fun addPrReviewComment(
+        repo: String,
+        prNumber: Int,
+        filePath: String,
+        body: String,
+        line: Int,
+        commitId: String
+    ): String {
+        val response = client.post("/repos/$repo/pulls/$prNumber/comments") {
+            contentType(ContentType.Application.Json)
+            setBody(buildJsonObject {
+                put("body", JsonPrimitive(body))
+                put("commit_id", JsonPrimitive(commitId))
+                put("path", JsonPrimitive(filePath))
+                put("line", JsonPrimitive(line))
+                put("side", JsonPrimitive("RIGHT"))
+            })
+        }
+        val responseObj = response.body<JsonObject>()
+        val id = responseObj["id"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+        return buildJsonObject {
+            put("id", JsonPrimitive(id))
+            put("status", JsonPrimitive("created"))
+        }.toString()
     }
 
     private fun resolveRepo(owner: String?, repo: String?): Pair<String, String> {

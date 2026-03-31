@@ -29,6 +29,7 @@ fun ChatSettingsDialog(
     state: ChatSettingsUiModel,
     onDismiss: () -> Unit,
     onSubmit: (chatTitle: String, settings: ChatSettings) -> Unit,
+    onHandlePrToggle: (Boolean) -> Unit = {},
     colors: ChatColorScheme = LocalChatColorScheme.current
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -42,6 +43,7 @@ fun ChatSettingsDialog(
                 state = state,
                 onSubmit = onSubmit,
                 onCancel = onDismiss,
+                onHandlePrToggle = onHandlePrToggle,
                 colors = colors
             )
         }

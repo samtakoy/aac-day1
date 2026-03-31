@@ -9,6 +9,10 @@ import com.example.day.core.core_features.chat.di.ChatCoreFeatureModule
 import com.example.day.core.core_features.llm.di.LlmCoreFeatureModule
 import com.example.day.core.core_features.mcp.di.McpCoreFeatureModule
 import com.example.day.core.core_features.memory.di.MemoryCoreFeatureModule
+import com.example.day.core.core_features.pr_review.di.PrReviewModule
+import com.example.day.core.core_features.pr_review.domain.repository.PrHandleRepository
+import com.example.day.core.core_features.pr_review.domain.repository.TelegramRepository
+import com.example.day.core.core_features.pr_review.domain.usecase.StartPrReviewUseCase
 import com.example.day.core.core_features.reminder.di.ReminderCoreFeatureModule
 import com.example.day.core.core_features.reminder.domain.usecase.ExecuteReminderUseCase
 import com.example.day.core.di.NetworkModule
@@ -42,7 +46,8 @@ import javax.inject.Singleton
         LlmCoreFeatureModule::class,
         McpCoreFeatureModule::class,
         McpSettingsFeatureApiModule::class,
-        AppSettingsModule::class
+        AppSettingsModule::class,
+        PrReviewModule::class
     ]
 )
 @Immutable
@@ -50,6 +55,9 @@ interface AppComponent : FeatureEntryProvider, ConsoleFeatureDeps, ChatsFeatureD
     GroupChoiceFeatureDeps, UserSettingsFeatureDeps, McpSettingsFeatureDeps {
     // TODO ого какая хрень
     fun executeReminderUseCase(): ExecuteReminderUseCase
+    fun telegramRepository(): TelegramRepository
+    fun prHandleRepository(): PrHandleRepository
+    fun startPrReviewUseCase(): StartPrReviewUseCase
 
     @Component.Factory
     interface Factory {

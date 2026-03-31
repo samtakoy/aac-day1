@@ -27,6 +27,11 @@ object GitHubToolNames {
     const val RESET_GIT_FILE_LIST_CACHE = "reset_git_file_list_cache"
     // Day 31: Developer assistant
     const val GET_CURRENT_GIT_BRANCH = "get_current_git_branch"
+    // Day 32: GitHub PR tools
+    const val GET_PR_INFO = "get_pr_info"
+    const val GET_PR_DIFF = "get_pr_diff"
+    const val GET_PR_FILE_DIFF = "get_pr_file_diff"
+    const val ADD_PR_REVIEW_COMMENT = "add_pr_review_comment"
 }
 
 object GitHubToolDefaults {
@@ -44,11 +49,16 @@ fun registerMcpTools(server: Server, api: GitHubApiClient, projectPath: String) 
     registerCreateIssue(server, api)
     registerCreateComment(server, api)
     // Day 19: Git file investigation tools
-    registerGetGitFileList(server, api)
+    registerGetGitFileList(server, api, projectPath)
     registerGetFileContent(server, api)
     registerResetGitFileListCache(server, api)
     // Day 31: Developer assistant
     registerGetCurrentGitBranch(server, projectPath)
+    // Day 32: GitHub PR tools
+    registerGetPrInfo(server, api)
+    registerGetPrDiff(server, api)
+    registerGetPrFileDiff(server, api)
+    registerAddPrReviewComment(server, api)
 }
 
 private fun registerEcho(server: Server) {
@@ -253,34 +263,80 @@ private fun registerCreateComment(server: Server, api: GitHubApiClient) {
     }
 }
 
-private fun registerGetGitFileList(server: Server, api: GitHubApiClient) {
+private fun registerGetGitFileList(server: Server, api: GitHubApiClient, projectPath: String) {
     server.addTool(
         name = GitHubToolNames.GET_GIT_FILE_LIST,
         description = "Получает список всех полных имён файлов из git репозитория. " +
             "Возвращает массив путей в формате /path/to/file.ext. " +
-            "owner и repo берутся из переменных окружения.",
-        inputSchema = ToolSchema(properties = buildJsonObject {})
-    ) { _ ->
-        api.listAllFiles().fold(
-            onSuccess = { fileList ->
+            "owner и repo берутся из переменных окружения. " +
+            "Опциональный параметр pattern позволяет фильтровать файлы по glob-паттерну (например '*.kt').",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("pattern", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Glob-паттерн для фильтрации файлов, например '*.kt' или 'app/src/**/*.kt'. Если не указан — возвращаются все файлы."))
+                })
+            }
+        )
+    ) { request ->
+        val pattern = request.arguments?.get("pattern")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+        if (pattern != null) {
+            // Filter by pattern using local git ls-files
+            try {
+                val process = ProcessBuilder("git", "-C", projectPath, "ls-files", pattern).start()
+                val completed = process.waitFor(10, TimeUnit.SECONDS)
+                if (!completed) {
+                    process.destroyForcibly()
+                    val responseJson = buildJsonObject {
+                        put("status", JsonPrimitive("error"))
+                        put("content", JsonArray(emptyList()))
+                        put("error", JsonPrimitive("Timeout: git ls-files не ответил за 10 секунд"))
+                    }
+                    return@addTool CallToolResult(
+                        content = listOf(TextContent(text = responseJson.toString())),
+                        isError = true
+                    )
+                }
+                val output = process.inputStream.bufferedReader().readText().trim()
+                val fileList = if (output.isBlank()) emptyList() else output.lines().map { "/$it" }
                 val responseJson = buildJsonObject {
                     put("status", JsonPrimitive("ok"))
                     put("content", JsonArray(fileList.map { JsonPrimitive(it) }))
                 }
                 CallToolResult(content = listOf(TextContent(text = responseJson.toString())))
-            },
-            onFailure = { error ->
+            } catch (e: Exception) {
                 val responseJson = buildJsonObject {
                     put("status", JsonPrimitive("error"))
                     put("content", JsonArray(emptyList()))
-                    put("error", JsonPrimitive(error.message ?: "Unknown error"))
+                    put("error", JsonPrimitive(e.message ?: "Unknown error"))
                 }
                 CallToolResult(
                     content = listOf(TextContent(text = responseJson.toString())),
                     isError = true
                 )
             }
-        )
+        } else {
+            api.listAllFiles().fold(
+                onSuccess = { fileList ->
+                    val responseJson = buildJsonObject {
+                        put("status", JsonPrimitive("ok"))
+                        put("content", JsonArray(fileList.map { JsonPrimitive(it) }))
+                    }
+                    CallToolResult(content = listOf(TextContent(text = responseJson.toString())))
+                },
+                onFailure = { error ->
+                    val responseJson = buildJsonObject {
+                        put("status", JsonPrimitive("error"))
+                        put("content", JsonArray(emptyList()))
+                        put("error", JsonPrimitive(error.message ?: "Unknown error"))
+                    }
+                    CallToolResult(
+                        content = listOf(TextContent(text = responseJson.toString())),
+                        isError = true
+                    )
+                }
+            )
+        }
     }
 }
 
@@ -375,6 +431,220 @@ private fun registerGetCurrentGitBranch(server: Server, projectPath: String) {
         } catch (e: Exception) {
             CallToolResult(
                 content = listOf(TextContent(text = e.message ?: "Unknown error")),
+                isError = true
+            )
+        }
+    }
+}
+
+// Day 32: GitHub PR tools
+
+private fun registerGetPrInfo(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.GET_PR_INFO,
+        description = "Получить информацию о Pull Request: заголовок, описание, статус, автор, список изменённых файлов и SHA коммита. Используй для получения обзора PR перед ревью.",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("pr_number", buildJsonObject {
+                    put("type", JsonPrimitive("integer"))
+                    put("description", JsonPrimitive("Номер Pull Request"))
+                })
+                put("repo", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Репозиторий в формате owner/repo"))
+                })
+            },
+            required = listOf("pr_number", "repo")
+        )
+    ) { request ->
+        val prNumber = request.arguments?.get("pr_number")?.jsonPrimitive?.intOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: pr_number is required")),
+                isError = true
+            )
+        val repo = request.arguments?.get("repo")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: repo is required")),
+                isError = true
+            )
+        try {
+            val text = api.getPrInfo(repo = repo, prNumber = prNumber)
+            CallToolResult(content = listOf(TextContent(text = text)))
+        } catch (e: Exception) {
+            CallToolResult(
+                content = listOf(TextContent(text = "error: ${e.message ?: "Unknown error"}")),
+                isError = true
+            )
+        }
+    }
+}
+
+private fun registerGetPrDiff(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.GET_PR_DIFF,
+        description = "Получить полный diff Pull Request. Возвращает текст в формате unified diff.",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("pr_number", buildJsonObject {
+                    put("type", JsonPrimitive("integer"))
+                    put("description", JsonPrimitive("Номер Pull Request"))
+                })
+                put("repo", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Репозиторий в формате owner/repo"))
+                })
+            },
+            required = listOf("pr_number", "repo")
+        )
+    ) { request ->
+        val prNumber = request.arguments?.get("pr_number")?.jsonPrimitive?.intOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: pr_number is required")),
+                isError = true
+            )
+        val repo = request.arguments?.get("repo")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: repo is required")),
+                isError = true
+            )
+        try {
+            val diff = api.getPrDiff(repo = repo, prNumber = prNumber)
+            CallToolResult(content = listOf(TextContent(text = diff)))
+        } catch (e: Exception) {
+            CallToolResult(
+                content = listOf(TextContent(text = "error: ${e.message ?: "Unknown error"}")),
+                isError = true
+            )
+        }
+    }
+}
+
+private fun registerGetPrFileDiff(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.GET_PR_FILE_DIFF,
+        description = "Получить diff конкретного файла из Pull Request. Используй для детального анализа изменений в одном файле.",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("pr_number", buildJsonObject {
+                    put("type", JsonPrimitive("integer"))
+                    put("description", JsonPrimitive("Номер Pull Request"))
+                })
+                put("repo", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Репозиторий в формате owner/repo"))
+                })
+                put("file_path", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Путь к файлу, например app/src/main/java/com/example/Foo.kt"))
+                })
+            },
+            required = listOf("pr_number", "repo", "file_path")
+        )
+    ) { request ->
+        val prNumber = request.arguments?.get("pr_number")?.jsonPrimitive?.intOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: pr_number is required")),
+                isError = true
+            )
+        val repo = request.arguments?.get("repo")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: repo is required")),
+                isError = true
+            )
+        val filePath = request.arguments?.get("file_path")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: file_path is required")),
+                isError = true
+            )
+        try {
+            val patch = api.getPrFileDiff(repo = repo, prNumber = prNumber, filePath = filePath)
+            CallToolResult(content = listOf(TextContent(text = patch)))
+        } catch (e: Exception) {
+            CallToolResult(
+                content = listOf(TextContent(text = "error: ${e.message ?: "Unknown error"}")),
+                isError = true
+            )
+        }
+    }
+}
+
+private fun registerAddPrReviewComment(server: Server, api: GitHubApiClient) {
+    server.addTool(
+        name = GitHubToolNames.ADD_PR_REVIEW_COMMENT,
+        description = "Добавить review-комментарий к конкретной строке файла в Pull Request на GitHub. Используй когда нашёл конкретную проблему в коде.",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("pr_number", buildJsonObject {
+                    put("type", JsonPrimitive("integer"))
+                    put("description", JsonPrimitive("Номер Pull Request"))
+                })
+                put("repo", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Репозиторий в формате owner/repo"))
+                })
+                put("file_path", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Путь к файлу"))
+                })
+                put("body", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Текст комментария"))
+                })
+                put("line", buildJsonObject {
+                    put("type", JsonPrimitive("integer"))
+                    put("description", JsonPrimitive("Номер строки в новой версии файла (должна входить в diff)"))
+                })
+                put("commit_id", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("SHA коммита (head_sha из get_pr_info)"))
+                })
+            },
+            required = listOf("pr_number", "repo", "file_path", "body", "line", "commit_id")
+        )
+    ) { request ->
+        val prNumber = request.arguments?.get("pr_number")?.jsonPrimitive?.intOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: pr_number is required")),
+                isError = true
+            )
+        val repo = request.arguments?.get("repo")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: repo is required")),
+                isError = true
+            )
+        val filePath = request.arguments?.get("file_path")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: file_path is required")),
+                isError = true
+            )
+        val body = request.arguments?.get("body")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: body is required")),
+                isError = true
+            )
+        val line = request.arguments?.get("line")?.jsonPrimitive?.intOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: line is required")),
+                isError = true
+            )
+        val commitId = request.arguments?.get("commit_id")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: commit_id is required")),
+                isError = true
+            )
+        try {
+            val result = api.addPrReviewComment(
+                repo = repo,
+                prNumber = prNumber,
+                filePath = filePath,
+                body = body,
+                line = line,
+                commitId = commitId
+            )
+            CallToolResult(content = listOf(TextContent(text = result)))
+        } catch (e: Exception) {
+            CallToolResult(
+                content = listOf(TextContent(text = "error: ${e.message ?: "Unknown error"}")),
                 isError = true
             )
         }

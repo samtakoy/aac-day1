@@ -175,6 +175,9 @@ private fun ConsoleScreenInternal(
                     onEvent(ConsoleViewModel.Event.SettingsSubmitClick(chatTitle, settings))
                 },
                 onCancel = { onEvent(ConsoleViewModel.Event.SettingsCancelClick) },
+                onHandlePrToggle = { isEnabled ->
+                    onEvent(ConsoleViewModel.Event.HandlePrToggled(isEnabled))
+                },
                 modifier = Modifier.fillMaxSize()
             )
         }

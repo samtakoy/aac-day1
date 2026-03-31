@@ -7,5 +7,6 @@ import com.example.day.core.core_features.chat.domain.model.ChatSettings
 data class ChatSettingsUiModel(
     val title: String,
     val chatTitle: String,
-    val settingsState: ChatSettings
+    val settingsState: ChatSettings,
+    val handlePr: Boolean = false
 )
