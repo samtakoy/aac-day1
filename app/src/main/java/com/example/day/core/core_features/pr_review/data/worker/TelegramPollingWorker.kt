@@ -3,7 +3,6 @@ package com.example.day.core.core_features.pr_review.data.worker
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
-import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -24,6 +23,7 @@ class TelegramPollingWorker(
         val startPrReviewUseCase = appComponent.startPrReviewUseCase()
 
         val lastUpdateId = prHandleRepo.getLastTelegramUpdateId()
+        Log.d(TAG, "lastUpdateId=$lastUpdateId, offset=${lastUpdateId + 1}")
         val result = telegramRepo.getPrUpdates(offset = lastUpdateId + 1)
 
         result.fold(
@@ -44,15 +44,16 @@ class TelegramPollingWorker(
 
         val nextRequest = OneTimeWorkRequestBuilder<TelegramPollingWorker>()
             .setInitialDelay(1, TimeUnit.MINUTES)
+            .addTag(WORK_TAG)
             .build()
-        WorkManager.getInstance(applicationContext)
-            .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, nextRequest)
+        WorkManager.getInstance(applicationContext).enqueue(nextRequest)
 
         return Result.success()
     }
 
     companion object {
         const val WORK_NAME = "telegram_polling"
+        const val WORK_TAG = "telegram_polling_tag"
         private const val TAG = "TelegramPolling"
     }
 }

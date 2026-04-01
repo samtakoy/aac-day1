@@ -27,7 +27,11 @@ object McpToolNames {
         "search_codebase_fixed",
         "get_current_git_branch",
         GET_FILE_CONTENT,
-        GET_GIT_FILE_LIST
+        GET_GIT_FILE_LIST,
+        "get_pr_info",
+        "get_pr_diff",
+        "get_pr_file_diff",
+        "add_pr_review_comment"
         /*
         GET_ISSUE,
         LIST_ISSUES,
