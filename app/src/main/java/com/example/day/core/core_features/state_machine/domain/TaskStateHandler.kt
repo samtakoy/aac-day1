@@ -1,6 +1,5 @@
 package com.example.day.core.core_features.state_machine.domain
 
-import com.example.day.core.core_features.agent.domain.model.TaskLlmResponse
 import com.example.day.core.core_features.state_machine.domain.model.StateId
 
 /**
@@ -31,7 +30,7 @@ interface TaskStateHandler {
     suspend fun handle(
         context: StateContext,
         userInput: String,
-        llmResponse: TaskLlmResponse
+        rawResponse: String
     ): HandlerResult
 
     suspend fun handleUserAction(

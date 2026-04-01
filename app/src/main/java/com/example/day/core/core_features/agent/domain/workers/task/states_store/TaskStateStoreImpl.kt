@@ -11,11 +11,8 @@ import com.example.day.core.core_features.state_machine.domain.model.StateId
 import com.example.day.core.core_features.state_machine.domain.serialize
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class TaskStateStoreImpl @Inject constructor(
+class StateStoreImpl constructor(
     private val agentMemoryRepository: AgentMemoryRepository,
     private val agentContextRepository: AgentContextRepository,
     private val stateConfig: StateConfig

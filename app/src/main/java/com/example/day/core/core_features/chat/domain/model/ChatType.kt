@@ -5,7 +5,8 @@ enum class ChatType(val dbType: String, val title: String) {
     AGENT_COMMANDS("agent_commands", "Agent Commands"),
     PLANNER("planner", "Project Planner"),
     RAG_CONTEXT("rag_context", "Code Rag Context"),
-    ASSISTANT("assistant", "Dev Assistant");
+    ASSISTANT("assistant", "Dev Assistant"),
+    SUPPORT("support", "User Support");
 
     companion object {
         fun fromDbType(dbType: String): ChatType? {

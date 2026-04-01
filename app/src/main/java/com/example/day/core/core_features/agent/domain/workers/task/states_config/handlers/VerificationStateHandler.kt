@@ -2,6 +2,7 @@ package com.example.day.core.core_features.agent.domain.workers.task.states_conf
 
 import com.example.day.core.core_features.agent.domain.model.TaskLlmResponse
 import com.example.day.core.core_features.agent.domain.workers.task.TaskMemKeys
+import com.example.day.core.core_features.agent.domain.workers.task.TaskResponseParser
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateData
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateMessage
@@ -114,8 +115,15 @@ class VerificationStateHandler : TaskStateHandler {
     override suspend fun handle(
         context: StateContext,
         userInput: String,
-        llmResponse: TaskLlmResponse
+        rawResponse: String
     ): HandlerResult {
+        val llmResponse = TaskResponseParser.parse(rawResponse)
+            ?: return HandlerResult(
+                messages = listOf(HandlerResult.Message(
+                    "⚠️ Не удалось разобрать ответ ассистента. Попробуйте переформулировать запрос.\n\nRaw: $rawResponse",
+                    isInfo = true
+                ))
+            )
         var data = context.getStateData(TaskStateConfig.VERIFICATION, 1) as? TaskStateData.Verification ?: TaskStateData.Verification()
         data = tryFillResultData(llmResponse, context.getTotalSteps(), data.retryCount).copy(
             history = data.history.continueHistory(userInput, llmResponse.replyToUser)

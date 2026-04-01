@@ -1,24 +1,63 @@
 package com.example.day.core.core_features.agent.di
 
+import com.example.day.core.core_features.agent.domain.AIAgentFactory
+import com.example.day.core.core_features.agent.domain.AgentContextRepository
+import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
+import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
+import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
+import com.example.day.core.core_features.agent.domain.tools.ToolProvider
+import com.example.day.core.core_features.agent.domain.workers.concrete.TaskWorker
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
-import com.example.day.core.core_features.state_machine.domain.StateConfig
+import com.example.day.core.core_features.agent.domain.workers.task.states_store.StateStoreImpl
+import com.example.day.core.core_features.chat.domain.tools.ChatTools
+import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
+import com.example.day.core.core_features.memory.domain.provider.StateMemoryProviderFactory
+import com.example.day.core.core_features.memory.domain.provider.base.MemoryProviderFactory
+import com.example.day.core.core_features.state_machine.domain.StateStore
 import dagger.Module
 import dagger.Provides
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
-internal interface TaskStateMachineModule {
+internal object TaskStateMachineModule {
 
-    companion object {
-        /**
-         * Provides the default TaskStateConfig.
-         * This is the standard workflow: INIT → PLANNING → EXECUTION → VERIFICATION → DONE
-         * TODO пока только есть один конфиг и поэтому это работает
-         */
-        @Provides
-        @Singleton
-        internal fun provideTaskStateConfig(): StateConfig {
-            return TaskStateConfig.config
-        }
-    }
+    @Provides
+    @Named("task")
+    @Singleton
+    internal fun provideTaskStateStore(
+        agentMemoryRepository: AgentMemoryRepository,
+        agentContextRepository: AgentContextRepository
+    ): StateStore = StateStoreImpl(
+        agentMemoryRepository = agentMemoryRepository,
+        agentContextRepository = agentContextRepository,
+        stateConfig = TaskStateConfig.config
+    )
+
+    @Provides
+    @Named("task")
+    internal fun provideTaskWorker(
+        aiAgentFactory: AIAgentFactory,
+        chatTools: ChatTools,
+        memoryProviderFactory: MemoryProviderFactory,
+        stateMemoryProviderFactory: StateMemoryProviderFactory,
+        contextRepository: AgentContextRepository,
+        llmRequestUseCase: LlmRequestUseCase,
+        strategyFactory: StrategyFactory,
+        @Named("task") stateStore: StateStore,
+        toolProvider: ToolProvider,
+        toolCallOrchestrator: ToolCallOrchestrator
+    ): TaskWorker = TaskWorker(
+        aiAgentFactory = aiAgentFactory,
+        chatTools = chatTools,
+        memoryProviderFactory = memoryProviderFactory,
+        stateMemoryProviderFactory = stateMemoryProviderFactory,
+        contextRepository = contextRepository,
+        llmRequestUseCase = llmRequestUseCase,
+        strategyFactory = strategyFactory,
+        stateStore = stateStore,
+        toolProvider = toolProvider,
+        toolCallOrchestrator = toolCallOrchestrator,
+        agentName = "task_state_agent"
+    )
 }

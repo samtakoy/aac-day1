@@ -13,8 +13,6 @@ import com.example.day.core.core_features.agent.domain.AgentRepository
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
 import com.example.day.core.core_features.agent.domain.tools.impl.ToolCallOrchestratorImpl
-import com.example.day.core.core_features.state_machine.domain.StateStore
-import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskStateStoreImpl
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentTools
 import com.example.day.core.core_features.agent.domain.workers.tools.AgentToolsImpl
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
@@ -35,7 +33,8 @@ import javax.inject.Singleton
     includes = [
         CommandHandlerModule::class,
         BranchingStrategyModule::class,
-        TaskStateMachineModule::class
+        TaskStateMachineModule::class,
+        SupportStateMachineModule::class
     ]
 )
 internal interface AgentCoreFeatureModule {
@@ -57,10 +56,6 @@ internal interface AgentCoreFeatureModule {
 
     @Binds
     fun bindsChatTools(impl: ChatToolsImpl): ChatTools
-
-    @Binds
-    @Singleton
-    fun bindsTaskStateStore(impl: TaskStateStoreImpl): StateStore
 
     companion object {
 
