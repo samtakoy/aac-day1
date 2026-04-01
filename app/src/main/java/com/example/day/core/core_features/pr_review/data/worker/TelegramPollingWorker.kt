@@ -46,7 +46,7 @@ class TelegramPollingWorker(
             .setInitialDelay(1, TimeUnit.MINUTES)
             .build()
         WorkManager.getInstance(applicationContext)
-            .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, nextRequest)
+            .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, nextRequest)
 
         return Result.success()
     }

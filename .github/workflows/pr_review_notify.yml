@@ -16,7 +16,11 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPO: ${{ github.repository }}
         run: |
-          MESSAGE="{\"event\":\"pr_opened\",\"repo\":\"$REPO\",\"pr_number\":$PR_NUMBER,\"title\":\"$PR_TITLE\"}"
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -H "Content-Type: application/json" \
-            -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"${MESSAGE}\"}"
+            -d "$(jq -n \
+              --arg chat_id "$TELEGRAM_CHAT_ID" \
+              --argjson pr_number "$PR_NUMBER" \
+              --arg repo "$REPO" \
+              --arg title "$PR_TITLE" \
+              '{chat_id: $chat_id, text: ({event:"pr_opened", repo:$repo, pr_number:$pr_number, title:$title} | tostring)}')"
