@@ -10,7 +10,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_confi
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withButton
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withInfo
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withTitle
-import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
+import com.example.day.core.core_features.state_machine.domain.StateContext
 import com.example.day.core.core_features.state_machine.domain.HandlerResult
 import com.example.day.core.core_features.state_machine.domain.TaskStateHandler
 import com.example.day.core.core_features.state_machine.domain.model.StateId
@@ -26,7 +26,7 @@ class InitStateHandler : TaskStateHandler {
 
     override val stateName: StateId = TaskStateConfig.INIT
 
-    override suspend fun buildSystemPrompt(context: TaskContext): String = """
+    override suspend fun buildSystemPrompt(context: StateContext): String = """
 Ты — System Design Expert. Твоя задача — через опрос выявить потребность пользователя, собрать требования к решению и основные use cases (если есть), с какой проблемой он пришел, чего хочет достичь, пожелания к решению.
 
 === ПРОТОКОЛ ОТВЕТА ===
@@ -67,7 +67,7 @@ class InitStateHandler : TaskStateHandler {
 2. Иначе не заполняй ${TaskMemKeys.NEXT_STATE} и значения ключей памяти
 """.trimIndent()
 
-    override suspend fun buildAssistantPreFillPrompt(context: TaskContext): String? {
+    override suspend fun buildAssistantPreFillPrompt(context: StateContext): String? {
         // НЕ УДАЛЯТЬ!
         val stateId = context.getState()
         // Пусть prefill ассистента будет всегда (пока)
@@ -85,7 +85,7 @@ class InitStateHandler : TaskStateHandler {
     }
 
     override suspend fun handle(
-        context: TaskContext,
+        context: StateContext,
         userInput: String,
         llmResponse: TaskLlmResponse
     ): HandlerResult {
@@ -143,7 +143,7 @@ class InitStateHandler : TaskStateHandler {
     }
 
     override suspend fun handleUserAction(
-        context: TaskContext,
+        context: StateContext,
         action: String
     ) : HandlerResult {
         return if (action == ACTION_PROCEED) {
