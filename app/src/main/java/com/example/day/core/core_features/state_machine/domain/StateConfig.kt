@@ -52,7 +52,7 @@ interface TaskStateHandlerFactory {
  * )
  * ```
  */
-data class StateConfig(
+class StateConfig(
     /**
      * List of valid state names.
      */
@@ -93,6 +93,10 @@ data class StateConfig(
      * Fallback state name when unknown state is encountered.
      */
     val fallbackState: StateId,
+
+    val fallbackStateData: StateData,
+
+    val stateInfoProvider: StateInfoProvider,
 
     /**
      * Factory for creating custom handlers dynamically.

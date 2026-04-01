@@ -1,7 +1,6 @@
 package com.example.day.core.core_features.state_machine.domain
 
 import com.example.day.core.core_features.agent.domain.model.TaskLlmResponse
-import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
 import com.example.day.core.core_features.state_machine.domain.model.StateId
 
 /**
@@ -21,22 +20,22 @@ interface TaskStateHandler {
      * Build system prompt for this state.
      * The prompt should include all context from previous states via artifacts.
      */
-    suspend fun buildSystemPrompt(context: TaskContext): String
+    suspend fun buildSystemPrompt(context: StateContext): String
 
     /** Приветственное сообщение ассистента самому себе когда история пустая */
-    suspend fun buildAssistantPreFillPrompt(context: TaskContext): String?
+    suspend fun buildAssistantPreFillPrompt(context: StateContext): String?
 
     /**
      * Process LLM response and determine next state.
      */
     suspend fun handle(
-        context: TaskContext,
+        context: StateContext,
         userInput: String,
         llmResponse: TaskLlmResponse
     ): HandlerResult
 
     suspend fun handleUserAction(
-        context: TaskContext,
+        context: StateContext,
         action: String
     ) : HandlerResult
 }

@@ -8,8 +8,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_confi
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.continueHistory
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withBot
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withButton
-import com.example.day.core.core_features.agent.domain.workers.task.states_config.withInfo
-import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
+import com.example.day.core.core_features.state_machine.domain.StateContext
 import com.example.day.core.core_features.state_machine.domain.HandlerResult
 import com.example.day.core.core_features.state_machine.domain.TaskStateHandler
 import com.example.day.core.core_features.state_machine.domain.model.StateId
@@ -25,7 +24,7 @@ class DoneStateHandler : TaskStateHandler {
 
     override val stateName: StateId = TaskStateConfig.DONE
 
-    override suspend fun buildSystemPrompt(context: TaskContext): String {
+    override suspend fun buildSystemPrompt(context: StateContext): String {
 
         return """Ты — Project Manager.
 К нам пришел человек с потребностью решить его задачу. Артефакты решения ниже. 
@@ -53,12 +52,12 @@ ${context.buildFinalResult(withFeedbacks = true)}
 """.trimIndent()
     }
 
-    override suspend fun buildAssistantPreFillPrompt(context: TaskContext): String? {
+    override suspend fun buildAssistantPreFillPrompt(context: StateContext): String? {
         return "Хорошо. Сейчас я соберу итоговое решение на основе артефактов решения задачи и отдам его пользователю в ключе ${TaskMemKeys.REPLY_TO_USER}"
     }
 
     override suspend fun handle(
-        context: TaskContext,
+        context: StateContext,
         userInput: String,
         llmResponse: TaskLlmResponse
     ): HandlerResult {
@@ -87,7 +86,7 @@ ${context.buildFinalResult(withFeedbacks = true)}
     }
 
     override suspend fun handleUserAction(
-        context: TaskContext,
+        context: StateContext,
         action: String
     ): HandlerResult {
         return if (action == ACTION_PROCEED) {

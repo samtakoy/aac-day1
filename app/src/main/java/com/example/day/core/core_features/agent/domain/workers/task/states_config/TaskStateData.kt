@@ -8,8 +8,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed interface TaskStateData : StateData {
 
-    @SerialName("history")
-    val history: List<TaskStateMessage>
+    // @SerialName("history")
+    // override val history: List<TaskStateMessage>
 
     /**
      * Initial state when a new task is created.
