@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.state_machine.domain
 
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateMessage
 import com.example.day.core.core_features.state_machine.domain.model.StateId
 
 /**
@@ -11,4 +12,5 @@ import com.example.day.core.core_features.state_machine.domain.model.StateId
 interface StateData {
     /** The current state ID as String */
     val state: StateId
+    val history: List<TaskStateMessage>
 }

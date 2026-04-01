@@ -6,6 +6,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_confi
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.handlers.PlanningStateHandler
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.handlers.VerificationStateHandler
 import com.example.day.core.core_features.state_machine.domain.StateConfig
+import com.example.day.core.core_features.state_machine.domain.StateInfoProvider
 import com.example.day.core.core_features.state_machine.domain.model.StateId
 
 object TaskStateConfig {
@@ -44,6 +45,27 @@ object TaskStateConfig {
         ),
         initialState = INIT,
         finalStates = listOf(DONE),
-        fallbackState = INIT
+        fallbackState = INIT,
+        fallbackStateData = TaskStateData.Init(),
+        stateInfoProvider = createInfoProvider()
     )
+
+    private fun createInfoProvider(): StateInfoProvider = object : StateInfoProvider {
+        override fun getStateDescription(state: StateId?, stepNum: Int, totalSteps: Int): String {
+            return when (state) {
+                INIT -> "Сбор требований и определение задачи"
+                PLANNING -> "Декомпозиция задачи на этапы"
+                EXECUTION -> buildString {
+                    append("Выполнение этапа $stepNum")
+                    if (totalSteps > 0) append(" из $totalSteps")
+                }
+                VERIFICATION -> buildString {
+                    append("Проверка задачи")
+                }
+                DONE -> "Формирование итогового отчёта"
+                else -> "Неизвестно"
+            }
+        }
+
+    }
 }

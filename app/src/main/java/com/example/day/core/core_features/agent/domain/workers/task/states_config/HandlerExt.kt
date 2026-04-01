@@ -1,9 +1,13 @@
 package com.example.day.core.core_features.agent.domain.workers.task.states_config
 
-import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
+import com.example.day.core.core_features.state_machine.domain.StateContext
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.state_machine.domain.HandlerResult
 import com.example.day.core.core_features.state_machine.domain.model.StateId
+
+suspend fun StateContext.getTaskStateData(state: StateId, step: Int): TaskStateData? {
+    return getStateData(state, step) as? TaskStateData
+}
 
 fun List<TaskStateMessage>.continueHistory(
     userInput: String,
@@ -72,7 +76,7 @@ fun List<HandlerResult.Message>.withBot(title: String): List<HandlerResult.Messa
     )
 }
 
-suspend fun TaskContext.buildStateTransitionInfoMessage(
+suspend fun StateContext.buildStateTransitionInfoMessage(
     newStep: Int,
     nextState: StateId?
 ): String {
@@ -97,7 +101,7 @@ suspend fun TaskContext.buildStateTransitionInfoMessage(
     return stateLabel
 }
 
-suspend fun TaskContext.buildFinalResult(withFeedbacks: Boolean): String {
+suspend fun StateContext.buildFinalResult(withFeedbacks: Boolean): String {
     val initData = getStateData(TaskStateConfig.INIT, 1) as? TaskStateData.Init ?: return "Что-то пошло не так"
     val commonTitle = initData.title ?: "Не поставлена"
     val commonDescription = initData.description ?: "Описание отсутствует"

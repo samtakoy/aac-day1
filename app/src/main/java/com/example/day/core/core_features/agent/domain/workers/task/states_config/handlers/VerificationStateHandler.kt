@@ -17,7 +17,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_confi
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withInfo
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withTitle
 import com.example.day.core.core_features.state_machine.domain.HandlerResult
-import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
+import com.example.day.core.core_features.state_machine.domain.StateContext
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.state_machine.domain.TaskStateHandler
 import com.example.day.core.core_features.state_machine.domain.model.StateId
@@ -45,7 +45,7 @@ class VerificationStateHandler : TaskStateHandler {
 
     override val stateName: StateId = TaskStateConfig.VERIFICATION
 
-    override suspend fun buildSystemPrompt(context: TaskContext): String {
+    override suspend fun buildSystemPrompt(context: StateContext): String {
         context.getCurStepNum()
         context.getTotalSteps()
 
@@ -107,12 +107,12 @@ class VerificationStateHandler : TaskStateHandler {
 """.trimIndent()
     }
 
-    override suspend fun buildAssistantPreFillPrompt(context: TaskContext): String {
+    override suspend fun buildAssistantPreFillPrompt(context: StateContext): String {
         return "Хорошо. Я получил задание провести ревью задачи и ее этапов. Вот мои выводы и оценки."
     }
 
     override suspend fun handle(
-        context: TaskContext,
+        context: StateContext,
         userInput: String,
         llmResponse: TaskLlmResponse
     ): HandlerResult {
@@ -144,7 +144,7 @@ class VerificationStateHandler : TaskStateHandler {
     }
 
     override suspend fun handleUserAction(
-        context: TaskContext,
+        context: StateContext,
         action: String
     ): HandlerResult {
         val actionStep = action.split(":").getOrNull(1)?.toIntOrNull() ?: 0
@@ -180,7 +180,7 @@ class VerificationStateHandler : TaskStateHandler {
         }
     }
 
-    private suspend fun makeExecutionStateUncompleted(context: TaskContext, executionStep: Int) {
+    private suspend fun makeExecutionStateUncompleted(context: StateContext, executionStep: Int) {
         val verifData = context.getStateData(TaskStateConfig.VERIFICATION, 1) as? TaskStateData.Verification ?: return
         context.saveStateData(
             verifData.copy(

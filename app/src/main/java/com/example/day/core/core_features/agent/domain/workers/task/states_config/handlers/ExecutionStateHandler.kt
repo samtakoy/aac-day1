@@ -10,7 +10,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_confi
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withButton
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withInfo
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withTitle
-import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
+import com.example.day.core.core_features.state_machine.domain.StateContext
 import com.example.day.core.core_features.state_machine.domain.HandlerResult
 import com.example.day.core.core_features.state_machine.domain.TaskStateHandler
 import com.example.day.core.core_features.state_machine.domain.model.StateId
@@ -26,7 +26,7 @@ class ExecutionStateHandler : TaskStateHandler {
 
     override val stateName: StateId = TaskStateConfig.EXECUTION
 
-    override suspend fun buildSystemPrompt(context: TaskContext): String {
+    override suspend fun buildSystemPrompt(context: StateContext): String {
         val initData = context.getStateData(TaskStateConfig.INIT, 1) as? TaskStateData.Init ?: return "Что-то пошло не так"
         val commonTitle = initData.title ?: "Не поставлена"
         val commonDescription = initData.description ?: "Описание отсутствует"
@@ -103,7 +103,7 @@ $feedbackSection
 """.trimIndent()
     }
 
-    override suspend fun buildAssistantPreFillPrompt(context: TaskContext): String {
+    override suspend fun buildAssistantPreFillPrompt(context: StateContext): String {
         val currentStep = context.getCurStepNum()
         val planData = context.getStateData(TaskStateConfig.PLANNING, currentStep) as? TaskStateData.Planning
         val stepData = planData?.steps?.getOrNull(context.getCurStepIdx())
@@ -112,7 +112,7 @@ $feedbackSection
     }
 
     override suspend fun handle(
-        context: TaskContext,
+        context: StateContext,
         userInput: String,
         llmResponse: TaskLlmResponse
     ): HandlerResult {
@@ -159,7 +159,7 @@ $feedbackSection
     }
 
     override suspend fun handleUserAction(
-        context: TaskContext,
+        context: StateContext,
         action: String
     ): HandlerResult {
         // Execu TODO("в конце сбросить фидбэк. и посмотреть в списке этапв - кто следующий")
@@ -186,7 +186,7 @@ $feedbackSection
         }
     }
 
-    private suspend fun findNextUncompletedStep(context: TaskContext): Int {
+    private suspend fun findNextUncompletedStep(context: StateContext): Int {
         val planData = context.getStateData(TaskStateConfig.PLANNING, 1) as? TaskStateData.Planning ?: return 0
         planData.steps.forEach { step ->
             if (!step.isCompleted) {
@@ -197,7 +197,7 @@ $feedbackSection
     }
 
     /** Отметить текущий шаг как выполненный (и убрат фидбэк, т.к. он больше не актуален) */
-    private suspend fun makeCurStepCompleted(context: TaskContext) {
+    private suspend fun makeCurStepCompleted(context: StateContext) {
         val planData = context.getStateData(TaskStateConfig.PLANNING, 1) as? TaskStateData.Planning ?: return
         val currentStep = context.getCurStepNum()
         context.saveStateData(
