@@ -34,6 +34,7 @@ import com.example.day.core.core_features.pr_review.domain.usecase.GetPrHandleSt
 import com.example.day.core.core_features.pr_review.domain.usecase.SetPrHandleEnabledUseCase
 import com.example.day.core.core_features.pr_review.domain.usecase.StartPrReviewUseCase
 import kotlinx.serialization.json.Json
+import javax.inject.Named
 
 interface ConsoleFeatureDeps {
     val getMessagesUseCase: GetChatMessagesAsFlowUseCase
@@ -60,7 +61,10 @@ interface ConsoleFeatureDeps {
     val consuption: ConsumptionCalculator
     
     // Task state machine dependencies
+    @get:Named("task")
     val taskWorker: TaskWorker
+    @get:Named("support")
+    val supportWorker: TaskWorker
     // RAG context chat dependencies
     val ragWorker: RagWorker
     // Assistant chat dependencies

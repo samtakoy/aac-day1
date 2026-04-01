@@ -3,6 +3,7 @@ package com.example.day.features.console.impl.di
 import com.example.day.features.console.impl.ui.delegates.AssistantTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.PlannerTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.RagTalkDelegate
+import com.example.day.features.console.impl.ui.delegates.SupportTalkDelegate
 import dagger.Module
 import dagger.Provides
 
@@ -38,6 +39,17 @@ internal class ConsoleFeatureModule {
             assistantWorker = deps.assistantWorker,
             chatTools = deps.chatTools,
             consumptionCalculator = deps.consuption,
+        )
+    }
+
+    @Provides
+    fun provideSupportTalkDelegate(deps: ConsoleFeatureDeps): SupportTalkDelegate {
+        return SupportTalkDelegate(
+            addChatMessageUseCase = deps.addChatMessageUseCase,
+            supportWorker = deps.supportWorker,
+            chatTools = deps.chatTools,
+            consumptionCalculator = deps.consuption,
+            json = deps.json
         )
     }
 }

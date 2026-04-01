@@ -84,6 +84,7 @@ private fun ChatsScreenInternal(
     val plannerChatEntry = appComponent.getPlannerConsoleFeatureEntry()
     val ragChatEntry = appComponent.getRagConsoleFeatureEntry()
     val assistantChatEntry = appComponent.getAssistantConsoleFeatureEntry()
+    val supportChatEntry = appComponent.getSupportConsoleFeatureEntry()
     val userSettingsEntry = appComponent.getUserSettingsFeatureEntry()
 
     // Create pager state at the top level to share between chips and pager
@@ -158,6 +159,9 @@ private fun ChatsScreenInternal(
                             }
                             ChatType.ASSISTANT -> {
                                 assistantChatEntry.EntryPoint(chatId = chip.id, modifier = Modifier.fillMaxSize())
+                            }
+                            ChatType.SUPPORT -> {
+                                supportChatEntry.EntryPoint(chatId = chip.id, modifier = Modifier.fillMaxSize())
                             }
                         }
                     }

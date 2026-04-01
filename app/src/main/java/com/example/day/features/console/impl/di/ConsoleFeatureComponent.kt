@@ -6,6 +6,7 @@ import com.example.day.features.console.impl.ui.delegates.AssistantTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.LlmTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.PlannerTalkDelegate
 import com.example.day.features.console.impl.ui.delegates.RagTalkDelegate
+import com.example.day.features.console.impl.ui.delegates.SupportTalkDelegate
 import com.example.day.features.console.impl.ui.viewmodel.ConsoleViewModelImpl
 import dagger.Component
 
@@ -28,4 +29,6 @@ internal interface ConsoleFeatureComponent {
     fun getPlannerTalkDelegate(): PlannerTalkDelegate
     fun getRagTalkDelegate(): RagTalkDelegate
     fun getAssistantTalkDelegate(): AssistantTalkDelegate
+    fun getSupportViewModelFactory(): ConsoleViewModelImpl.SupportFactory
+    fun getSupportTalkDelegate(): SupportTalkDelegate
 }

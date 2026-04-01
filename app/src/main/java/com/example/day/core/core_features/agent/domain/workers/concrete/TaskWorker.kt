@@ -5,44 +5,38 @@ import com.example.day.core.core_features.agent.domain.AIAgent
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
-import com.example.day.core.core_features.agent.domain.model.TaskLlmResponse
 import com.example.day.core.core_features.agent.domain.strategy.AContextDefaultFactory
 import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
-import com.example.day.core.core_features.agent.domain.workers.task.TaskResponseParser
 import com.example.day.core.core_features.state_machine.domain.StateContext
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.memory.domain.provider.CompositeMemoryProvider
-import com.example.day.core.core_features.memory.domain.provider.TaskStateMemoryProviderFactory
+import com.example.day.core.core_features.memory.domain.provider.StateMemoryProviderFactory
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProviderFactory
 import com.example.day.core.core_features.state_machine.domain.StateStore
-import javax.inject.Inject
 
 /**
  * Worker for task state machine.
  * Manages task lifecycle: INIT → PLANNING → EXECUTION → VERIFICATION → DONE
  */
-class TaskWorker @Inject constructor(
+class TaskWorker constructor(
     private val aiAgentFactory: AIAgentFactory,
     private val chatTools: ChatTools,
     private val memoryProviderFactory: MemoryProviderFactory,
-    private val taskStateMemoryProviderFactory: TaskStateMemoryProviderFactory,
+    private val stateMemoryProviderFactory: StateMemoryProviderFactory,
     private val contextRepository: AgentContextRepository,
     private val llmRequestUseCase: LlmRequestUseCase,
     private val strategyFactory: StrategyFactory,
     private val stateStore: StateStore,
     private val toolProvider: ToolProvider,
-    private val toolCallOrchestrator: ToolCallOrchestrator
+    private val toolCallOrchestrator: ToolCallOrchestrator,
+    private val agentName: String
 ) : AWorker {
-
-    companion object {
-        const val AGENT_NAME = "task_state_agent"
-    }
 
     /**
      * TODO синхронизировать взаимодействие с воркерами через каналы.
@@ -55,7 +49,7 @@ class TaskWorker @Inject constructor(
     ) {
         // Get or create agent. System prompt is empty — TaskStateMemoryProvider manages it dynamically.
         val agent = aiAgentFactory.getOrCreate(
-            AGENT_NAME,
+            agentName,
             chat.id,
             "",
             defaultModel = { chat.settings.model.copy(jsonFormat = true) },
@@ -101,19 +95,7 @@ class TaskWorker @Inject constructor(
         // process result
         result.fold(
             onSuccess = { agentResult ->
-                val llmResponse = TaskResponseParser.parse(agentResult.responseText)
-                if (llmResponse != null) {
-                    processSuccessResponse(
-                        chat,
-                        taskContext,
-                        userPrompt,
-                        llmResponse,
-                        agentResult.responseText,
-                        onEvent
-                    )
-                } else {
-                    handleParseError(chat.id, agentResult.responseText)
-                }
+                processSuccessResponse(chat, taskContext, userPrompt, agentResult.responseText, onEvent)
             },
             onFailure = { error ->
                 handleLlmError(chat.id, error)
@@ -123,7 +105,7 @@ class TaskWorker @Inject constructor(
 
     suspend fun handleAction(chat: Chat, action: String, onEvent: (suspend (WorkerEvent) -> Unit)?) {
         val agent = aiAgentFactory.getOrCreate(
-            AGENT_NAME, chat.id, "",
+            agentName, chat.id, "",
             defaultModel = { chat.settings.model.copy(jsonFormat = true) },
             defaultContext = { AContextDefaultFactory.createEmpty() }
         )
@@ -154,10 +136,11 @@ class TaskWorker @Inject constructor(
         chat: Chat,
         agent: AIAgent
     ): CompositeMemoryProvider {
-        // Create TaskStateMemoryProvider using factory (injects TaskStateStore + Json)
-        val taskStateProvider = taskStateMemoryProviderFactory.create(
+        // Create TaskStateMemoryProvider using factory
+        val taskStateProvider = stateMemoryProviderFactory.create(
             chat = chat,
-            agentId = agent.config.id
+            agentId = agent.config.id,
+            stateStore = stateStore
         )
 
         // Base memory from agent config (e.g. UserProfile if configured)
@@ -182,7 +165,6 @@ class TaskWorker @Inject constructor(
         chat: Chat,
         context: StateContext,
         userInput: String,
-        llmResponse: TaskLlmResponse,
         rawResponse: String,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
@@ -191,7 +173,7 @@ class TaskWorker @Inject constructor(
         val handler =  stateConfig.handlers[currentState]!!
 
         // Handle state logic
-        val result = handler.handle(context, userInput, llmResponse)
+        val result = handler.handle(context, userInput, rawResponse)
 
         // 1. Сообщения в чат
         result.messages.forEach { msg ->
@@ -233,16 +215,6 @@ class TaskWorker @Inject constructor(
                 context.clearTaskMemory()
             }
         }
-    }
-
-    private suspend fun handleParseError(
-        chatId: Long,
-        rawResponse: String
-    ) {
-        chatTools.addInfoMessage(
-            chatId,
-            "⚠️ Не удалось обработать ответ от LLM. Пожалуйста, попробуйте переформулировать запрос.\n\nrawResponse: $rawResponse"
-        )
     }
 
     private suspend fun handleLlmError(

@@ -8,6 +8,7 @@ import com.example.day.features.console.api.AssistantConsoleFeatureEntry
 import com.example.day.features.console.api.ConsoleFeatureEntry
 import com.example.day.features.console.api.PlannerConsoleFeatureEntry
 import com.example.day.features.console.api.RagConsoleFeatureEntry
+import com.example.day.features.console.api.SupportConsoleFeatureEntry
 import com.example.day.features.group_choice.api.GroupChoiceFeatureEntry
 import com.example.day.features.mcp_settings.api.McpSettingsFeatureEntry
 import com.example.day.features.user_settings.api.UserSettingsFeatureEntry
@@ -32,4 +33,6 @@ interface FeatureEntryProvider {
     fun getRagConsoleFeatureEntry(): RagConsoleFeatureEntry
     @Stable
     fun getAssistantConsoleFeatureEntry(): AssistantConsoleFeatureEntry
+    @Stable
+    fun getSupportConsoleFeatureEntry(): SupportConsoleFeatureEntry
 }

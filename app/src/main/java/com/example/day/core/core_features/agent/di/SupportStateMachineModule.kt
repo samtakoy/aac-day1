@@ -7,7 +7,7 @@ import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.agent.domain.workers.concrete.TaskWorker
-import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.SupportStateConfig
 import com.example.day.core.core_features.agent.domain.workers.task.states_store.StateStoreImpl
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
@@ -20,23 +20,23 @@ import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
-internal object TaskStateMachineModule {
+internal object SupportStateMachineModule {
 
     @Provides
-    @Named("task")
+    @Named("support")
     @Singleton
-    internal fun provideTaskStateStore(
+    internal fun provideSupportStateStore(
         agentMemoryRepository: AgentMemoryRepository,
         agentContextRepository: AgentContextRepository
     ): StateStore = StateStoreImpl(
         agentMemoryRepository = agentMemoryRepository,
         agentContextRepository = agentContextRepository,
-        stateConfig = TaskStateConfig.config
+        stateConfig = SupportStateConfig.config
     )
 
     @Provides
-    @Named("task")
-    internal fun provideTaskWorker(
+    @Named("support")
+    internal fun provideSupportWorker(
         aiAgentFactory: AIAgentFactory,
         chatTools: ChatTools,
         memoryProviderFactory: MemoryProviderFactory,
@@ -44,7 +44,7 @@ internal object TaskStateMachineModule {
         contextRepository: AgentContextRepository,
         llmRequestUseCase: LlmRequestUseCase,
         strategyFactory: StrategyFactory,
-        @Named("task") stateStore: StateStore,
+        @Named("support") stateStore: StateStore,
         toolProvider: ToolProvider,
         toolCallOrchestrator: ToolCallOrchestrator
     ): TaskWorker = TaskWorker(
@@ -58,6 +58,6 @@ internal object TaskStateMachineModule {
         stateStore = stateStore,
         toolProvider = toolProvider,
         toolCallOrchestrator = toolCallOrchestrator,
-        agentName = "task_state_agent"
+        agentName = "support_agent"
     )
 }
