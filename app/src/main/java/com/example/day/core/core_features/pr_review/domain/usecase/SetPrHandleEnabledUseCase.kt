@@ -1,6 +1,5 @@
 package com.example.day.core.core_features.pr_review.domain.usecase
 
-import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.day.core.core_features.llm.domain.model.ModelSettings
@@ -15,14 +14,13 @@ class SetPrHandleEnabledUseCase @Inject constructor(
     suspend operator fun invoke(isEnabled: Boolean, chatId: Long, modelSettings: ModelSettings? = null) {
         prHandleRepository.setPrHandleState(isEnabled, chatId, modelSettings)
         if (isEnabled) {
-            val request = OneTimeWorkRequestBuilder<TelegramPollingWorker>().build()
-            workManager.enqueueUniqueWork(
-                TelegramPollingWorker.WORK_NAME,
-                ExistingWorkPolicy.KEEP,
-                request
-            )
+            workManager.cancelAllWorkByTag(TelegramPollingWorker.WORK_TAG)
+            val request = OneTimeWorkRequestBuilder<TelegramPollingWorker>()
+                .addTag(TelegramPollingWorker.WORK_TAG)
+                .build()
+            workManager.enqueue(request)
         } else {
-            workManager.cancelUniqueWork(TelegramPollingWorker.WORK_NAME)
+            workManager.cancelAllWorkByTag(TelegramPollingWorker.WORK_TAG)
         }
     }
 }

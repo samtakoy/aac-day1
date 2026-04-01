@@ -32,7 +32,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
 
     private companion object {
         private const val TAG = "ToolCallOrchestrator(ktor)"
-        private const val MAX_TOOL_LOOPS = 3
+        private const val MAX_TOOL_LOOPS = 100
     }
 
     override suspend fun execute(

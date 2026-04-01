@@ -1,5 +1,6 @@
 package com.example.day.core.core_features.pr_review.data
 
+import android.util.Log
 import com.example.day.BuildConfig
 import com.example.day.core.core_features.pr_review.domain.model.TelegramPrEvent
 import com.example.day.core.core_features.pr_review.domain.repository.TelegramRepository
@@ -18,12 +19,20 @@ internal class TelegramRepositoryImpl @Inject constructor(
     private val json: Json
 ) : TelegramRepository {
 
+    private companion object {
+        const val TAG = "TelegramRepo"
+    }
+
     override suspend fun getPrUpdates(offset: Long): Result<List<TelegramPrEvent>> =
         runCatching {
             val url = "https://api.telegram.org/bot${BuildConfig.TELEGRAM_BOT_TOKEN}" +
                 "/getUpdates?offset=$offset&limit=10&timeout=0"
             val response: TelegramUpdatesResponse = httpClient.get(url).body()
             val targetChatId = BuildConfig.TELEGRAM_CHAT_ID.toLong()
+            Log.d(TAG, "targetChatId=$targetChatId, total updates=${response.result.size}")
+            response.result.forEach { u ->
+                Log.d(TAG, "  update_id=${u.updateId} chat=${u.message?.chat?.id} text=${u.message?.text?.take(80)}")
+            }
 
             response.result
                 .filter { update -> update.message?.chat?.id == targetChatId }

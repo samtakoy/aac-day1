@@ -29,27 +29,41 @@ internal class McpToolProvider @Inject constructor(
     private val json: Json
 ) : ToolProvider {
 
+    private companion object {
+        private const val TAG = "McpToolProvider"
+    }
+
     private val toolToServer = ConcurrentHashMap<String, String>()
 
     override suspend fun getTools(agentId: Long?): List<ModelRequest.Tool> {
+        android.util.Log.d(TAG, "getTools: start agentId=$agentId")
         val servers = getEnabledServers()
-        if (servers.isEmpty()) return emptyList()
+        if (servers.isEmpty()) {
+            android.util.Log.w(TAG, "getTools: no servers → returning empty")
+            return emptyList()
+        }
+        android.util.Log.d(TAG, "getTools: servers=${servers.map { "${it.id}(enabled=${it.isEnabled})" }}")
 
         toolToServer.clear()
-        // toolToServer map is rebuilt for each tool listing
 
-        // Получаем список разрешенных tools для агента (если задан agentId)
         val allowedTools = agentId?.let { getAllowedTools(it) }
+        android.util.Log.d(TAG, "getTools: agentAllowedTools=$allowedTools")
 
         val collected = mutableListOf<ModelRequest.Tool>()
         servers.forEach { server ->
             val tools = getConnectedTools(server.id)
+            android.util.Log.d(TAG, "getTools: server=${server.id} connectedTools=${tools.map { it.name }}")
             tools.forEach { tool ->
                 // Проверка 1: tool в глобальном списке разрешенных
-                if (!McpToolNames.ALLOWED_TOOL_NAMES.contains(tool.name)) return@forEach
-
+                if (!McpToolNames.ALLOWED_TOOL_NAMES.contains(tool.name)) {
+                    android.util.Log.v(TAG, "getTools: skip '${tool.name}' — not in ALLOWED_TOOL_NAMES")
+                    return@forEach
+                }
                 // Проверка 2: tool в списке разрешенных для агента (если задан)
-                if (allowedTools != null && !allowedTools.contains(tool.name)) return@forEach
+                if (allowedTools != null && !allowedTools.contains(tool.name)) {
+                    android.util.Log.v(TAG, "getTools: skip '${tool.name}' — not in agent allowedTools")
+                    return@forEach
+                }
 
                 if (toolToServer.containsKey(tool.name)) return@forEach
                 toolToServer[tool.name] = server.id
@@ -65,6 +79,7 @@ internal class McpToolProvider @Inject constructor(
                 )
             }
         }
+        android.util.Log.d(TAG, "getTools: returning ${collected.size} tools: ${collected.map { it.function.name }}")
         return collected
     }
 
@@ -72,12 +87,12 @@ internal class McpToolProvider @Inject constructor(
         toolCall: ModelResult.Success.ToolCall,
         context: ToolCallContext
     ): Result<String> {
+        // Некоторые модели (gpt-oss-20b/DeepInfra) добавляют артефакты в имя функции:
+        // "search_codebase<|channel|>commentary", "search_codebasecommentaryjson" и т.п.
+        // Обрезаем всё после первого невалидного символа.
         val toolName = toolCall.function.name
-        if (!McpToolNames.ALLOWED_TOOL_NAMES.contains(toolName)) {
-            return Result.failure(
-                IllegalArgumentException("${ToolCallingConstants.TOOL_NOT_ALLOWED_PREFIX}: $toolName")
-            )
-        }
+            .replace(Regex("[^a-zA-Z0-9_\\-].*"), "")
+            .trim()
 
         val serverId = resolveServerIdForTool(toolName)
             ?: return Result.failure(IllegalStateException(ToolCallingConstants.MCP_NOT_CONFIGURED))
@@ -120,9 +135,11 @@ internal class McpToolProvider @Inject constructor(
 
     private suspend fun resolveServerIdForTool(toolName: String): String? {
         toolToServer[toolName]?.let { return it }
+        android.util.Log.w(TAG, "resolveServer: '$toolName' not in toolToServer map (size=${toolToServer.size}, keys=${toolToServer.keys})")
         val servers = getEnabledServers()
         for (server in servers) {
             val tools = getConnectedTools(server.id)
+            android.util.Log.d(TAG, "resolveServer fallback: server=${server.id} tools=${tools.map { it.name }}")
             if (tools.any { it.name == toolName }) {
                 toolToServer[toolName] = server.id
                 return server.id
