@@ -16,7 +16,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,17 +27,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.FontWeight
 
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
+import com.mikepenz.markdown.compose.elements.MarkdownTable
+import com.mikepenz.markdown.compose.elements.MarkdownTableHeader
+import com.mikepenz.markdown.compose.elements.MarkdownTableRow
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
@@ -296,6 +302,12 @@ private fun ChatBubbleMarkdown(
     text: String,
     textColor: Color,
 ) {
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val highlightsBuilder = remember(isDark) {
+        dev.snipme.highlights.Highlights.Builder()
+            .theme(dev.snipme.highlights.model.SyntaxThemes.darcula(darkMode = isDark))
+            .language(dev.snipme.highlights.model.SyntaxLanguage.KOTLIN)
+    }
     CompositionLocalProvider(LocalContentColor provides textColor) {
         Markdown(
             content = text,
@@ -309,6 +321,51 @@ private fun ChatBubbleMarkdown(
                 h4 = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 h5 = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                 h6 = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+            ),
+            components = markdownComponents(
+                codeBlock = {
+                    MarkdownHighlightedCodeFence(
+                        content = it.content,
+                        node = it.node,
+                        highlightsBuilder = highlightsBuilder,
+                    )
+                },
+                codeFence = {
+                    MarkdownHighlightedCodeFence(
+                        content = it.content,
+                        node = it.node,
+                        highlightsBuilder = highlightsBuilder,
+                    )
+                },
+                table = {
+                    MarkdownTable(
+                        content = it.content,
+                        node = it.node,
+                        style = it.typography.table,
+                        headerBlock = { content, header, tableWidth, style ->
+                            MarkdownTableHeader(
+                                content = content,
+                                header = header,
+                                tableWidth = tableWidth,
+                                style = style,
+                                verticalAlignment = Alignment.Top,
+                                maxLines = Int.MAX_VALUE,
+                                overflow = TextOverflow.Clip,
+                            )
+                        },
+                        rowBlock = { content, row, tableWidth, style ->
+                            MarkdownTableRow(
+                                content = content,
+                                header = row,
+                                tableWidth = tableWidth,
+                                style = style,
+                                verticalAlignment = Alignment.Top,
+                                maxLines = Int.MAX_VALUE,
+                                overflow = TextOverflow.Clip,
+                            )
+                        },
+                    )
+                },
             ),
             modifier = Modifier.fillMaxWidth()
         )
