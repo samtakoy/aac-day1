@@ -3,6 +3,7 @@ package com.example.day.core.core_features.state_machine.domain
 import com.example.day.core.core_features.state_machine.domain.model.StateId
 
 interface StateStore {
+    fun getStateConfig(): StateConfig
     suspend fun getStateId(agentId: Long): StateId?
     suspend fun updateState(agentId: Long, newState: StateId)
     suspend fun getStateData(agentId: Long, stateId: StateId, step: Int): StateData?

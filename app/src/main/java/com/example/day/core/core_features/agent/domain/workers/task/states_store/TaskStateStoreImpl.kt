@@ -3,7 +3,6 @@ package com.example.day.core.core_features.agent.domain.workers.task.states_stor
 import android.util.Log
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.repository.AgentMemoryRepository
-import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
 import com.example.day.core.core_features.state_machine.domain.StateConfig
 import com.example.day.core.core_features.state_machine.domain.StateData
 import com.example.day.core.core_features.state_machine.domain.StateStore
@@ -27,23 +26,15 @@ class TaskStateStoreImpl @Inject constructor(
         private const val STATE_KEY = "state"
         private const val CUR_STEP_KEY = "step"
         private const val TOTAL_STEPS_KEY = "total_steps"
-        private const val INIT_DATA_KEY = "init:data"
-        private const val PLAN_DATA_KEY = "planning:data"
-        private const val EXE_DATA_KEY = "execution:data:"
-        private const val VERIF_DATA_KEY = "verification:data"
-        private const val DONE_DATA_KEY = "done:data"
-        /*
-        private val json = Json {
-            ignoreUnknownKeys = true
-            encodeDefaults = true
-            prettyPrint = false
-            isLenient = true
-        }*/
     }
 
     // In-memory cache for fast access
     private val keyToFact = mutableMapOf<String, String>()
     private val mutex = Mutex()
+
+    override fun getStateConfig(): StateConfig {
+        return stateConfig
+    }
 
     /**
      * TODO из-за отделения id состояния от его data-представления возможны гонки.
@@ -154,13 +145,7 @@ class TaskStateStoreImpl @Inject constructor(
     }
 
     private fun getStateDataKey(stateId: StateId, step: Int): String {
-        return when (stateId) {
-            TaskStateConfig.INIT -> INIT_DATA_KEY
-            TaskStateConfig.PLANNING -> PLAN_DATA_KEY
-            TaskStateConfig.EXECUTION -> EXE_DATA_KEY + step
-            TaskStateConfig.VERIFICATION -> VERIF_DATA_KEY
-            TaskStateConfig.DONE -> DONE_DATA_KEY
-            else -> ""
-        }
+        // вообще тут :data тут не обязательно, потому что это все просто id категории
+        return "state_${stateId.value}_$step:data"
     }
 }

@@ -71,7 +71,7 @@ class JustWorkWorker @Inject constructor(
             chatId = config.chatId,
             systemPrompt = "",  // ПУСТО! systemPrompt настраивается через onCreateCallback
             defaultModel = config.defaultModel,
-            defaultContext = { AContextDefaultFactory.createFull() },
+                defaultContext = { AContextDefaultFactory.createFull() } ,
             onCreateCallback = { agentId ->
                 // Настройка systemPrompt и allowedTools при первом создании агента
                 // Сохраняем системный промпт

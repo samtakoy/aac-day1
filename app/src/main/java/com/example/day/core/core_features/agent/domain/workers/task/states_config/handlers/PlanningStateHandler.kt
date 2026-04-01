@@ -10,7 +10,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_confi
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withButton
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withInfo
 import com.example.day.core.core_features.agent.domain.workers.task.states_config.withTitle
-import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
+import com.example.day.core.core_features.state_machine.domain.StateContext
 import com.example.day.core.core_features.state_machine.domain.HandlerResult
 import com.example.day.core.core_features.state_machine.domain.TaskStateHandler
 import com.example.day.core.core_features.state_machine.domain.model.StateId
@@ -26,7 +26,7 @@ class PlanningStateHandler : TaskStateHandler {
 
     override val stateName: StateId = TaskStateConfig.PLANNING
 
-    override suspend fun buildSystemPrompt(context: TaskContext): String {
+    override suspend fun buildSystemPrompt(context: StateContext): String {
         // Читаем результаты предыдущего этапа
         val initData = context.getStateData(TaskStateConfig.INIT, 1) as? TaskStateData.Init ?: return "Что-то пошло не так"
         val expert = initData.expert ?: "Эксперт"
@@ -92,12 +92,12 @@ class PlanningStateHandler : TaskStateHandler {
 """.trimIndent()
     }
 
-    override suspend fun buildAssistantPreFillPrompt(context: TaskContext): String {
+    override suspend fun buildAssistantPreFillPrompt(context: StateContext): String {
         return "Итак, ко мне пришел пользователь с постановкой задачи, которую мне нужно разбить на этапы и определить эксперта для каждого этапа. Сейчас я напишу, что я думаю об этом на основе имеющейся информации и буду задавать вопросы для полного понимания, с помощью каких этапов и кем решается задача пользователя, чтобы пользователь могу достичь своей цели."
     }
 
     override suspend fun handle(
-        context: TaskContext,
+        context: StateContext,
         userInput: String,
         llmResponse: TaskLlmResponse
     ): HandlerResult {
@@ -170,7 +170,7 @@ class PlanningStateHandler : TaskStateHandler {
     }
 
     override suspend fun handleUserAction(
-        context: TaskContext,
+        context: StateContext,
         action: String
     ): HandlerResult {
         return if (action == ACTION_PROCEED) {

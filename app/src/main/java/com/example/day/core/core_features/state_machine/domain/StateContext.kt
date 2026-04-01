@@ -1,17 +1,12 @@
-package com.example.day.core.core_features.agent.domain.workers.task.states_store
+package com.example.day.core.core_features.state_machine.domain
 
-import com.example.day.core.core_features.agent.domain.workers.task.TaskMemKeys
-import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateData
-import com.example.day.core.core_features.chat.domain.model.Chat
-import com.example.day.core.core_features.state_machine.domain.StateStore
 import com.example.day.core.core_features.state_machine.domain.model.StateId
 
 /**
  * Context for task state machine execution.
  * Holds all necessary data for current task state.
  */
-data class TaskContext(
-    val chat: Chat,
+data class StateContext(
     val agentId: Long,
     val store: StateStore
 ) {
@@ -26,20 +21,21 @@ data class TaskContext(
     suspend fun setTotalSteps(steps: Int) = store.setTotalStages(agentId, steps)
 
     // TODO - этот дефолтный параметр - источник багов - убрать (и вообще откзаться от него как и от отдельной переменной стейта)
-    suspend fun saveStateData(data: TaskStateData, step: Int = 1) {
+    suspend fun saveStateData(data: StateData, step: Int = 1) {
         store.updateStateData(agentId, step, data)
     }
 
-    suspend fun getStateData(state: StateId, step: Int): TaskStateData? {
-        return store.getStateData(agentId, state, step) as TaskStateData?
+    suspend fun getStateData(state: StateId, step: Int): StateData? {
+        return store.getStateData(agentId, state, step)
     }
 
     suspend fun clearTaskMemory() = store.clearMemory(agentId)
 
-    data class StageArtifact(
-        val step: Int,
-        val name: String,
-        val description: String,
-        val artifact: String
-    )
+    suspend fun getStateDescription(): String {
+        return store.getStateConfig().stateInfoProvider.getStateDescription(
+            state = getState(),
+            stepNum = getCurStepNum(),
+            totalSteps = getTotalSteps()
+        )
+    }
 }

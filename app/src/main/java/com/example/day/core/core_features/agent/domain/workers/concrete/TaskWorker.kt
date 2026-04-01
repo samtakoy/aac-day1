@@ -12,9 +12,7 @@ import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrato
 import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.agent.domain.workers.task.TaskResponseParser
-import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
-import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateData
-import com.example.day.core.core_features.agent.domain.workers.task.states_store.TaskContext
+import com.example.day.core.core_features.state_machine.domain.StateContext
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
@@ -63,8 +61,7 @@ class TaskWorker @Inject constructor(
             defaultModel = { chat.settings.model.copy(jsonFormat = true) },
             defaultContext = { AContextDefaultFactory.createEmpty() }
         )
-        val taskContext = TaskContext(
-            chat = chat,
+        val taskContext = StateContext(
             agentId = agent.config.id,
             store = stateStore
         )
@@ -106,7 +103,14 @@ class TaskWorker @Inject constructor(
             onSuccess = { agentResult ->
                 val llmResponse = TaskResponseParser.parse(agentResult.responseText)
                 if (llmResponse != null) {
-                    processSuccessResponse(taskContext, userPrompt, llmResponse, agentResult.responseText, onEvent)
+                    processSuccessResponse(
+                        chat,
+                        taskContext,
+                        userPrompt,
+                        llmResponse,
+                        agentResult.responseText,
+                        onEvent
+                    )
                 } else {
                     handleParseError(chat.id, agentResult.responseText)
                 }
@@ -123,9 +127,9 @@ class TaskWorker @Inject constructor(
             defaultModel = { chat.settings.model.copy(jsonFormat = true) },
             defaultContext = { AContextDefaultFactory.createEmpty() }
         )
-        val taskContext = TaskContext(chat = chat, agentId = agent.config.id, store = stateStore)
+        val taskContext = StateContext(agentId = agent.config.id, store = stateStore)
         val currentState = taskContext.getState()
-        val handler = TaskStateConfig.config.handlers[currentState]
+        val handler = taskContext.store.getStateConfig().handlers[currentState]
 
         val result = handler?.handleUserAction(taskContext, action)
         result?.messages?.forEach { msg ->
@@ -168,37 +172,21 @@ class TaskWorker @Inject constructor(
 
     private suspend fun reportCurrentState(
         chatId: Long,
-        taskContext: TaskContext
+        taskContext: StateContext
     ) {
-        val step = taskContext.getCurStepNum()
-        val totalStages = taskContext.getTotalSteps()
-        val stageName = taskContext.getCurStepNum()
-
-        val stateDescription = when (taskContext.getState()) {
-            TaskStateConfig.INIT -> "Сбор требований и определение задачи"
-            TaskStateConfig.PLANNING -> "Декомпозиция задачи на этапы"
-            TaskStateConfig.EXECUTION -> buildString {
-                append("Выполнение этапа $step")
-                if (totalStages > 0) append(" из $totalStages")
-            }
-            TaskStateConfig.VERIFICATION -> buildString {
-                append("Проверка задачи")
-            }
-            TaskStateConfig.DONE -> "Формирование итогового отчёта"
-            else -> "Неизвестно"
-        }
-
+        val stateDescription = taskContext.getStateDescription()
         chatTools.addInfoMessage(chatId, "📍 Было Состояние: ${taskContext.getState()?.value} — $stateDescription")
     }
 
     private suspend fun processSuccessResponse(
-        context: TaskContext,
+        chat: Chat,
+        context: StateContext,
         userInput: String,
         llmResponse: TaskLlmResponse,
         rawResponse: String,
         onEvent: (suspend (WorkerEvent) -> Unit)?
     ) {
-        val stateConfig = TaskStateConfig.config
+        val stateConfig = context.store.getStateConfig()
         val currentState = context.getState()!!
         val handler =  stateConfig.handlers[currentState]!!
 
@@ -208,41 +196,40 @@ class TaskWorker @Inject constructor(
         // 1. Сообщения в чат
         result.messages.forEach { msg ->
             when {
-                msg.isTitle -> chatTools.addTitleMessage(context.   chat.id, msg.message, msg.buttons)
-                msg.isInfo -> chatTools.addInfoMessage(context.chat.id, msg.message, msg.buttons)
-                else -> chatTools.addBotMessage(context.chat.id, msg.message, msg.buttons)
+                msg.isTitle -> chatTools.addTitleMessage(chat.id, msg.message, msg.buttons)
+                msg.isInfo -> chatTools.addInfoMessage(chat.id, msg.message, msg.buttons)
+                else -> chatTools.addBotMessage(chat.id, msg.message, msg.buttons)
             }
         }
         // Отладочное при ошибке
         if (result.errorMessage != null) {
-            chatTools.addBotMessage(context.chat.id, "Что-то пошло не так: ${result.errorMessage}\n$rawResponse")
+            chatTools.addBotMessage(chat.id, "Что-то пошло не так: ${result.errorMessage}\n$rawResponse")
         }
 
         // Loop back
         if (result.llmRequest != null) {
             doWork(
                 userPrompt = result.llmRequest.userPrompt.orEmpty(),
-                chat = context.chat,
+                chat = chat,
                 onEvent = onEvent
             )
         }
     }
 
-    private suspend fun validateInitialState(context: TaskContext) {
+    private suspend fun validateInitialState(context: StateContext) {
         val currentState = context.getState()
         when {
             currentState == null -> {
-                val newState = TaskStateConfig.INIT
-                context.updateState(newState)
-                context.saveStateData(TaskStateData.Init())
+                context.updateState(context.store.getStateConfig().fallbackState)
+                context.saveStateData(context.store.getStateConfig().fallbackStateData)
             }
         }
     }
 
-    private suspend fun clearTaskDataIfNeeded(context: TaskContext) {
+    private suspend fun clearTaskDataIfNeeded(context: StateContext) {
         val currentState = context.getState()
         when {
-            currentState == TaskStateConfig.DONE || currentState == null -> {
+            currentState == null -> {
                 context.clearTaskMemory()
             }
         }
