@@ -40,9 +40,9 @@ interface NetworkModule {
                 }
                 install(SSE)
                 install(HttpTimeout) {
-                    requestTimeoutMillis = 300_000  // 5 мин — для медленных локальных LLM
+                    //requestTimeoutMillis = 300_000  // 5 мин — для медленных локальных LLM
                     connectTimeoutMillis = 15_000
-                    socketTimeoutMillis = 300_000
+                    //socketTimeoutMillis = 300_000
                 }
             }
         }

@@ -31,7 +31,12 @@ object McpToolNames {
         "get_pr_info",
         "get_pr_diff",
         "get_pr_file_diff",
-        "add_pr_review_comment"
+        "add_pr_review_comment",
+        "get_crm_user_by_chat",
+        "create_crm_user",
+        "get_crm_user_tickets",
+        "create_crm_ticket",
+        "update_crm_ticket",
         /*
         GET_ISSUE,
         LIST_ISSUES,

@@ -1,6 +1,6 @@
 package com.example.day.core.core_features.agent.domain.model
 
-import com.example.day.core.core_features.agent.domain.workers.task.TaskMemKeys
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.task.TaskMemKeys
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

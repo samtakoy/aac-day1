@@ -6,6 +6,7 @@ import com.example.day.core.core_features.agent.domain.workers.task.states_confi
 import com.example.day.core.core_features.state_machine.domain.StateContext
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.memory.domain.provider.base.MemoryProvider
+import com.example.day.core.core_features.state_machine.domain.SM_TAG
 import com.example.day.core.core_features.state_machine.domain.StateStore
 
 class TaskStateMemoryProvider(
@@ -21,12 +22,13 @@ class TaskStateMemoryProvider(
     }
 
     override suspend fun getMemoryContext(): List<AContextMessage> {
-        Log.e("ktor", "getMemoryContext: ${agentId}")
         val curState = taskStateStore.getStateId(agentId) ?: return emptyList()
-        Log.e("ktor", "getMemoryContext: agentId=$agentId, curState=$curState, step=${taskStateStore.getCurrentStage(agentId)}")
-        val stateData = taskStateStore.getStateData(agentId, curState, taskStateStore.getCurrentStage(agentId))
-        Log.e("ktor", "stateData: $stateData")
+        val step = taskStateStore.getCurrentStage(agentId)
+        Log.d(SM_TAG, "[$agentId] getMemoryContext: state=${curState.value}, step=$step")
+        val stateData = taskStateStore.getStateData(agentId, curState, step)
+        Log.d(SM_TAG, "[$agentId] stateData=${stateData?.javaClass?.simpleName ?: "null"}, historySize=${stateData?.history?.size ?: 0}")
         val context = StateContext(
+            chatId = chat.id,
             agentId = agentId,
             store = taskStateStore
         )

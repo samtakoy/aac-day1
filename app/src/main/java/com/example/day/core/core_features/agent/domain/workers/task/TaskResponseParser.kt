@@ -1,6 +1,7 @@
 package com.example.day.core.core_features.agent.domain.workers.task
 
 import com.example.day.core.core_features.agent.domain.model.TaskLlmResponse
+import com.example.day.core.core_features.agent.domain.workers.task.util.sanitizeJsonStringValues
 import kotlinx.serialization.json.Json
 
 /**
@@ -24,9 +25,9 @@ object TaskResponseParser {
      */
     fun parse(rawResponse: String): TaskLlmResponse? {
         return try {
-            // Try to extract JSON from markdown code block
             val jsonContent = extractJson(rawResponse)
-            json.decodeFromString(TaskLlmResponse.serializer(), jsonContent)
+            val sanitized = sanitizeJsonStringValues(jsonContent)
+            json.decodeFromString(TaskLlmResponse.serializer(), sanitized)
         } catch (e: Exception) {
             null
         }
@@ -34,24 +35,28 @@ object TaskResponseParser {
 
     /**
      * Extract JSON from response that may be wrapped in markdown.
+     * NOTE: code-block search is only applied when the response is NOT already raw JSON,
+     * to avoid matching ``` blocks embedded inside a JSON string value.
      */
-    private fun extractJson(response: String): String {
-        // Try to find JSON in markdown code block
+    internal fun extractJson(response: String): String {
+        val trimmed = response.trim()
+
+        // Already a JSON object — return as-is (code blocks inside string values must not be touched)
+        if (trimmed.startsWith('{')) return trimmed
+
+        // Wrapped in a markdown code block — extract the inner content
         val codeBlockRegex = """```(?:json)?\s*([\s\S]*?)```""".toRegex()
-        val match = codeBlockRegex.find(response)
+        val match = codeBlockRegex.find(trimmed)
+        if (match != null) return match.groupValues[1].trim()
 
-        return if (match != null) {
-            match.groupValues[1].trim()
+        // Last resort: find first { … last }
+        val jsonStart = trimmed.indexOf('{')
+        val jsonEnd = trimmed.lastIndexOf('}')
+        return if (jsonStart >= 0 && jsonEnd > jsonStart) {
+            trimmed.substring(jsonStart, jsonEnd + 1)
         } else {
-            // Try to find JSON object directly
-            val jsonStart = response.indexOf('{')
-            val jsonEnd = response.lastIndexOf('}')
-
-            if (jsonStart >= 0 && jsonEnd > jsonStart) {
-                response.substring(jsonStart, jsonEnd + 1)
-            } else {
-                response.trim()
-            }
+            trimmed
         }
     }
+
 }

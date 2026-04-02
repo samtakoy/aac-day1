@@ -2,6 +2,8 @@ package com.example.day.core.core_features.agent.domain.workers.concrete
 
 import android.util.Log
 import com.example.day.core.core_features.agent.domain.AIAgent
+import com.example.day.core.core_features.state_machine.domain.SM_TAG
+
 import com.example.day.core.core_features.agent.domain.AIAgentFactory
 import com.example.day.core.core_features.agent.domain.AgentContextRepository
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
@@ -52,21 +54,22 @@ class TaskWorker constructor(
             agentName,
             chat.id,
             "",
-            defaultModel = { chat.settings.model.copy(jsonFormat = true) },
+            defaultModel = { chat.settings.model.copy(jsonFormat = true, temperature = 0.0) },
             defaultContext = { AContextDefaultFactory.createEmpty() }
         )
         val taskContext = StateContext(
+            chatId = chat.id,
             agentId = agent.config.id,
             store = stateStore
         )
+        Log.d(SM_TAG, "[${agent.config.id}] doWork: state=${taskContext.getState()?.value ?: "null"}, prompt='$userPrompt'")
         if (userPrompt.isNotBlank()) {
             clearTaskDataIfNeeded(taskContext)
         }
         validateInitialState(taskContext)
+        Log.d(SM_TAG, "[${agent.config.id}] after init: state=${taskContext.getState()?.value}, step=${taskContext.getCurStepNum()}")
         val compositeProvider = buildMemoryProvider(chat, agent)
         val strategy = strategyFactory.create(agent.config.contextStrategyType)
-
-        Log.e("ktor", "init agent: ${agent.config.id}")
         // Create new agent instance with composite memory provider
         val agentWithTaskState = AIAgent(
             config = agent.config,
@@ -109,7 +112,7 @@ class TaskWorker constructor(
             defaultModel = { chat.settings.model.copy(jsonFormat = true) },
             defaultContext = { AContextDefaultFactory.createEmpty() }
         )
-        val taskContext = StateContext(agentId = agent.config.id, store = stateStore)
+        val taskContext = StateContext(chatId = chat.id, agentId = agent.config.id, store = stateStore)
         val currentState = taskContext.getState()
         val handler = taskContext.store.getStateConfig().handlers[currentState]
 
@@ -172,8 +175,10 @@ class TaskWorker constructor(
         val currentState = context.getState()!!
         val handler =  stateConfig.handlers[currentState]!!
 
+        Log.d(SM_TAG, "[${context.agentId}] processSuccessResponse: state=${currentState.value}, raw=$rawResponse")
         // Handle state logic
         val result = handler.handle(context, userInput, rawResponse)
+        Log.d(SM_TAG, "[${context.agentId}] handler result: msgs=${result.messages.size}, nextLlm=${result.llmRequest?.userPrompt}, err=${result.errorMessage}")
 
         // 1. Сообщения в чат
         result.messages.forEach { msg ->
@@ -203,6 +208,7 @@ class TaskWorker constructor(
         when {
             currentState == null -> {
                 context.updateState(context.store.getStateConfig().fallbackState)
+                context.setCurStepNum(1)
                 context.saveStateData(context.store.getStateConfig().fallbackStateData)
             }
         }
@@ -211,7 +217,7 @@ class TaskWorker constructor(
     private suspend fun clearTaskDataIfNeeded(context: StateContext) {
         val currentState = context.getState()
         when {
-            currentState == null -> {
+            currentState == null || context.store.getStateConfig().isFinalState(currentState)  -> {
                 context.clearTaskMemory()
             }
         }

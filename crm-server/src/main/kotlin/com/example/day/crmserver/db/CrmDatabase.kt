@@ -5,6 +5,7 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -51,6 +52,32 @@ class CrmDatabase {
             it[CrmUsersTable.name] = name
         }[CrmUsersTable.id]
         UserRow(id = insertedId, chatId = chatId, name = name)
+    }
+
+    fun getUsersByName(name: String): List<UserRow> = transaction {
+        CrmUsersTable.selectAll()
+            .where { CrmUsersTable.name.lowerCase() like "%${name.lowercase()}%" }
+            .map { row ->
+                UserRow(
+                    id = row[CrmUsersTable.id],
+                    chatId = row[CrmUsersTable.chatId],
+                    name = row[CrmUsersTable.name]
+                )
+            }
+    }
+
+    fun getAllTickets(): List<TicketRow> = transaction {
+        CrmTicketsTable.selectAll()
+            .map { row ->
+                TicketRow(
+                    id = row[CrmTicketsTable.id],
+                    chatId = row[CrmTicketsTable.chatId],
+                    status = row[CrmTicketsTable.status],
+                    title = row[CrmTicketsTable.title],
+                    description = row[CrmTicketsTable.description],
+                    result = row[CrmTicketsTable.result]
+                )
+            }
     }
 
     fun getTicketsByChatId(chatId: Long): List<TicketRow> = transaction {

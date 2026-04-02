@@ -7,7 +7,7 @@ import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.agent.domain.workers.concrete.TaskWorker
-import com.example.day.core.core_features.agent.domain.workers.task.states_config.SupportStateConfig
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.support.SupportStateConfig
 import com.example.day.core.core_features.agent.domain.workers.task.states_store.StateStoreImpl
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
@@ -27,11 +27,12 @@ internal object SupportStateMachineModule {
     @Singleton
     internal fun provideSupportStateStore(
         agentMemoryRepository: AgentMemoryRepository,
-        agentContextRepository: AgentContextRepository
+        agentContextRepository: AgentContextRepository,
+        stateConfig: SupportStateConfig
     ): StateStore = StateStoreImpl(
         agentMemoryRepository = agentMemoryRepository,
         agentContextRepository = agentContextRepository,
-        stateConfig = SupportStateConfig.config
+        stateConfig = stateConfig.config
     )
 
     @Provides

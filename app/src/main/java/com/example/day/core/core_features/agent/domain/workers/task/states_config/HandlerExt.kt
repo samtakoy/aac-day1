@@ -1,5 +1,7 @@
 package com.example.day.core.core_features.agent.domain.workers.task.states_config
 
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.task.TaskStateConfig
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.task.TaskStateData
 import com.example.day.core.core_features.state_machine.domain.StateContext
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
 import com.example.day.core.core_features.state_machine.domain.HandlerResult

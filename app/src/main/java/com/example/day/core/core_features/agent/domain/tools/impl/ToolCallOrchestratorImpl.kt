@@ -2,6 +2,7 @@ package com.example.day.core.core_features.agent.domain.tools.impl
 
 import android.util.Log
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
+import com.example.day.core.core_features.state_machine.domain.SM_TAG
 import com.example.day.core.core_features.agent.domain.model.toModelRequestMessage
 import com.example.day.core.core_features.agent.domain.tools.AssistantToolCall
 import com.example.day.core.core_features.agent.domain.tools.ToolCallContext
@@ -65,6 +66,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
 
         while (loopIndex < MAX_TOOL_LOOPS) {
             // 1. Запрос к LLM
+            Log.d(SM_TAG, "[ORC] askLlm iteration=$loopIndex, messages=${messages.size}, tools=${tools.size}")
             val llmResult = llmProvider.askLlm(
                 model = modelSettings,
                 prompt = null,

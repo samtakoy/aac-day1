@@ -1,6 +1,6 @@
 package com.example.day.core.core_features.agent.domain.workers.task.validation
 
-import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.task.TaskStateConfig
 import com.example.day.core.core_features.state_machine.domain.model.StateId
 
 /**

@@ -7,7 +7,7 @@ import com.example.day.core.core_features.agent.domain.strategy.StrategyFactory
 import com.example.day.core.core_features.agent.domain.tools.ToolCallOrchestrator
 import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.agent.domain.workers.concrete.TaskWorker
-import com.example.day.core.core_features.agent.domain.workers.task.states_config.TaskStateConfig
+import com.example.day.core.core_features.agent.domain.workers.task.states_config.task.TaskStateConfig
 import com.example.day.core.core_features.agent.domain.workers.task.states_store.StateStoreImpl
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase

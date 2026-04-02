@@ -2,6 +2,7 @@ package com.example.day.crmserver
 
 import com.example.day.crmserver.config.CrmConfig
 import com.example.day.crmserver.db.CrmDatabase
+import com.example.day.crmserver.routes.crmRoutes
 import com.example.day.crmserver.tools.registerCrmTools
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
@@ -46,6 +47,7 @@ fun main() {
             get("/health") {
                 call.respond(buildJsonObject { put("status", JsonPrimitive("ok")) })
             }
+            crmRoutes(db)
         }
     }.start(wait = true)
 }

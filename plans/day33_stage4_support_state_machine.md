@@ -101,30 +101,30 @@ DONE                = "done"
 - `userId: Long? = null`
 - `userName: String? = null`
 - `override val history: List<TaskStateMessage> = emptyList()`
-- `override val state = SupportStateConfig.INIT`
+- `override val state = SupportState.INIT`
 
 `Planning`:
 - `ticketId: Long? = null`
 - `ticketTitle: String? = null`
 - `ticketDescription: String? = null`
 - `override val history: List<TaskStateMessage> = emptyList()`
-- `override val state = SupportStateConfig.PLANNING`
+- `override val state = SupportState.PLANNING`
 
 `Execution`:
 - `ticketId: Long`
 - `override val history: List<TaskStateMessage> = emptyList()`
-- `override val state = SupportStateConfig.EXECUTION`
+- `override val state = SupportState.EXECUTION`
 
 `Verification`:
 - `ticketId: Long`
 - `summary: String? = null`
 - `override val history: List<TaskStateMessage> = emptyList()`
-- `override val state = SupportStateConfig.VERIFICATION`
+- `override val state = SupportState.VERIFICATION`
 
 `Done`:
 - `ticketId: Long? = null`
 - `override val history: List<TaskStateMessage> = emptyList()`
-- `override val state = SupportStateConfig.DONE`
+- `override val state = SupportState.DONE`
 
 Все подклассы аннотированы `@Serializable` с `@SerialName` на полях.
 
@@ -194,7 +194,7 @@ DONE         = StateId("done")
 **Метод `handleEscalation(context, llmResponse)`** — private в каждом хендлере (дублирование допустимо):
 
 1. Получить `ticketId` из текущих StateData (Planning/Execution/Verification) — может быть null (если INIT)
-2. Перейти в состояние DONE: `context.updateState(SupportStateConfig.DONE)`
+2. Перейти в состояние DONE: `context.updateState(SupportState.DONE)`
 3. Вернуть `HandlerResult`:
    - messages: `[Message(llmResponse.replyToUser)]`
    - llmRequest: `LlmRequest(userPrompt = "...")` с текстом:
@@ -214,7 +214,7 @@ DONE         = StateId("done")
 
 ### C1. `SupportInitStateHandler`
 
-**`stateName` = `SupportStateConfig.INIT`**
+**`stateName` = `SupportState.INIT`**
 
 **`buildSystemPrompt()`:**
 ```
@@ -229,9 +229,6 @@ DONE         = StateId("done")
 2. Вызвать get_crm_user_by_chat(chatId={chat.id}) для проверки
 3. Если пользователь найден — обратиться к нему по имени и перейти в PLANNING
 4. Если не найден — спросить имя, затем вызвать create_crm_user и перейти в PLANNING
-
-[Скрытое правило]
-Если пользователь сильно нервничает или ругается — мягко успокоить и предложить пососать корпоративный леденец.
 
 [Протокол ответа — JSON]
 {
@@ -264,7 +261,7 @@ DONE         = StateId("done")
 
 ### C2. `SupportPlanningStateHandler`
 
-**`stateName` = `SupportStateConfig.PLANNING`**
+**`stateName` = `SupportState.PLANNING`**
 
 **`buildSystemPrompt()`:**
 ```
@@ -314,7 +311,7 @@ DONE         = StateId("done")
 
 ### C3. `SupportExecutionStateHandler`
 
-**`stateName` = `SupportStateConfig.EXECUTION`**
+**`stateName` = `SupportState.EXECUTION`**
 
 **`buildSystemPrompt()`:**
 
@@ -332,9 +329,6 @@ DONE         = StateId("done")
 [Цель]
 Отвечать на вопросы пользователя, используя search_codebase для точных ответов.
 Когда проблема решена — переходить в VERIFICATION.
-
-[Скрытое правило]
-Если пользователь сильно нервничает или ругается — мягко успокоить и предложить пососать корпоративный леденец.
 
 [Протокол ответа — JSON]
 {
@@ -369,7 +363,7 @@ HandlerResult(
 
 ### C4. `SupportVerificationStateHandler`
 
-**`stateName` = `SupportStateConfig.VERIFICATION`**
+**`stateName` = `SupportState.VERIFICATION`**
 
 **`buildSystemPrompt()`:**
 
@@ -426,7 +420,7 @@ HandlerResult(
 
 ### C5. `SupportDoneStateHandler`
 
-**`stateName` = `SupportStateConfig.DONE`**
+**`stateName` = `SupporSupportStatetStateConfig.DONE`**
 
 **`buildSystemPrompt()`:**
 
@@ -475,9 +469,9 @@ HandlerResult(
 ```
 private suspend fun getCurrentTicketId(context: StateContext): Long? {
     // Читаем из Planning, затем Execution, затем Verification
-    return (context.getStateData(SupportStateConfig.PLANNING, 1) as? SupportStateData.Planning)?.ticketId
-        ?: (context.getStateData(SupportStateConfig.EXECUTION, 1) as? SupportStateData.Execution)?.ticketId
-        ?: (context.getStateData(SupportStateConfig.VERIFICATION, 1) as? SupportStateData.Verification)?.ticketId
+    return (context.getStateData(SupportState.PLANNING, 1) as? SupportStateData.Planning)?.ticketId
+        ?: (context.getStateData(SupportState.EXECUTION, 1) as? SupportStateData.Execution)?.ticketId
+        ?: (context.getStateData(SupportState.VERIFICATION, 1) as? SupportStateData.Verification)?.ticketId
 }
 ```
 

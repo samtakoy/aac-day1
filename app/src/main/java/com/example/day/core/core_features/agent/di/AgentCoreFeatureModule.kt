@@ -19,6 +19,7 @@ import com.example.day.core.core_features.agent.domain.tools.ToolProvider
 import com.example.day.core.core_features.chat.data.local.ChatDatabase
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
 import com.example.day.core.core_features.chat.domain.tools.ChatToolsImpl
+import com.example.day.core.core_features.crm.di.CrmModule
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import dagger.Binds
 import dagger.Module
@@ -34,7 +35,8 @@ import javax.inject.Singleton
         CommandHandlerModule::class,
         BranchingStrategyModule::class,
         TaskStateMachineModule::class,
-        SupportStateMachineModule::class
+        SupportStateMachineModule::class,
+        CrmModule::class
     ]
 )
 internal interface AgentCoreFeatureModule {

@@ -155,7 +155,7 @@ ACTION_PROCEED -> {
 
 ```kotlin
 if (llmResponse.memoryUpdates["escalate_to_operator"] == "true") {
-    context.updateState(SupportStateConfig.DONE)
+    context.updateState(SupportState.DONE)
     return HandlerResult(
         messages = listOf(HandlerResult.Message(llmResponse.replyToUser)),
         llmRequest = HandlerResult.LlmRequest(

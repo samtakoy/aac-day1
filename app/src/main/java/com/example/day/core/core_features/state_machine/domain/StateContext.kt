@@ -7,6 +7,7 @@ import com.example.day.core.core_features.state_machine.domain.model.StateId
  * Holds all necessary data for current task state.
  */
 data class StateContext(
+    val chatId: Long,
     val agentId: Long,
     val store: StateStore
 ) {

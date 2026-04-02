@@ -1,7 +1,6 @@
 package com.example.day.core.core_features.agent.domain.tools
 
 object ToolCallingConstants {
-    const val MAX_TOOL_LOOPS = 3
     const val MCP_NOT_CONFIGURED = "MCP сервер не настроен"
     const val MCP_TOOL_ERROR_PREFIX = "MCP tool error"
     const val UNKNOWN_TOOL_ERROR = "Неизвестная ошибка"

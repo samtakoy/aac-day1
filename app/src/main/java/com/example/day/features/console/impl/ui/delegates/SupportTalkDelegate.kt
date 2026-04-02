@@ -63,7 +63,7 @@ class SupportTalkDelegate(
     private suspend fun handleWorkerEvent(event: WorkerEvent, chat: Chat) {
         when (event) {
             is WorkerEvent.ToolCallStarted -> {
-                chatTools.addInfoMessage(chat.id, "MCP tool: ${event.toolName}")
+                chatTools.addInfoMessage(chat.id, "MCP tool: ${event.toolName}, ${event.arguments}, id: ${event.toolCallId}")
             }
             is WorkerEvent.ToolCallFinished -> {
                 val status = if (event.isError) "error" else "ok"
