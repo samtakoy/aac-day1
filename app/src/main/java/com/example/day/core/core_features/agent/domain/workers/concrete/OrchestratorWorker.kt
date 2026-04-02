@@ -53,6 +53,7 @@ class OrchestratorWorker @Inject constructor(
         private const val SYNTHESIZER_AGENT_NAME = "orchestrator_synthesizer"
 
         const val isVerifyOn = true
+        private const val MAX_RESULT_IN_CONTEXT = 3000
 
         private val SYSTEM_PROMPT = """
 Ты эксперт по декомпозиции задач.
@@ -368,7 +369,11 @@ class OrchestratorWorker @Inject constructor(
             previousResults.forEach { r ->
                 appendLine()
                 appendLine(r.subtask)
-                appendLine("Результат: ${r.result}")
+                val resultText = if (r.result.length > MAX_RESULT_IN_CONTEXT)
+                    r.result.take(MAX_RESULT_IN_CONTEXT) + "\n... [truncated, ${r.result.length} chars total]"
+                else
+                    r.result
+                appendLine("Результат: $resultText")
             }
             appendLine()
             appendLine("---")
