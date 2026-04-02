@@ -40,6 +40,30 @@ object GitHubToolDefaults {
     const val DEFAULT_PAGE = 1
 }
 
+/**
+ * Converts a glob pattern (using '/' as separator) to a Regex.
+ * Supports * (any chars within a segment) and ** (any chars including '/').
+ * Works cross-platform — does not rely on OS-specific PathMatcher.
+ */
+private fun globToRegex(glob: String): Regex {
+    val sb = StringBuilder("^")
+    var i = 0
+    while (i < glob.length) {
+        when {
+            glob[i] == '*' && i + 1 < glob.length && glob[i + 1] == '*' -> {
+                sb.append(".*")
+                i += 2
+                if (i < glob.length && glob[i] == '/') i++ // skip trailing slash after **
+            }
+            glob[i] == '*' -> { sb.append("[^/]*"); i++ }
+            glob[i] == '?' -> { sb.append("[^/]"); i++ }
+            else -> { sb.append(Regex.escape(glob[i].toString())); i++ }
+        }
+    }
+    sb.append("$")
+    return Regex(sb.toString())
+}
+
 fun registerMcpTools(server: Server, api: GitHubApiClient, projectPath: String) {
     registerEcho(server)
     registerGetIssue(server, api)
@@ -274,47 +298,36 @@ private fun registerGetGitFileList(server: Server, api: GitHubApiClient, project
             properties = buildJsonObject {
                 put("pattern", buildJsonObject {
                     put("type", JsonPrimitive("string"))
-                    put("description", JsonPrimitive("Glob-паттерн для фильтрации файлов, например '*.kt' или 'app/src/**/*.kt'. Если не указан — возвращаются все файлы."))
+                    put("description", JsonPrimitive("Glob-паттерн для фильтрации файлов. Примеры: '*.kt' — .kt файлы в корне; 'app/src/**/*.kt' — все .kt по пути; '**/*Worker*' — файлы с 'Worker' в имени в любой директории. ВАЖНО: для поиска по имени файла в поддиректориях всегда используй '**/*keyword*', а не просто '*keyword*'. Если не указан — возвращаются все файлы."))
                 })
             }
         )
     ) { request ->
         val pattern = request.arguments?.get("pattern")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
         if (pattern != null) {
-            // Filter by pattern using local git ls-files
-            try {
-                val process = ProcessBuilder("git", "-C", projectPath, "ls-files", pattern).start()
-                val completed = process.waitFor(10, TimeUnit.SECONDS)
-                if (!completed) {
-                    process.destroyForcibly()
+            // Get all files via GitHub API, then filter locally by glob pattern
+            api.listAllFiles().fold(
+                onSuccess = { allFiles ->
+                    val regex = globToRegex(pattern)
+                    val fileList = allFiles.filter { regex.matches(it.trimStart('/')) }
+                    val responseJson = buildJsonObject {
+                        put("status", JsonPrimitive("ok"))
+                        put("content", JsonArray(fileList.map { JsonPrimitive(it) }))
+                    }
+                    CallToolResult(content = listOf(TextContent(text = responseJson.toString())))
+                },
+                onFailure = { error ->
                     val responseJson = buildJsonObject {
                         put("status", JsonPrimitive("error"))
                         put("content", JsonArray(emptyList()))
-                        put("error", JsonPrimitive("Timeout: git ls-files не ответил за 10 секунд"))
+                        put("error", JsonPrimitive(error.message ?: "Unknown error"))
                     }
-                    return@addTool CallToolResult(
+                    CallToolResult(
                         content = listOf(TextContent(text = responseJson.toString())),
                         isError = true
                     )
                 }
-                val output = process.inputStream.bufferedReader().readText().trim()
-                val fileList = if (output.isBlank()) emptyList() else output.lines().map { "/$it" }
-                val responseJson = buildJsonObject {
-                    put("status", JsonPrimitive("ok"))
-                    put("content", JsonArray(fileList.map { JsonPrimitive(it) }))
-                }
-                CallToolResult(content = listOf(TextContent(text = responseJson.toString())))
-            } catch (e: Exception) {
-                val responseJson = buildJsonObject {
-                    put("status", JsonPrimitive("error"))
-                    put("content", JsonArray(emptyList()))
-                    put("error", JsonPrimitive(e.message ?: "Unknown error"))
-                }
-                CallToolResult(
-                    content = listOf(TextContent(text = responseJson.toString())),
-                    isError = true
-                )
-            }
+            )
         } else {
             api.listAllFiles().fold(
                 onSuccess = { fileList ->

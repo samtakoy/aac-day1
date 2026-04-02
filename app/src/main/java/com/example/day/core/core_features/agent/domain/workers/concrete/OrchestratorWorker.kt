@@ -7,7 +7,6 @@ import com.example.day.core.core_features.agent.domain.workers.base.AWorker
 import com.example.day.core.core_features.agent.domain.workers.base.WorkerEvent
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.tools.ChatTools
-import com.mikepenz.markdown.utils.LogCompositions
 import javax.inject.Inject
 
 class OrchestratorWorker @Inject constructor(
@@ -36,6 +35,12 @@ class OrchestratorWorker @Inject constructor(
         data class Failure(val index: Int, val message: String) : StepOutcome
     }
 
+    private sealed interface VerifyOutcome {
+        data object Ok : VerifyOutcome
+        data class Fail(val reason: String) : VerifyOutcome
+        data class Retry(val revisedPrompt: String) : VerifyOutcome
+    }
+
     // endregion
 
     companion object {
@@ -44,6 +49,9 @@ class OrchestratorWorker @Inject constructor(
         const val AGENT_NAME = "orchestrator_agent"
         const val TASK_PREFIX = "@@task"
         private const val WORKER_AGENT_NAME = "orchestrator_worker"
+        private const val VERIFIER_AGENT_NAME = "orchestrator_verifier"
+
+        const val isVerifyOn = true
 
         private val SYSTEM_PROMPT = """
 Ты эксперт по декомпозиции задач.
@@ -57,6 +65,7 @@ class OrchestratorWorker @Inject constructor(
 5. Инструкция должна исключать догадки: ассистент должен работать только с теми данными, которые получил от инструментов или из предыдущих шагов.
 6. Если задача решается в один шаг — создай одну подзадачу.
 7. Если инструменты не позволяют выполнить задачу — напиши обоснование вместо подзадач.
+8. Если для выполнения подзадачи нужен инструмент — укажи его имя явно в тексте подзадачи.
 
 # ТРЕБОВАНИЯ К ФОРМАТУ:
 - Запрещено добавлять любой текст (приветствия, пояснения) до тега [TASK_START] или после последнего тега [SUBTASKS_END].
@@ -72,6 +81,24 @@ class OrchestratorWorker @Inject constructor(
 [SUBTASKS_START]
 Подзадача 2: Из списка в Подзадаче 1 выбери... Ожидаемый результат: список из 3 строк.
 [SUBTASKS_END]
+        """.trimIndent()
+
+        private val VERIFY_SYSTEM_PROMPT = """
+Ты верификатор результата подзадачи в пайплайне.
+
+Тебе передаётся полный контекст пайплайна (общая задача, список всех шагов, результаты предыдущих шагов, текущая подзадача) и фактический результат исполнителя текущего шага.
+Твоя задача — оценить, выполнена ли текущая подзадача корректно. Предыдущие шаги не оценивай.
+
+Отвечай ТОЛЬКО одной из трёх форм — никакого другого текста:
+
+[OK]
+— результат соответствует ожиданиям подзадачи
+
+[FAIL] <причина>
+— результат некорректен и исправить его невозможно (объективный факт: ошибка инструмента, данных нет и т.п.)
+
+[RETRY] <исправленная инструкция для исполнителя>
+— результат некорректен, но задачу можно переформулировать. Напиши конкретную исправленную инструкцию.
         """.trimIndent()
     }
 
@@ -113,22 +140,45 @@ class OrchestratorWorker @Inject constructor(
                 orchestratorData = orchestratorResults,
                 previousResults = results
             )
-            Log.e(TAG,"task ${index + 1} systemPrompt: ${step.systemPrompt}")
-            Log.e(TAG,"task ${index + 1} userPrompt: ${step.userPrompt}")
+            Log.e(TAG, "task ${index + 1} systemPrompt: ${step.systemPrompt}")
+            Log.e(TAG, "task ${index + 1} userPrompt: ${step.userPrompt}")
+
             when (val outcome = executeStep(step, chat, onEvent)) {
-                is StepOutcome.Success -> {
-                    results.add(outcome.result)
-                    Log.e(TAG,"task ${index + 1} result: ${outcome.result}")
-                }
                 is StepOutcome.Failure -> {
                     chatTools.addBotMessage(chat.id, "❌ Ошибка подзадачи ${outcome.index + 1}: ${outcome.message}")
-                    Log.e(TAG,"task ${index + 1} failure: ${outcome.message}")
+                    Log.e(TAG, "task ${index + 1} failure: ${outcome.message}")
                     return
+                }
+                is StepOutcome.Success -> {
+                    Log.e(TAG, "task ${index + 1} result: ${outcome.result}")
+                    val finalResult = if (isVerifyOn) {
+                        when (val verify = verifyStep(step, outcome.result, chat, onEvent)) {
+                            is VerifyOutcome.Ok -> outcome.result
+                            is VerifyOutcome.Fail -> {
+                                chatTools.addInfoMessage(chat.id, "❌ Верификация подзадачи ${step.index + 1}: ${verify.reason}")
+                                return
+                            }
+                            is VerifyOutcome.Retry -> {
+                                chatTools.addInfoMessage(chat.id, "🔁 Повтор подзадачи ${step.index + 1}...")
+                                val retryStep = step.copy(userPrompt = verify.revisedPrompt)
+                                when (val retryOutcome = executeStep(retryStep, chat, onEvent)) {
+                                    is StepOutcome.Success -> retryOutcome.result
+                                    is StepOutcome.Failure -> {
+                                        chatTools.addInfoMessage(chat.id, "❌ Повтор подзадачи ${step.index + 1}: ${retryOutcome.message}")
+                                        return
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        outcome.result
+                    }
+                    results.add(finalResult)
                 }
             }
         }
 
-        chatTools.addInfoMessage(chat.id, "✅ Ok")
+        chatTools.addBotMessage(chat.id, "✅ Ok")
     }
 
     // endregion
@@ -206,6 +256,44 @@ class OrchestratorWorker @Inject constructor(
 
     // endregion
 
+    // region — Phase 2: Verifier
+
+    private suspend fun verifyStep(
+        step: PipelineStep,
+        result: SubTaskResult,
+        chat: Chat,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ): VerifyOutcome {
+        val config = JustWorkConfig(
+            agentName = "${VERIFIER_AGENT_NAME}_${chat.id}",
+            chatId = chat.id,
+            systemPrompt = buildVerifierSystemPrompt(step),
+            allowedTools = emptyList(),
+            defaultModel = { chat.settings.model },
+            defaultContext = { AContextDefaultFactory.createFull() },
+            recreateAgent = true,
+            memoryTypes = emptyList(),
+        )
+
+        val text = justWorkWorker.doWork(config, buildVerifierUserPrompt(step, result), onEvent = onEvent)
+            .getOrElse { return VerifyOutcome.Ok }
+
+        Log.e(TAG, "verify ${step.index + 1} outcome: $text")
+        return parseVerifyOutcome(text)
+    }
+
+    private fun parseVerifyOutcome(text: String): VerifyOutcome {
+        val trimmed = text.trim()
+        return when {
+            trimmed.startsWith("[OK]")    -> VerifyOutcome.Ok
+            trimmed.startsWith("[FAIL]")  -> VerifyOutcome.Fail(trimmed.removePrefix("[FAIL]").trim())
+            trimmed.startsWith("[RETRY]") -> VerifyOutcome.Retry(trimmed.removePrefix("[RETRY]").trim())
+            else -> VerifyOutcome.Ok
+        }
+    }
+
+    // endregion
+
     // region — prompt builders
 
     private fun buildWorkerSystemPrompt(parsed: OrchestratorParsedResult, currentIndex: Int): String = buildString {
@@ -240,6 +328,23 @@ class OrchestratorWorker @Inject constructor(
         }
         appendLine("Твоя текущая задача (подзадача ${currentIndex + 1}):")
         append(subtasks[currentIndex])
+    }
+
+    private fun buildVerifierSystemPrompt(step: PipelineStep): String = buildString {
+        appendLine(step.systemPrompt)
+        appendLine()
+        appendLine("---")
+        appendLine()
+        append(VERIFY_SYSTEM_PROMPT)
+    }
+
+    private fun buildVerifierUserPrompt(step: PipelineStep, result: SubTaskResult): String = buildString {
+        appendLine(step.userPrompt)
+        appendLine()
+        appendLine("---")
+        appendLine()
+        appendLine("Фактический результат исполнителя:")
+        append(result.result)
     }
 
     // endregion
