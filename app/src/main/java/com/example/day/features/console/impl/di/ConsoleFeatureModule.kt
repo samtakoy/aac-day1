@@ -37,8 +37,10 @@ internal class ConsoleFeatureModule {
         return AssistantTalkDelegate(
             addChatMessageUseCase = deps.addChatMessageUseCase,
             assistantWorker = deps.assistantWorker,
+            orchestratorWorker = deps.orchestratorWorker,
             chatTools = deps.chatTools,
             consumptionCalculator = deps.consuption,
+            json = deps.json
         )
     }
 

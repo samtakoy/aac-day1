@@ -19,6 +19,7 @@ import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.ModelResult
 import com.example.day.core.core_features.llm.domain.model.ModelSettings
 import com.example.day.core.core_features.llm.domain.model.getContent
+import com.example.day.core.core_features.llm.domain.model.getReasoning
 import kotlinx.collections.immutable.toPersistentList
 import javax.inject.Inject
 
@@ -80,6 +81,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
             }
 
             lastLlmResult = llmResult
+            Log.e("[ORCH]", "reasoning: " + llmResult.getReasoning().orEmpty() + "\n")
             val choice = llmResult.choices.firstOrNull()
             val toolCalls = choice?.message?.toolCalls
 

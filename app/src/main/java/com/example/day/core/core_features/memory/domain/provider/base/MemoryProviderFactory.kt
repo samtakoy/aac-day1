@@ -23,23 +23,20 @@ class MemoryProviderFactory @Inject constructor(
         agentId: Long? = null
     ): MemoryProvider {
         val providers = mutableListOf<MemoryProvider>()
-        
+
         // Добавляем memory providers по типам
         if (memoryTypes.isNotEmpty()) {
             providers.addAll(
                 memoryTypes.mapNotNull { createProviderByType(it, agentId) }
             )
         }
-        
+
         // Всегда добавляем agent-specific providers если есть agentId
         agentId?.let {
             providers.add(agentSystemPromptMemoryProvider.apply { bindAgentId(it) })
             providers.add(agentToolsMemoryProvider.apply { bindAgentId(it) })
         }
-        
-        // Всегда добавляем tool call helper
-        providers.add(toolCallHelperMemoryProvider)
-        
+
         return CompositeMemoryProvider(providers)
     }
 
@@ -60,6 +57,7 @@ class MemoryProviderFactory @Inject constructor(
                     autoRagMemoryProvider
                 }
             }
+            MemoryType.ToolCallHelper -> toolCallHelperMemoryProvider
         }
     }
 }
