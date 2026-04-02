@@ -24,6 +24,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
@@ -136,15 +137,23 @@ class GitHubApiClient(
     suspend fun listAllFiles(): Result<List<String>> = runCatching {
         val (resolvedOwner, resolvedRepo) = resolveRepo(null, null)
 
-        // Получаем SHA default branch через repo info
-        val repoInfo = client.get("/repos/$resolvedOwner/$resolvedRepo")
-            .body<JsonObject>()
+        // Определяем ветку: из env GIT_BRANCH, иначе default_branch репозитория
+        val repoInfo = client.get("/repos/$resolvedOwner/$resolvedRepo").body<JsonObject>()
         val defaultBranch = repoInfo["default_branch"]?.jsonPrimitive?.content ?: "main"
+        val branch = System.getenv("GIT_BRANCH")?.takeIf { it.isNotBlank() } ?: defaultBranch
 
-        // Запрашиваем дерево файлов рекурсивно
+        val branchResp = client.get("/repos/$resolvedOwner/$resolvedRepo/git/ref/heads/$branch")
+            .body<JsonObject>()
+        val sha = branchResp["object"]?.jsonObject?.get("sha")?.jsonPrimitive?.content
+            ?: error("Cannot resolve SHA for branch '$branch'")
+
+        // Запрашиваем дерево файлов рекурсивно по SHA коммита
         val treeResponse = client.get(
-            "/repos/$resolvedOwner/$resolvedRepo/git/trees/$defaultBranch?recursive=1"
+            "/repos/$resolvedOwner/$resolvedRepo/git/trees/$sha?recursive=1"
         ).body<JsonObject>()
+
+        val truncated = treeResponse["truncated"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
+        if (truncated) error("GitHub tree response is truncated — repository is too large for Trees API")
 
         val tree = treeResponse["tree"]?.jsonArray
             ?: error("Invalid tree response: missing 'tree' field")
@@ -161,12 +170,13 @@ class GitHubApiClient(
      * Скачивает содержимое файла по полному пути.
      * GitHub возвращает содержимое в base64, метод декодирует его.
      */
-    suspend fun getFileContent(filePath: String): Result<String> = runCatching {
+    suspend fun getFileContent(filePath: String, branch: String? = null): Result<String> = runCatching {
         val (resolvedOwner, resolvedRepo) = resolveRepo(null, null)
         val cleanPath = filePath.trimStart('/')
+        val refSuffix = branch?.takeIf { it.isNotBlank() }?.let { "?ref=$it" } ?: ""
 
         val response = client.get(
-            "/repos/$resolvedOwner/$resolvedRepo/contents/$cleanPath"
+            "/repos/$resolvedOwner/$resolvedRepo/contents/$cleanPath$refSuffix"
         ).body<JsonObject>()
 
         val contentBase64 = response["content"]?.jsonPrimitive?.content

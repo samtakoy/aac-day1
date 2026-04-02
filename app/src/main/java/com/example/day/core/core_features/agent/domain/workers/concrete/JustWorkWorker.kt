@@ -83,7 +83,7 @@ class JustWorkWorker @Inject constructor(
                         fact = config.systemPrompt
                     )
                 }
-                
+
                 // Сохраняем список разрешенных tools (если не пустой)
                 if (config.allowedTools.isNotEmpty()) {
                     val toolsJson = json.encodeToString(config.allowedTools)
@@ -93,6 +93,11 @@ class JustWorkWorker @Inject constructor(
                         category = AgentToolsMemoryProvider.CATEGORY,
                         fact = toolsJson
                     )
+                }
+
+                // Явно задаём MemoryType если указано в конфиге
+                config.memoryTypes?.let { types ->
+                    agentRepository.updateAgentMemories(agentId, types)
                 }
             }
         )

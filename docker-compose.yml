@@ -8,10 +8,13 @@ services:
     container_name: mcp-server
     ports:
       - "3000:3000"
+    volumes:
+      - .:/workspace:ro
     environment:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GITHUB_OWNER=${GITHUB_OWNER}
       - GITHUB_REPO=${GITHUB_REPO}
+      - GIT_PROJECT_PATH=/workspace
       - JAVA_OPTS=-Xmx256m
     restart: unless-stopped
     healthcheck:

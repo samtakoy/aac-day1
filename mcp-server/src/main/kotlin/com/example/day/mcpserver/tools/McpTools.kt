@@ -12,6 +12,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 object GitHubToolNames {
@@ -27,6 +28,11 @@ object GitHubToolNames {
     const val RESET_GIT_FILE_LIST_CACHE = "reset_git_file_list_cache"
     // Day 31: Developer assistant
     const val GET_CURRENT_GIT_BRANCH = "get_current_git_branch"
+    // Day 34: Local file tools
+    const val READ_LOCAL_FILE = "read_local_file"
+    const val WRITE_LOCAL_FILE = "write_local_file"
+    const val LIST_LOCAL_FILES = "list_local_files"
+    const val SEARCH_LOCAL_FILES = "search_local_files"
     // Day 32: GitHub PR tools
     const val GET_PR_INFO = "get_pr_info"
     const val GET_PR_DIFF = "get_pr_diff"
@@ -38,6 +44,58 @@ object GitHubToolDefaults {
     const val DEFAULT_STATE = "open"
     const val DEFAULT_PER_PAGE = 20
     const val DEFAULT_PAGE = 1
+}
+
+/**
+ * Converts a glob pattern (using '/' as separator) to a Regex.
+ * Supports * (any chars within a segment), ** (any chars including '/'),
+ * ? (single char), and {a,b,c} brace expansion (e.g. "*.{kt,java}").
+ * Works cross-platform — does not rely on OS-specific PathMatcher.
+ */
+// Normalises a user-supplied glob pattern so that filename-only patterns work
+// for files anywhere in the directory tree:
+//   "Worker"   -> "**/*Worker*"   (plain name, no wildcards)
+//   "*Worker*" -> "**/*Worker*"   (filename glob, no path separator)
+//   "*.kt"     -> "**/*.kt"       (extension glob)
+// Patterns that already contain '/' or start with "**" are returned unchanged.
+internal fun normalizeGlobPattern(raw: String): String = when {
+    raw.contains('/') -> raw        // explicit path — leave as-is
+    raw.startsWith("**") -> raw     // already anchored with ** — leave as-is
+    raw.contains('*') -> "**/$raw"  // filename glob like *Worker* → **/*Worker*
+    else -> "**/*$raw*"             // plain name like Worker → **/*Worker*
+}
+
+internal fun globToRegex(glob: String): Regex {
+    val sb = StringBuilder("^")
+    var i = 0
+    while (i < glob.length) {
+        when {
+            glob[i] == '*' && i + 1 < glob.length && glob[i + 1] == '*' -> {
+                sb.append(".*")
+                i += 2
+                if (i < glob.length && glob[i] == '/') i++ // skip trailing slash after **
+            }
+            glob[i] == '*' -> { sb.append("[^/]*"); i++ }
+            glob[i] == '?' -> { sb.append("[^/]"); i++ }
+            glob[i] == '{' -> {
+                val end = glob.indexOf('}', i)
+                if (end == -1) { sb.append(Regex.escape("{")); i++ }
+                else {
+                    val alternatives = glob.substring(i + 1, end).split(',')
+                    sb.append("(?:")
+                    alternatives.forEachIndexed { idx, alt ->
+                        if (idx > 0) sb.append('|')
+                        sb.append(Regex.escape(alt.trim()))
+                    }
+                    sb.append(')')
+                    i = end + 1
+                }
+            }
+            else -> { sb.append(Regex.escape(glob[i].toString())); i++ }
+        }
+    }
+    sb.append("$")
+    return Regex(sb.toString())
 }
 
 fun registerMcpTools(server: Server, api: GitHubApiClient, projectPath: String) {
@@ -54,6 +112,11 @@ fun registerMcpTools(server: Server, api: GitHubApiClient, projectPath: String) 
     registerResetGitFileListCache(server, api)
     // Day 31: Developer assistant
     registerGetCurrentGitBranch(server, projectPath)
+    // Day 34: Local file tools
+    registerReadLocalFile(server, projectPath)
+    registerWriteLocalFile(server, projectPath)
+    registerListLocalFiles(server, projectPath)
+    registerSearchLocalFiles(server, projectPath)
     // Day 32: GitHub PR tools
     registerGetPrInfo(server, api)
     registerGetPrDiff(server, api)
@@ -266,55 +329,44 @@ private fun registerCreateComment(server: Server, api: GitHubApiClient) {
 private fun registerGetGitFileList(server: Server, api: GitHubApiClient, projectPath: String) {
     server.addTool(
         name = GitHubToolNames.GET_GIT_FILE_LIST,
-        description = "Получает список всех полных имён файлов из git репозитория. " +
-            "Возвращает массив путей в формате /path/to/file.ext. " +
-            "owner и repo берутся из переменных окружения. " +
-            "Опциональный параметр pattern позволяет фильтровать файлы по glob-паттерну (например '*.kt').",
+        description = "Получает список файлов через GitHub API (только запушенные ветки). " +
+            "Используй ТОЛЬКО когда нужен список файлов конкретной remote-ветки. " +
+            "Для работы с текущими локальными файлами используй list_local_files — он видит незапушенные изменения и работает быстрее.",
         inputSchema = ToolSchema(
             properties = buildJsonObject {
                 put("pattern", buildJsonObject {
                     put("type", JsonPrimitive("string"))
-                    put("description", JsonPrimitive("Glob-паттерн для фильтрации файлов, например '*.kt' или 'app/src/**/*.kt'. Если не указан — возвращаются все файлы."))
+                    put("description", JsonPrimitive("Glob-паттерн для фильтрации файлов (globstar). Если указать просто имя файла без '*' и '/' — инструмент сам применит '**/*name*' (рекурсивный поиск). Примеры: 'MemoryProviderFactory.kt' → найдёт файл в любой директории; '**/*Worker*' — все файлы с 'Worker' в имени; 'app/src/**/*.kt' — все .kt в поддиректориях пути. Если не указан — возвращаются все файлы."))
                 })
             }
         )
     ) { request ->
-        val pattern = request.arguments?.get("pattern")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+        val rawPattern = request.arguments?.get("pattern")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+        val pattern = rawPattern?.let { normalizeGlobPattern(it) }
         if (pattern != null) {
-            // Filter by pattern using local git ls-files
-            try {
-                val process = ProcessBuilder("git", "-C", projectPath, "ls-files", pattern).start()
-                val completed = process.waitFor(10, TimeUnit.SECONDS)
-                if (!completed) {
-                    process.destroyForcibly()
+            // Get all files via GitHub API, then filter locally by glob pattern
+            api.listAllFiles().fold(
+                onSuccess = { allFiles ->
+                    val regex = globToRegex(pattern)
+                    val fileList = allFiles.filter { regex.matches(it.trimStart('/')) }
+                    val responseJson = buildJsonObject {
+                        put("status", JsonPrimitive("ok"))
+                        put("content", JsonArray(fileList.map { JsonPrimitive(it) }))
+                    }
+                    CallToolResult(content = listOf(TextContent(text = responseJson.toString())))
+                },
+                onFailure = { error ->
                     val responseJson = buildJsonObject {
                         put("status", JsonPrimitive("error"))
                         put("content", JsonArray(emptyList()))
-                        put("error", JsonPrimitive("Timeout: git ls-files не ответил за 10 секунд"))
+                        put("error", JsonPrimitive(error.message ?: "Unknown error"))
                     }
-                    return@addTool CallToolResult(
+                    CallToolResult(
                         content = listOf(TextContent(text = responseJson.toString())),
                         isError = true
                     )
                 }
-                val output = process.inputStream.bufferedReader().readText().trim()
-                val fileList = if (output.isBlank()) emptyList() else output.lines().map { "/$it" }
-                val responseJson = buildJsonObject {
-                    put("status", JsonPrimitive("ok"))
-                    put("content", JsonArray(fileList.map { JsonPrimitive(it) }))
-                }
-                CallToolResult(content = listOf(TextContent(text = responseJson.toString())))
-            } catch (e: Exception) {
-                val responseJson = buildJsonObject {
-                    put("status", JsonPrimitive("error"))
-                    put("content", JsonArray(emptyList()))
-                    put("error", JsonPrimitive(e.message ?: "Unknown error"))
-                }
-                CallToolResult(
-                    content = listOf(TextContent(text = responseJson.toString())),
-                    isError = true
-                )
-            }
+            )
         } else {
             api.listAllFiles().fold(
                 onSuccess = { fileList ->
@@ -343,12 +395,18 @@ private fun registerGetGitFileList(server: Server, api: GitHubApiClient, project
 private fun registerGetFileContent(server: Server, api: GitHubApiClient) {
     server.addTool(
         name = GitHubToolNames.GET_FILE_CONTENT,
-        description = "Скачивает содержимое файла из git репозитория по полному пути.",
+        description = "Скачивает содержимое файла через GitHub API (только запушенные ветки). " +
+            "Используй ТОЛЬКО когда нужно получить файл из конкретной remote-ветки (например сравнить с 'main'). " +
+            "Для чтения текущих локальных файлов используй read_local_file — он работает без push и быстрее.",
         inputSchema = ToolSchema(
             properties = buildJsonObject {
                 put("file_path", buildJsonObject {
                     put("type", JsonPrimitive("string"))
                     put("description", JsonPrimitive("Полный путь к файлу (например /path/to/file.kt)"))
+                })
+                put("branch", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Ветка для получения файла. Если не указана — используется текущая (GIT_BRANCH). Пример: 'main'"))
                 })
             },
             required = listOf("file_path")
@@ -359,7 +417,8 @@ private fun registerGetFileContent(server: Server, api: GitHubApiClient) {
                 content = listOf(TextContent(text = "file_path is required")),
                 isError = true
             )
-        api.getFileContent(filePath).fold(
+        val branch = request.arguments?.get("branch")?.jsonPrimitive?.contentOrNull
+        api.getFileContent(filePath, branch).fold(
             onSuccess = { content ->
                 val responseJson = buildJsonObject {
                     put("status", JsonPrimitive("ok"))
@@ -431,6 +490,258 @@ private fun registerGetCurrentGitBranch(server: Server, projectPath: String) {
         } catch (e: Exception) {
             CallToolResult(
                 content = listOf(TextContent(text = e.message ?: "Unknown error")),
+                isError = true
+            )
+        }
+    }
+}
+
+// Day 34: Local file tools
+
+private fun localFile(projectPath: String, filePath: String): File {
+    val root = File(projectPath).canonicalFile
+    val target = File(root, filePath.trimStart('/')).canonicalFile
+    require(target.path.startsWith(root.path)) { "Access denied: path outside project root" }
+    return target
+}
+
+private fun registerReadLocalFile(server: Server, projectPath: String) {
+    server.addTool(
+        name = GitHubToolNames.READ_LOCAL_FILE,
+        description = "Читает содержимое файла из локального проекта на устройстве. " +
+            "Используй для чтения текущего состояния файла (включая незапушенные изменения). " +
+            "file_path — путь относительно корня проекта, например '/app/src/main/java/com/example/Foo.kt'.",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("file_path", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Путь к файлу от корня проекта, например /app/src/main/java/com/example/Foo.kt"))
+                })
+            },
+            required = listOf("file_path")
+        )
+    ) { request ->
+        val filePath = request.arguments?.get("file_path")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: file_path is required")),
+                isError = true
+            )
+        try {
+            val file = localFile(projectPath, filePath)
+            if (!file.exists()) {
+                return@addTool CallToolResult(
+                    content = listOf(TextContent(text = buildJsonObject {
+                        put("status", JsonPrimitive("error"))
+                        put("error", JsonPrimitive("File not found: $filePath"))
+                    }.toString())),
+                    isError = true
+                )
+            }
+            val content = file.readText(Charsets.UTF_8)
+            CallToolResult(content = listOf(TextContent(text = buildJsonObject {
+                put("status", JsonPrimitive("ok"))
+                put("content", JsonPrimitive(content))
+            }.toString())))
+        } catch (e: IllegalArgumentException) {
+            CallToolResult(
+                content = listOf(TextContent(text = buildJsonObject {
+                    put("status", JsonPrimitive("error"))
+                    put("error", JsonPrimitive(e.message ?: "Access denied"))
+                }.toString())),
+                isError = true
+            )
+        } catch (e: Exception) {
+            CallToolResult(
+                content = listOf(TextContent(text = buildJsonObject {
+                    put("status", JsonPrimitive("error"))
+                    put("error", JsonPrimitive(e.message ?: "Unknown error"))
+                }.toString())),
+                isError = true
+            )
+        }
+    }
+}
+
+private fun registerWriteLocalFile(server: Server, projectPath: String) {
+    server.addTool(
+        name = GitHubToolNames.WRITE_LOCAL_FILE,
+        description = "Создаёт или полностью перезаписывает файл в локальном проекте. " +
+            "Промежуточные директории создаются автоматически. " +
+            "ВАЖНО: передавай полное содержимое файла — существующий файл будет заменён целиком.",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("file_path", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Путь к файлу от корня проекта, например /app/src/main/java/com/example/Foo.kt"))
+                })
+                put("content", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Полное содержимое файла (заменяет существующий файл целиком)"))
+                })
+            },
+            required = listOf("file_path", "content")
+        )
+    ) { request ->
+        val filePath = request.arguments?.get("file_path")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: file_path is required")),
+                isError = true
+            )
+        val content = request.arguments?.get("content")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: content is required")),
+                isError = true
+            )
+        try {
+            val file = localFile(projectPath, filePath)
+            file.parentFile?.mkdirs()
+            file.writeText(content, Charsets.UTF_8)
+            CallToolResult(content = listOf(TextContent(text = buildJsonObject {
+                put("status", JsonPrimitive("ok"))
+                put("file_path", JsonPrimitive(filePath))
+                put("bytes_written", JsonPrimitive(content.toByteArray(Charsets.UTF_8).size))
+            }.toString())))
+        } catch (e: IllegalArgumentException) {
+            CallToolResult(
+                content = listOf(TextContent(text = buildJsonObject {
+                    put("status", JsonPrimitive("error"))
+                    put("error", JsonPrimitive(e.message ?: "Access denied"))
+                }.toString())),
+                isError = true
+            )
+        } catch (e: Exception) {
+            CallToolResult(
+                content = listOf(TextContent(text = buildJsonObject {
+                    put("status", JsonPrimitive("error"))
+                    put("error", JsonPrimitive(e.message ?: "Unknown error"))
+                }.toString())),
+                isError = true
+            )
+        }
+    }
+}
+
+private fun registerListLocalFiles(server: Server, projectPath: String) {
+    server.addTool(
+        name = GitHubToolNames.LIST_LOCAL_FILES,
+        description = "Возвращает список файлов из локального проекта на устройстве (включая незапушенные изменения). " +
+            "В отличие от get_git_file_list не требует push — читает прямо с диска. " +
+            "Опциональный параметр pattern — glob-паттерн (например '**/*.kt'). " +
+            "Просто имя файла без '*' и '/' автоматически превращается в '**/*name*'.",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("pattern", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Glob-паттерн. Примеры: 'Foo.kt' → найдёт в любой директории; '**/*Worker*' — все файлы с Worker в имени; 'app/src/**/*.kt' — все .kt файлы. Если не указан — все файлы."))
+                })
+            }
+        )
+    ) { request ->
+        try {
+            val rawPattern = request.arguments?.get("pattern")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+            val pattern = rawPattern?.let { normalizeGlobPattern(it) }
+            val root = File(projectPath)
+            val allFiles = root.walk()
+                .onEnter { dir -> !dir.name.startsWith('.') && dir.name != "build" }
+                .filter { it.isFile }
+                .map { "/" + it.relativeTo(root).path.replace('\\', '/') }
+                .toList()
+            val filtered = if (pattern != null) {
+                val regex = globToRegex(pattern)
+                allFiles.filter { regex.matches(it.trimStart('/')) }
+            } else {
+                allFiles
+            }
+            CallToolResult(content = listOf(TextContent(text = buildJsonObject {
+                put("status", JsonPrimitive("ok"))
+                put("content", JsonArray(filtered.map { JsonPrimitive(it) }))
+            }.toString())))
+        } catch (e: Exception) {
+            CallToolResult(
+                content = listOf(TextContent(text = buildJsonObject {
+                    put("status", JsonPrimitive("error"))
+                    put("error", JsonPrimitive(e.message ?: "Unknown error"))
+                }.toString())),
+                isError = true
+            )
+        }
+    }
+}
+
+private fun registerSearchLocalFiles(server: Server, projectPath: String) {
+    server.addTool(
+        name = GitHubToolNames.SEARCH_LOCAL_FILES,
+        description = "Ищет строки, содержащие заданный текст, во всех локальных файлах проекта. " +
+            "Возвращает ТОЛЬКО совпадающие строки с указанием файла и номера строки — не читает файлы целиком. " +
+            "Используй вместо read_local_file когда нужно найти что-то по всему проекту. " +
+            "Опциональный glob ограничивает поиск по типу файлов (например '**/*.kt').",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                put("pattern", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Текст для поиска (поддерживается regex). Например: '// Day', 'registerMcpTools', 'addTool'"))
+                })
+                put("glob", buildJsonObject {
+                    put("type", JsonPrimitive("string"))
+                    put("description", JsonPrimitive("Glob-фильтр файлов. Например: '**/*.kt', '**/*.md'. Если не указан — ищет во всех файлах."))
+                })
+                put("max_results", buildJsonObject {
+                    put("type", JsonPrimitive("integer"))
+                    put("description", JsonPrimitive("Максимальное число совпадений (по умолчанию 200)"))
+                })
+            },
+            required = listOf("pattern")
+        )
+    ) { request ->
+        val patternStr = request.arguments?.get("pattern")?.jsonPrimitive?.contentOrNull
+            ?: return@addTool CallToolResult(
+                content = listOf(TextContent(text = "error: pattern is required")),
+                isError = true
+            )
+        val rawGlob = request.arguments?.get("glob")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+        val glob = rawGlob?.let {
+            if (!it.contains('/') && !it.contains('*')) "**/*$it*" else it
+        }
+        val maxResults = request.arguments?.get("max_results")?.jsonPrimitive?.intOrNull ?: 200
+
+        try {
+            val regex = Regex(patternStr)
+            val globRegex = glob?.let { globToRegex(it) }
+            val root = File(projectPath)
+
+            data class Match(val path: String, val line: Int, val text: String)
+
+            val matches = mutableListOf<Match>()
+            root.walk()
+                .onEnter { dir -> !dir.name.startsWith('.') && dir.name != "build" }
+                .filter { it.isFile }
+                .forEach { file ->
+                if (matches.size >= maxResults) return@forEach
+                val relativePath = "/" + file.relativeTo(root).path.replace('\\', '/')
+                if (globRegex != null && !globRegex.matches(relativePath.trimStart('/'))) return@forEach
+                runCatching {
+                    file.bufferedReader(Charsets.UTF_8).useLines { lines ->
+                        lines.forEachIndexed { idx, line ->
+                            if (matches.size < maxResults && regex.containsMatchIn(line)) {
+                                matches.add(Match(relativePath, idx + 1, line.trim()))
+                            }
+                        }
+                    }
+                }
+            }
+
+            val resultLines = matches.joinToString("\n") { "${it.path}:${it.line}: ${it.text}" }
+            CallToolResult(content = listOf(TextContent(text = buildJsonObject {
+                put("status", JsonPrimitive("ok"))
+                put("count", JsonPrimitive(matches.size))
+                put("results", JsonPrimitive(resultLines))
+            }.toString())))
+        } catch (e: Exception) {
+            CallToolResult(
+                content = listOf(TextContent(text = buildJsonObject {
+                    put("status", JsonPrimitive("error"))
+                    put("error", JsonPrimitive(e.message ?: "Unknown error"))
+                }.toString())),
                 isError = true
             )
         }

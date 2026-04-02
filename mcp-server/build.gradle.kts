@@ -10,6 +10,7 @@ group = "com.example.day"
 version = "1.0.0"
 
 dependencies {
+    testImplementation("org.jetbrains.kotlin:kotlin-test")
     implementation(libs.mcp.kotlin.sdk.server)
     implementation("io.ktor:ktor-server-core:3.2.3")
     implementation("io.ktor:ktor-server-netty:3.2.3")

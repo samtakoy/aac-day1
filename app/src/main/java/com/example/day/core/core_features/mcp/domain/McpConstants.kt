@@ -20,6 +20,11 @@ object McpToolNames {
     const val GET_GIT_FILE_LIST = "get_git_file_list"
     const val GET_FILE_CONTENT = "get_file_content"
     const val RESET_GIT_FILE_LIST_CACHE = "reset_git_file_list_cache"
+    // Day 34: Local file tools
+    const val READ_LOCAL_FILE = "read_local_file"
+    const val WRITE_LOCAL_FILE = "write_local_file"
+    const val LIST_LOCAL_FILES = "list_local_files"
+    const val SEARCH_LOCAL_FILES = "search_local_files"
 
     // TODO это как тут оказалось? это инструменты сервера, мы не должны их хардкодить
     val ALLOWED_TOOL_NAMES = setOf(
@@ -32,6 +37,10 @@ object McpToolNames {
         "get_pr_diff",
         "get_pr_file_diff",
         "add_pr_review_comment",
+        READ_LOCAL_FILE,
+        WRITE_LOCAL_FILE,
+        LIST_LOCAL_FILES,
+        SEARCH_LOCAL_FILES,
         "get_crm_user_by_chat",
         "create_crm_user",
         "get_crm_user_tickets",

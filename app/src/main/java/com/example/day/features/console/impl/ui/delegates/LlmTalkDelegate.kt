@@ -1,5 +1,6 @@
 package com.example.day.features.console.impl.ui.delegates
 
+import android.util.Log
 import com.example.day.core.core_features.agent.domain.model.AContextMessage
 import com.example.day.core.core_features.chat.domain.model.Chat
 import com.example.day.core.core_features.chat.domain.model.ChatMessage
@@ -12,6 +13,7 @@ import com.example.day.core.core_features.chat.domain.usecase.GetChatMessagesWit
 import com.example.day.core.core_features.llm.domain.LlmRequestUseCase
 import com.example.day.core.core_features.llm.domain.model.ModelRequest
 import com.example.day.core.core_features.llm.domain.model.getContent
+import com.example.day.core.core_features.llm.domain.model.getReasoning
 import javax.inject.Inject
 
 /** Ведет простой диалог с Llm.
@@ -49,6 +51,7 @@ internal class LlmTalkDelegate @Inject constructor(
                     ChatMessageStatus.Viewed,
                     Type.Bot
                 )
+
                 onSuccess()
             }
             .getOrThrow()

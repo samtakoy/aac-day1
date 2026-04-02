@@ -15,4 +15,6 @@ enum class MemoryType(val dbName: String) {
     AgentRules("agent_rules"),
     /** Автоматическое обогащение промпта через RAG-сервер */
     AutoRag("auto_rag"),
+    /** Инструкция агенту о вызове внешних инструментов */
+    ToolCallHelper("tool_call_helper"),
 }
