@@ -81,7 +81,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
             }
 
             lastLlmResult = llmResult
-            Log.e("[ORCH]", "reasoning: " + llmResult.getReasoning().orEmpty() + "\n")
+            Log.e("[ORCH][Reasoning]", "reasoning: " + llmResult.getReasoning().orEmpty() + "\n")
             val choice = llmResult.choices.firstOrNull()
             val toolCalls = choice?.message?.toolCalls
 
@@ -108,7 +108,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
                 role = ModelRequest.Role.Assistant,
                 content = choice.message.content.orEmpty(),
                 toolCalls = toolCalls.map { call ->
-                    Log.e("[ORCH]", "tool call, type: ${call.type}, function: ${call.function.name}, args: ${call.function.arguments}  \n")
+                    Log.e("[ORCH][ToolCall]", "tool call, type: ${call.type}, function: ${call.function.name}, args: ${call.function.arguments}  \n")
                     ModelRequest.ToolCall(
                         id = call.id,
                         type = call.type,
@@ -152,7 +152,7 @@ class ToolCallOrchestratorImpl @Inject constructor(
                         toolCallId = call.id  // КРИТИЧНО: tool_call_id
                     )
                 )
-                Log.e("[ORCH]", "tool call result: $content  \n")
+                Log.e("[ORCH][ToolCall]", "tool call result: $content  \n")
                 toolResults.add(
                     ToolResult(
                         toolCallId = call.id,

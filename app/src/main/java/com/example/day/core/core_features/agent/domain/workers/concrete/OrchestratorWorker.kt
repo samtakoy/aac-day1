@@ -44,12 +44,13 @@ class OrchestratorWorker @Inject constructor(
     // endregion
 
     companion object {
-        private const val TAG = "[ORCH]"
+        private const val TAG = "[ORCH][Only]"
 
         const val AGENT_NAME = "orchestrator_agent"
         const val TASK_PREFIX = "@@task"
         private const val WORKER_AGENT_NAME = "orchestrator_worker"
         private const val VERIFIER_AGENT_NAME = "orchestrator_verifier"
+        private const val SYNTHESIZER_AGENT_NAME = "orchestrator_synthesizer"
 
         const val isVerifyOn = true
 
@@ -81,6 +82,16 @@ class OrchestratorWorker @Inject constructor(
 [SUBTASKS_START]
 Подзадача 2: Из списка в Подзадаче 1 выбери... Ожидаемый результат: список из 3 строк.
 [SUBTASKS_END]
+        """.trimIndent()
+
+        private val SYNTHESIZE_SYSTEM_PROMPT = """
+Ты финальный верификатор пайплайна.
+Тебе переданы описание задачи и результаты всех подзадач.
+
+Твоя цель — сформировать итоговый ответ пользователю:
+- Если задача запрашивала данные или информацию — верни их в удобном виде согласно условиям задачи.
+- Если задача предполагала выполнение действий — подтверди что все шаги выполнены и кратко резюмируй результат.
+- Если какой-то шаг вернул пустой или некорректный результат — сообщи об этом явно.
         """.trimIndent()
 
         private val VERIFY_SYSTEM_PROMPT = """
@@ -155,7 +166,7 @@ class OrchestratorWorker @Inject constructor(
                         when (val verify = verifyStep(step, outcome.result, chat, onEvent)) {
                             is VerifyOutcome.Ok -> outcome.result
                             is VerifyOutcome.Fail -> {
-                                chatTools.addInfoMessage(chat.id, "❌ Верификация подзадачи ${step.index + 1}: ${verify.reason}")
+                                chatTools.addBotMessage(chat.id, "❌ Верификация подзадачи ${step.index + 1}: ${verify.reason}")
                                 return
                             }
                             is VerifyOutcome.Retry -> {
@@ -178,7 +189,8 @@ class OrchestratorWorker @Inject constructor(
             }
         }
 
-        chatTools.addBotMessage(chat.id, "✅ Ok")
+        // Phase 3: синтез
+        synthesize(cleanPrompt, orchestratorResults, results, chat, onEvent)
     }
 
     // endregion
@@ -256,6 +268,35 @@ class OrchestratorWorker @Inject constructor(
 
     // endregion
 
+    // region — Phase 3: Synthesizer
+
+    private suspend fun synthesize(
+        cleanPrompt: String,
+        orchestratorData: OrchestratorParsedResult,
+        results: List<SubTaskResult>,
+        chat: Chat,
+        onEvent: (suspend (WorkerEvent) -> Unit)?
+    ) {
+        val config = JustWorkConfig(
+            agentName = "${SYNTHESIZER_AGENT_NAME}_${chat.id}",
+            chatId = chat.id,
+            systemPrompt = SYNTHESIZE_SYSTEM_PROMPT,
+            allowedTools = emptyList(),
+            defaultModel = { chat.settings.model },
+            defaultContext = { AContextDefaultFactory.createFull() },
+            recreateAgent = true,
+            memoryTypes = emptyList(),
+        )
+
+        justWorkWorker.doWork(config, buildSynthesizerUserPrompt(cleanPrompt, orchestratorData, results), onEvent = onEvent)
+            .fold(
+                onSuccess = { text -> chatTools.addBotMessage(chat.id, text) },
+                onFailure = { chatTools.addBotMessage(chat.id, "✅ Что-то пошло не так при формировании отчета: ${it.stackTraceToString()}") }
+            )
+    }
+
+    // endregion
+
     // region — Phase 2: Verifier
 
     private suspend fun verifyStep(
@@ -328,6 +369,22 @@ class OrchestratorWorker @Inject constructor(
         }
         appendLine("Твоя текущая задача (подзадача ${currentIndex + 1}):")
         append(subtasks[currentIndex])
+    }
+
+    private fun buildSynthesizerUserPrompt(
+        cleanPrompt: String,
+        orchestratorData: OrchestratorParsedResult,
+        results: List<SubTaskResult>,
+    ): String = buildString {
+        appendLine("Задача:")
+        appendLine(orchestratorData.taskDescription ?: cleanPrompt)
+        appendLine()
+        appendLine("Результаты подзадач:")
+        results.forEach { r ->
+            appendLine()
+            appendLine("Подзадача ${r.index}: ${r.subtask}")
+            appendLine("Результат: ${r.result}")
+        }
     }
 
     private fun buildVerifierSystemPrompt(step: PipelineStep): String = buildString {
