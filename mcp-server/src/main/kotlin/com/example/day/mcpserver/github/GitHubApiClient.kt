@@ -170,12 +170,13 @@ class GitHubApiClient(
      * Скачивает содержимое файла по полному пути.
      * GitHub возвращает содержимое в base64, метод декодирует его.
      */
-    suspend fun getFileContent(filePath: String): Result<String> = runCatching {
+    suspend fun getFileContent(filePath: String, branch: String? = null): Result<String> = runCatching {
         val (resolvedOwner, resolvedRepo) = resolveRepo(null, null)
         val cleanPath = filePath.trimStart('/')
+        val refSuffix = branch?.takeIf { it.isNotBlank() }?.let { "?ref=$it" } ?: ""
 
         val response = client.get(
-            "/repos/$resolvedOwner/$resolvedRepo/contents/$cleanPath"
+            "/repos/$resolvedOwner/$resolvedRepo/contents/$cleanPath$refSuffix"
         ).body<JsonObject>()
 
         val contentBase64 = response["content"]?.jsonPrimitive?.content
