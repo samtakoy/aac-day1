@@ -28,6 +28,7 @@ class OrchestratorWorker @Inject constructor(
         val subtask: String,
         val systemPrompt: String,
         val userPrompt: String,
+        val dependsOn: List<Int>?,  // null = legacy (все предыдущие), [] = независимый, [1,2] = только эти
     )
 
     private sealed interface StepOutcome {
@@ -53,6 +54,7 @@ class OrchestratorWorker @Inject constructor(
         private const val SYNTHESIZER_AGENT_NAME = "orchestrator_synthesizer"
 
         const val isVerifyOn = true
+        const val isDependsOnEnabled = true
         private const val MAX_RESULT_IN_CONTEXT = 3000
 
         private val SYSTEM_PROMPT = """
@@ -71,19 +73,24 @@ class OrchestratorWorker @Inject constructor(
 9. Если для выполнения подзадачи нужен инструмент — укажи его имя явно в тексте подзадачи.
 10. Если шаг читает данные только чтобы передать их следующему шагу — объедини чтение и обработку в один шаг. Промежуточные сырые данные (содержимое файлов и т.п.) не должны быть результатом отдельного шага.
 11. При поиске информации по нескольким файлам используй search_local_files — он возвращает только совпадающие строки без полного содержимого файла. read_local_file используй только когда нужно полное содержимое конкретного известного небольшого файла. Если нужно найти несколько связанных паттернов (например, маркеры дней и имена инструментов рядом с ними) — делай несколько вызовов search_local_files с разными паттернами, а не читай файлы целиком. Никогда не поручай одному шагу "для каждого из N результатов прочитай файл" — это приведёт к взрыву контекста.
+12. Для нахождения файла по имени используй list_local_files с паттерном (например, "*MemoryProviderFactory*" или "**/*Factory*.kt"), а не search_local_files. search_local_files ищет по содержимому строк внутри файлов, а не по именам файлов.
+13. В начале каждой подзадачи ОБЯЗАТЕЛЬНО указывай строку depends_on: [номера шагов] — список шагов (1-based), результаты которых нужны этому шагу. Исполнитель получит ТОЛЬКО результаты указанных шагов. Примеры: depends_on: [] — шаг независим; depends_on: [1] — нужен результат шага 1; depends_on: [1, 3] — нужны результаты шагов 1 и 3.
 
 # ТРЕБОВАНИЯ К ФОРМАТУ:
 - Запрещено добавлять любой текст (приветствия, пояснения) до тега [TASK_START] или после последнего тега [SUBTASKS_END].
 - Каждая подзадача ДОЛЖНА быть обернута в отдельный блок [SUBTASKS_START] / [SUBTASKS_END].
+- Первая строка каждой подзадачи — depends_on: [...]. Текст задачи начинается со следующей строки.
 
 # ПРИМЕР ЭТАЛОННОГО ОТВЕТА:
 [TASK_START]
 Описание решения: сначала найдем файлы, затем отберем нужные и прочитаем их.
 [TASK_END]
 [SUBTASKS_START]
+depends_on: []
 Подзадача 1: Найди файлы... Ожидаемый результат: список путей.
 [SUBTASKS_END]
 [SUBTASKS_START]
+depends_on: [1]
 Подзадача 2: Из списка в Подзадаче 1 выбери... Ожидаемый результат: список из 3 строк.
 [SUBTASKS_END]
         """.trimIndent()
@@ -105,7 +112,8 @@ class OrchestratorWorker @Inject constructor(
 Твоя задача — оценить, выполнена ли текущая подзадача корректно. Предыдущие шаги не оценивай.
 
 Если результат пустой из-за неверного паттерна/параметра инструмента, а не из-за логической ошибки — предпочитай [RETRY] с исправленным параметром.
-Если данные корректны, но нарушен только формат (лишние поля, неверный порядок, неверное обёртывание) — предпочитай [RETRY] с инструкцией исправить формат, а не [FAIL].
+Если данные корректны, но нарушен только формат (лишние поля, вводный текст, неверный порядок, markdown-обёртка) — ОБЯЗАТЕЛЬНО [RETRY] с инструкцией исправить формат, а не [FAIL]. Пример: исполнитель нашёл правильные данные, но добавил вводное предложение перед ответом — это [RETRY], не [FAIL].
+[FAIL] только когда данные объективно неверны или задача невыполнима: инструмент вернул ошибку, файл не существует, логика ответа неправильна.
 
 Отвечай ТОЛЬКО одной из трёх форм — никакого другого текста:
 
@@ -140,7 +148,7 @@ class OrchestratorWorker @Inject constructor(
         }
 
         orchestratorResults.taskDescription?.let { chatTools.addInfoMessage(chat.id, it) }
-        orchestratorResults.subtasks.forEach { chatTools.addInfoMessage(chat.id, it) }
+        orchestratorResults.subtasks.forEach { chatTools.addInfoMessage(chat.id, it.text) }
 
         if (orchestratorResults.subtasks.isEmpty()) {
             chatTools.addBotMessage(chat.id, "Не получилось создать подзаадачи")
@@ -150,11 +158,11 @@ class OrchestratorWorker @Inject constructor(
         // Phase 2: пайплайн воркеров
         val results = mutableListOf<SubTaskResult>()
 
-        for ((index, subtask) in orchestratorResults.subtasks.withIndex()) {
+        for ((index, subtaskDef) in orchestratorResults.subtasks.withIndex()) {
             val step = buildStep(
                 index = index,
                 total = orchestratorResults.subtasks.size,
-                subtask = subtask,
+                subtaskDef = subtaskDef,
                 orchestratorData = orchestratorResults,
                 previousResults = results
             )
@@ -232,16 +240,32 @@ class OrchestratorWorker @Inject constructor(
     private fun buildStep(
         index: Int,
         total: Int,
-        subtask: String,
+        subtaskDef: SubtaskDef,
         orchestratorData: OrchestratorParsedResult,
         previousResults: List<SubTaskResult>,
-    ): PipelineStep = PipelineStep(
-        index = index,
-        total = total,
-        subtask = subtask,
-        systemPrompt = buildWorkerSystemPrompt(orchestratorData, index),
-        userPrompt = buildWorkerUserPrompt(orchestratorData.subtasks, previousResults, index),
-    )
+    ): PipelineStep {
+        val relevantResults = selectRelevantResults(previousResults, subtaskDef.dependsOn)
+        return PipelineStep(
+            index = index,
+            total = total,
+            subtask = subtaskDef.text,
+            systemPrompt = buildWorkerSystemPrompt(orchestratorData, index),
+            userPrompt = buildWorkerUserPrompt(orchestratorData.subtasks.map { it.text }, relevantResults, index),
+            dependsOn = subtaskDef.dependsOn,
+        )
+    }
+
+    private fun selectRelevantResults(
+        previousResults: List<SubTaskResult>,
+        dependsOn: List<Int>?,
+    ): List<SubTaskResult> = when {
+        !isDependsOnEnabled -> previousResults
+        dependsOn == null -> previousResults           // depends_on не указан → все предыдущие (backward compat)
+        dependsOn.isEmpty() -> emptyList()             // depends_on: [] → независимый шаг
+        else -> dependsOn.mapNotNull { depIdx ->       // depends_on: [1, 3] → только нужные
+            previousResults.find { it.index == depIdx }
+        }
+    }
 
     private suspend fun executeStep(
         step: PipelineStep,
@@ -352,7 +376,7 @@ class OrchestratorWorker @Inject constructor(
         }
         appendLine("Ты работаешь как часть пайплайна из ${parsed.subtasks.size} шагов:")
         parsed.subtasks.forEachIndexed { i, subtask ->
-            appendLine("${i + 1}. $subtask")
+            appendLine("${i + 1}. ${subtask.text}")
         }
         appendLine()
         append("Выполняй только свою подзадачу (${currentIndex + 1}). Результаты предыдущих шагов переданы в запросе.")
