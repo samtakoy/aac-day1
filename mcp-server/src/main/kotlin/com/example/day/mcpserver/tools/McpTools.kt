@@ -634,6 +634,7 @@ private fun registerListLocalFiles(server: Server, projectPath: String) {
             }
             val root = File(projectPath)
             val allFiles = root.walk()
+                .onEnter { dir -> !dir.name.startsWith('.') && dir.name != "build" }
                 .filter { it.isFile }
                 .map { "/" + it.relativeTo(root).path.replace('\\', '/') }
                 .toList()
@@ -703,7 +704,10 @@ private fun registerSearchLocalFiles(server: Server, projectPath: String) {
             data class Match(val path: String, val line: Int, val text: String)
 
             val matches = mutableListOf<Match>()
-            root.walk().filter { it.isFile }.forEach { file ->
+            root.walk()
+                .onEnter { dir -> !dir.name.startsWith('.') && dir.name != "build" }
+                .filter { it.isFile }
+                .forEach { file ->
                 if (matches.size >= maxResults) return@forEach
                 val relativePath = "/" + file.relativeTo(root).path.replace('\\', '/')
                 if (globRegex != null && !globRegex.matches(relativePath.trimStart('/'))) return@forEach
